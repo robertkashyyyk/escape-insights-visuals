@@ -1,48 +1,71 @@
 
 
-# Plan: Future Pipeline (OTB) Dashboard
+# Plan: Revenue Pacing Dashboard
 
-## Overview
+## Problem
 
-New `/pipeline` route showing only future reservations (check-in >= today). KPI cards, a 6-month forward revenue bar chart, and a grouped upcoming check-ins table.
+The `reservations` table has no `reservation_date` column (the date the booking was *made*). Without it, we can't reconstruct the historical booking curve — i.e. "how much revenue was on the books for July 2025, as of 60 days before July 1st." The CSV that was imported earlier contained a "Reservation date" column, but it was not mapped during import.
 
-## 1. Data Hook: `src/hooks/useOTBData.ts`
+## Prerequisites
 
-- Queries `reservations` where `check_in >= today`, joined with `listings(name, city)`
-- Computes:
-  - **Total Confirmed Future Revenue**: sum of `total_amount`
-  - **Total Future Nights**: sum of nights (check_out - check_in) per reservation
-  - **Average Lead Time**: average days between today and check_in
-  - **Monthly buckets**: next 6 calendar months, revenue per month (for bar chart)
-  - **Upcoming 14 days**: reservations with check_in within next 14 days, grouped by property name
-- Returns `{ totalRevenue, totalNights, avgLeadTime, monthlyData, upcomingByProperty, isLoading }`
+**Migration**: Add `reservation_date date` column to `reservations`. Then backfill from the original CSV data (or accept nulls for now and re-import later).
 
-## 2. Page: `src/pages/FuturePipeline.tsx`
+**Key question**: Do you still have the CSV, or should we just add the column now and backfill later? Without `reservation_date` populated, the pacing comparison won't have historical data to work with. We could use `created_at` as a rough proxy if the CSV data was imported close to the actual reservation dates, but that would be inaccurate.
 
-**Header**: "Future Pipeline (OTB)" title + subtitle
+## Implementation
 
-**3 KPI Cards** (row):
-- Total Confirmed Future Revenue (DollarSign icon)
-- Total Future Nights Booked (CalendarDays icon)
-- Average Lead Time (Clock icon)
+### 1. Database Migration
 
-**Bar Chart**: Recharts `BarChart` — X-axis: next 6 months, Y-axis: confirmed revenue. Glassmorphic card wrapper, custom tooltip with GBP formatting. Uses the same styling patterns as existing charts.
+- Add `reservation_date date` column to `reservations` (nullable)
 
-**Upcoming Check-ins Table**: Glassmorphic card with shadcn `Table`. Grouped by property name (property name as a spanning header row). Columns: Guest Name, Check-in, Check-out, Nights, Revenue. Only shows next 14 days.
+### 2. Backfill (one-time script)
 
-**Loading**: Skeletons on KPIs and chart while fetching.
+- Re-read the original CSV, match reservations by `(listing_id, check_in, guest_name)`, and update `reservation_date` for each row
 
-## 3. Route & Nav
+### 3. Hook: `src/hooks/useRevenuePacing.ts`
 
-- `src/App.tsx`: Add `/pipeline` route with `ProtectedRoute` (all roles)
-- `src/components/layout/AppSidebar.tsx`: Add "Future Pipeline" nav item with `Telescope` icon, after Reservations
+Accepts `targetMonth: Date` (e.g. August 2025)
+
+Logic:
+- Calculate `daysUntilStart = differenceInDays(startOfMonth(targetMonth), today)`
+- **Current year**: Query reservations where `check_in` falls in `targetMonth` — these are already booked. Sum `total_amount` → `currentRevenue`
+- **Previous year**: Query reservations where `check_in` falls in the *same month last year* AND `reservation_date <= (startOfSameMonthLastYear - daysUntilStart)` — i.e. bookings that were on the books at the same lead time. Sum `total_amount` → `historicalRevenue`
+- Compute `pacingPct = (currentRevenue / historicalRevenue) * 100`
+- Also compute the final historical total for that month (all reservations, regardless of reservation_date) → `historicalFinalRevenue`
+- Returns `{ currentRevenue, historicalRevenue, historicalFinalRevenue, pacingPct, daysUntilStart }`
+
+### 4. Page: `src/pages/RevenuePacing.tsx`
+
+**Header**: "Revenue Pacing" title
+
+**Month Selector**: Dropdown of the next 6 months (e.g. Apr 2026 – Sep 2026)
+
+**Pacing Gauge**: A visual arc/gauge component showing:
+- Current booked revenue vs historical at same point
+- Green fill + "Ahead" label if pacing > 100%
+- Red fill + "Behind" label if pacing < 100%
+- Percentage displayed prominently
+
+**KPI row** (3 cards):
+- Current Booked Revenue (for selected month)
+- Same Point Last Year
+- Final Revenue Last Year (what the month ultimately achieved)
+
+**Progress bar**: Visual bar showing current revenue as % of last year's final, with a marker showing where last year was at this same lead time
+
+### 5. Route & Nav
+
+- `/pacing` route in `App.tsx` (all roles)
+- "Revenue Pacing" nav item in sidebar after "Future Pipeline" with `Gauge` icon
 
 ## File Summary
 
 | File | Action |
 |------|--------|
-| `src/hooks/useOTBData.ts` | New — future reservations aggregation |
-| `src/pages/FuturePipeline.tsx` | New — KPIs, bar chart, grouped table |
-| `src/App.tsx` | Add `/pipeline` route |
+| Database migration | Add `reservation_date` column |
+| One-time backfill | Update existing rows from CSV |
+| `src/hooks/useRevenuePacing.ts` | New — pacing comparison logic |
+| `src/pages/RevenuePacing.tsx` | New — month selector + gauge + KPIs |
+| `src/App.tsx` | Add `/pacing` route |
 | `src/components/layout/AppSidebar.tsx` | Add nav item |
 
