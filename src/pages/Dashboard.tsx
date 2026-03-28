@@ -1,10 +1,20 @@
+import { useState } from "react";
 import { DollarSign, Calendar, TrendingUp, Moon, Hash } from "lucide-react";
+import { startOfYear, endOfYear } from "date-fns";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { TopProperties } from "@/components/dashboard/TopProperties";
 import { DateFilter } from "@/components/dashboard/DateFilter";
+import { useDashboardData, type PeriodType } from "@/hooks/useDashboardData";
 
 export default function Dashboard() {
+  const now = new Date();
+  const [dateRange, setDateRange] = useState({ from: startOfYear(now), to: endOfYear(now) });
+  const [periodType, setPeriodType] = useState<PeriodType>("Year");
+
+  const { data, isLoading } = useDashboardData(dateRange, periodType);
+  const kpis = data?.kpis;
+
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -16,40 +26,42 @@ export default function Dashboard() {
             Performance overview across your portfolio
           </p>
         </div>
-        <DateFilter />
+        <DateFilter
+          dateRange={dateRange}
+          periodType={periodType}
+          onDateRangeChange={setDateRange}
+          onPeriodTypeChange={setPeriodType}
+        />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <KpiCard
           title="Total Revenue"
-          value="£451,100"
-          subtitle="All properties, 2025"
-          change={{ value: "12.4%", positive: true }}
+          value={isLoading ? "..." : `£${(kpis?.totalRevenue ?? 0).toLocaleString()}`}
+          subtitle="All properties"
           icon={DollarSign}
           accentColor="primary"
           delay={0}
         />
         <KpiCard
           title="Avg Occupancy"
-          value="73%"
-          subtitle="Across 18 listings"
-          change={{ value: "3.2%", positive: true }}
+          value={isLoading ? "..." : `${kpis?.avgOccupancy ?? 0}%`}
+          subtitle="Active listings"
           icon={TrendingUp}
           accentColor="accent"
           delay={60}
         />
         <KpiCard
           title="Avg Daily Rate"
-          value="£142"
-          subtitle="Per night, all properties"
-          change={{ value: "£8", positive: true }}
+          value={isLoading ? "..." : `£${kpis?.avgDailyRate ?? 0}`}
+          subtitle="Per night"
           icon={Moon}
           accentColor="chart-5"
           delay={120}
         />
         <KpiCard
           title="Nights Booked"
-          value="3,176"
+          value={isLoading ? "..." : (kpis?.nightsBooked ?? 0).toLocaleString()}
           subtitle="Total across portfolio"
           icon={Calendar}
           accentColor="chart-3"
@@ -57,9 +69,8 @@ export default function Dashboard() {
         />
         <KpiCard
           title="Reservations"
-          value="847"
+          value={isLoading ? "..." : (kpis?.reservationsCount ?? 0).toLocaleString()}
           subtitle="Total bookings"
-          change={{ value: "8.1%", positive: true }}
           icon={Hash}
           accentColor="chart-4"
           delay={240}
@@ -68,10 +79,10 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <div className="lg:col-span-3">
-          <RevenueChart />
+          <RevenueChart data={data?.chartData ?? []} isLoading={isLoading} />
         </div>
         <div className="lg:col-span-2">
-          <TopProperties />
+          <TopProperties properties={data?.topProperties ?? []} isLoading={isLoading} />
         </div>
       </div>
     </div>
