@@ -18,6 +18,7 @@ type AppRole = "super" | "senior" | "admin" | "client";
 
 const allNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, roles: ["super", "senior", "admin", "client"] as AppRole[] },
+  { title: "YoY Performance", url: "/yoy", icon: TrendingUp, roles: ["super", "senior", "admin", "client"] as AppRole[] },
   { title: "Reservations", url: "/reservations", icon: CalendarDays, roles: ["super", "senior", "admin", "client"] as AppRole[] },
   { title: "Properties", url: "/properties", icon: Building2, roles: ["super", "senior", "admin", "client"] as AppRole[] },
   { title: "Owner Portfolios", url: "/owners", icon: Users, roles: ["super", "senior"] as AppRole[] },
