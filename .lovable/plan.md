@@ -1,55 +1,45 @@
 
 
-# Plan: Owner Portfolios — List/View Toggle + Portfolio Dashboard
+# Plan: Occupancy Heatmap Page
 
 ## Overview
 
-Add a List/View toggle to the Owners page. List = current table. View = card grid with clickable owner cards that open a detailed portfolio dashboard.
+New `/heatmap` route showing a visual matrix — properties on Y-axis, months on X-axis, cells colored by occupancy percentage. Year toggle at top.
 
-## 1. Owners Page Toggle
+## 1. Data Hook: `src/hooks/useOccupancyHeatmap.ts`
 
-**`src/pages/Owners.tsx`** — Add state for `viewMode: "list" | "view"` with a toggle in the header row (using the same button toggle pattern from YoY). Render `OwnersTable` in list mode, new `OwnersCardGrid` in view mode. Both share the same Add Owner button.
+- Accepts `year: number`
+- Queries all `listings` (id, name) and `reservations` for that year
+- For each listing × month, calculates: `nights / days_in_month × 100`
+- Returns `{ listings: { id, name, months: number[] }[] }` — 12 values per listing
 
-## 2. Owner Card Grid
+## 2. Page: `src/pages/OccupancyHeatmap.tsx`
 
-**`src/components/owners/OwnersCardGrid.tsx`** — New component:
+**Header:** Title + year selector (ChevronLeft / year / ChevronRight)
 
-- Queries `property_owners` + counts listings per owner (same as OwnersTable)
-- Renders responsive grid (1/2/3 cols) of glassmorphic cards
-- Each card shows: owner name, company, number of active listings
-- Click opens the portfolio dashboard (inline expansion or dedicated sub-view)
+**Heatmap grid:**
+- Left column: property names (sticky)
+- 12 month columns (Jan–Dec)
+- Each cell shows occupancy % as text, with dynamic background:
+  - `< 40%` → red/warning tint (`bg-red-500/20` to `bg-red-500/40`)
+  - `40–75%` → amber/neutral tint (`bg-amber-500/20` to `bg-amber-500/30`)
+  - `> 75%` → green/accent tint (`bg-emerald-500/30` to `bg-emerald-500/50`)
+- Smooth color interpolation using inline `rgba` styles based on exact value
+- Horizontally scrollable on mobile with sticky property name column
 
-## 3. Owner Portfolio Dashboard
+**Loading:** Skeleton rows while data fetches
 
-**`src/components/owners/OwnerPortfolio.tsx`** — New component shown when an owner card is clicked (replaces the grid, with a back button):
+## 3. Route & Nav
 
-- **Data**: Queries `reservations` joined with `listings` where `listings.owner_id = selectedOwner.id`, filtered to current year
-- **KPI Cards** (3 across top):
-  - **Total Portfolio Revenue**: sum of `total_amount`
-  - **Avg Portfolio Occupancy**: total nights / (listings count × 365) × 100
-  - **Blended ADR**: total revenue / total nights
-- **Monthly Revenue Bar Chart**: Same Recharts `BarChart` pattern as dashboard, grouped by month for current year
-- **Property Breakdown Table**: Each listing's name, revenue contribution, nights, ADR — sorted by revenue descending. Shows percentage of total portfolio revenue.
-
-## 4. Hook
-
-**`src/hooks/useOwnerPortfolio.ts`** — Accepts `ownerId` and `year`, queries reservations + listings, computes all KPIs, monthly chart buckets, and per-property breakdown. Uses `react-query`.
+- `src/App.tsx`: Add `/heatmap` route with `ProtectedRoute` (all roles)
+- `src/components/layout/AppSidebar.tsx`: Add "Occupancy Heatmap" after "YoY Performance" with `Grid3X3` icon
 
 ## File Summary
 
 | File | Action |
 |------|--------|
-| `src/pages/Owners.tsx` | Add List/View toggle state, conditionally render table or cards |
-| `src/components/owners/OwnersCardGrid.tsx` | New — card grid with listing counts |
-| `src/components/owners/OwnerPortfolio.tsx` | New — portfolio dashboard with KPIs, chart, breakdown |
-| `src/hooks/useOwnerPortfolio.ts` | New — data hook for portfolio metrics |
-
-## Design
-
-- Toggle uses the same rounded border button group as YoY period selector
-- Cards use `glass-card-hover` class, show owner initials avatar, name, company, listing count badge
-- Portfolio dashboard uses existing `KpiCard` component for the 3 KPIs
-- Revenue chart reuses the same Recharts pattern from `RevenueChart.tsx`
-- Property breakdown uses shadcn `Table` with progress bars showing % contribution
-- Back arrow button to return from portfolio to card grid
+| `src/hooks/useOccupancyHeatmap.ts` | New — query + aggregate occupancy by listing × month |
+| `src/pages/OccupancyHeatmap.tsx` | New — heatmap page with year toggle |
+| `src/App.tsx` | Add `/heatmap` route |
+| `src/components/layout/AppSidebar.tsx` | Add nav item after YoY |
 
