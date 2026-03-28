@@ -92,16 +92,8 @@ export default function Auth() {
 
       <div className="w-full max-w-md relative z-10">
         {/* Logo */}
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center">
-            <span className="text-primary font-bold text-lg" style={{ fontFamily: "Outfit, sans-serif" }}>E</span>
-          </div>
-          <div>
-            <h1 className="font-bold text-xl text-foreground tracking-tight" style={{ fontFamily: "Outfit, sans-serif" }}>
-              Escape Grids
-            </h1>
-            <p className="text-[10px] text-muted-foreground tracking-wider uppercase font-medium">Analytics</p>
-          </div>
+        <div className="flex justify-center mb-8">
+          <img src="/images/eg_logo_full.png" alt="Escape Grids" className="h-12 object-contain" />
         </div>
 
         <Card className="border-border/30 bg-card/50 backdrop-blur-xl shadow-2xl">
