@@ -23,7 +23,12 @@ export default function FuturePipeline() {
   const { data, isLoading } = useOTBData();
 
   return (
-    <AppLayout title="Future Pipeline (OTB)" subtitle="Confirmed bookings with future check-in dates">
+    <AppLayout>
+      <div className="p-6 space-y-6">
+        <div>
+          <h1 className="text-2xl font-display font-bold text-foreground tracking-tight">Future Pipeline (OTB)</h1>
+          <p className="text-sm text-muted-foreground mt-1">Confirmed bookings with future check-in dates</p>
+        </div>
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {isLoading ? (
