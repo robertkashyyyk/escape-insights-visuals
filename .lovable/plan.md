@@ -1,45 +1,48 @@
 
 
-# Plan: Management Revenue Dashboard
+# Plan: Future Pipeline (OTB) Dashboard
 
 ## Overview
 
-New `/management` route showing agency revenue — calculated as each reservation's `total_amount × owner.management_rate_pct / 100`. Includes a YTD KPI card, monthly line chart, and top 10 most profitable properties for the agency.
+New `/pipeline` route showing only future reservations (check-in >= today). KPI cards, a 6-month forward revenue bar chart, and a grouped upcoming check-ins table.
 
-## 1. Data Hook: `src/hooks/useAgencyRevenue.ts`
+## 1. Data Hook: `src/hooks/useOTBData.ts`
 
-- Queries `reservations` with `listings(name, city, location_group, owner_id)` for current year
-- Queries `property_owners` to get `management_rate_pct` per owner
-- For each reservation: `agencyRevenue = total_amount × (management_rate_pct / 100)`
+- Queries `reservations` where `check_in >= today`, joined with `listings(name, city)`
 - Computes:
-  - **Total Agency Revenue YTD**: sum of all agency revenue
-  - **Monthly buckets**: 12 months, agency revenue per month (for line chart)
-  - **Top 10 properties**: grouped by listing, sorted by agency revenue descending
-- Returns `{ totalYTD, monthlyData, topProperties, isLoading }`
+  - **Total Confirmed Future Revenue**: sum of `total_amount`
+  - **Total Future Nights**: sum of nights (check_out - check_in) per reservation
+  - **Average Lead Time**: average days between today and check_in
+  - **Monthly buckets**: next 6 calendar months, revenue per month (for bar chart)
+  - **Upcoming 14 days**: reservations with check_in within next 14 days, grouped by property name
+- Returns `{ totalRevenue, totalNights, avgLeadTime, monthlyData, upcomingByProperty, isLoading }`
 
-## 2. Page: `src/pages/ManagementRevenue.tsx`
+## 2. Page: `src/pages/FuturePipeline.tsx`
 
-**Header**: "Management Revenue" title
+**Header**: "Future Pipeline (OTB)" title + subtitle
 
-**Large KPI card**: Total Agency Revenue YTD — uses `KpiCard` component with `DollarSign` icon, prominent styling
+**3 KPI Cards** (row):
+- Total Confirmed Future Revenue (DollarSign icon)
+- Total Future Nights Booked (CalendarDays icon)
+- Average Lead Time (Clock icon)
 
-**Line chart**: Recharts `LineChart` (not bar — differentiates from the main dashboard) showing agency revenue month-by-month. Glassmorphic card wrapper. Custom tooltip with £ formatting.
+**Bar Chart**: Recharts `BarChart` — X-axis: next 6 months, Y-axis: confirmed revenue. Glassmorphic card wrapper, custom tooltip with GBP formatting. Uses the same styling patterns as existing charts.
 
-**Top 10 table**: Glassmorphic card with shadcn `Table` — columns: Property Name, Location, Total Revenue, Agency Revenue, Management %. Sorted by agency revenue descending.
+**Upcoming Check-ins Table**: Glassmorphic card with shadcn `Table`. Grouped by property name (property name as a spanning header row). Columns: Guest Name, Check-in, Check-out, Nights, Revenue. Only shows next 14 days.
 
-**Loading**: Skeletons while data fetches.
+**Loading**: Skeletons on KPIs and chart while fetching.
 
 ## 3. Route & Nav
 
-- `src/App.tsx`: Add `/management` route with `ProtectedRoute` restricted to `super` and `senior` roles
-- `src/components/layout/AppSidebar.tsx`: Add "Management Revenue" nav item with `Briefcase` icon, visible to `super` and `senior` only, positioned after Upload Data
+- `src/App.tsx`: Add `/pipeline` route with `ProtectedRoute` (all roles)
+- `src/components/layout/AppSidebar.tsx`: Add "Future Pipeline" nav item with `Telescope` icon, after Reservations
 
 ## File Summary
 
 | File | Action |
 |------|--------|
-| `src/hooks/useAgencyRevenue.ts` | New — agency revenue aggregation |
-| `src/pages/ManagementRevenue.tsx` | New — KPI, line chart, top 10 table |
-| `src/App.tsx` | Add `/management` route |
+| `src/hooks/useOTBData.ts` | New — future reservations aggregation |
+| `src/pages/FuturePipeline.tsx` | New — KPIs, bar chart, grouped table |
+| `src/App.tsx` | Add `/pipeline` route |
 | `src/components/layout/AppSidebar.tsx` | Add nav item |
 
