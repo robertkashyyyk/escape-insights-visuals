@@ -1,54 +1,55 @@
 
 
-# Plan: YoY Performance Page
+# Plan: Owner Portfolios — List/View Toggle + Portfolio Dashboard
 
 ## Overview
 
-A new `/yoy` route showing a grid of property cards, each with Revenue, ADR, and Occupancy for a selected period — plus percentage change badges comparing the same period last year. Cards sorted by highest revenue growth.
+Add a List/View toggle to the Owners page. List = current table. View = card grid with clickable owner cards that open a detailed portfolio dashboard.
 
-## 1. New Hook: `src/hooks/useYoYData.ts`
+## 1. Owners Page Toggle
 
-Accepts `periodType` (Week / Month / Quarter) and `periodValue` (e.g. "Q1", "March", "W10") plus `year` (2026).
+**`src/pages/Owners.tsx`** — Add state for `viewMode: "list" | "view"` with a toggle in the header row (using the same button toggle pattern from YoY). Render `OwnersTable` in list mode, new `OwnersCardGrid` in view mode. Both share the same Add Owner button.
 
-- Computes two date ranges: current period and same period in `year - 1`
-- Queries `reservations` joined with `listings` for both ranges
-- Groups by listing, calculates per-property:
-  - **Revenue** (sum of `total_amount`)
-  - **ADR** (revenue / nights)
-  - **Occupancy** (nights / days-in-period × 100)
-- Computes YoY % change for each metric: `((current - previous) / previous) * 100`
-- Returns array sorted by revenue growth descending
-- Uses `react-query` with the period params as query key
+## 2. Owner Card Grid
 
-## 2. New Page: `src/pages/YoYPerformance.tsx`
+**`src/components/owners/OwnersCardGrid.tsx`** — New component:
 
-**Header row:**
-- Title "YoY Performance"
-- Period selector: toggle for Week / Month / Quarter
-- Sub-selector: dropdown (Q1–Q4, Jan–Dec, or W1–W52 depending on type)
-- Year selector with left/right arrows (same pattern as Dashboard)
+- Queries `property_owners` + counts listings per owner (same as OwnersTable)
+- Renders responsive grid (1/2/3 cols) of glassmorphic cards
+- Each card shows: owner name, company, number of active listings
+- Click opens the portfolio dashboard (inline expansion or dedicated sub-view)
 
-**Grid below:**
-- Responsive grid: 1 col mobile, 2 cols tablet, 3 cols desktop
-- Each card is a glassmorphic card showing:
-  - Property name + location
-  - Three metric rows: Revenue, ADR, Occupancy %
-  - Each metric has current value on left, YoY badge on right
-  - Badge: green text + `TrendingUp` icon for positive, red + `TrendingDown` for negative
-  - "N/A" badge if no prior year data exists
-- Loading skeleton cards while fetching
+## 3. Owner Portfolio Dashboard
 
-## 3. Routing & Nav
+**`src/components/owners/OwnerPortfolio.tsx`** — New component shown when an owner card is clicked (replaces the grid, with a back button):
 
-- `src/App.tsx`: Add `/yoy` route wrapped in `ProtectedRoute` (all roles)
-- `src/components/layout/AppSidebar.tsx`: Add "YoY Performance" nav item with `TrendingUp` icon, positioned after Dashboard, available to all roles
+- **Data**: Queries `reservations` joined with `listings` where `listings.owner_id = selectedOwner.id`, filtered to current year
+- **KPI Cards** (3 across top):
+  - **Total Portfolio Revenue**: sum of `total_amount`
+  - **Avg Portfolio Occupancy**: total nights / (listings count × 365) × 100
+  - **Blended ADR**: total revenue / total nights
+- **Monthly Revenue Bar Chart**: Same Recharts `BarChart` pattern as dashboard, grouped by month for current year
+- **Property Breakdown Table**: Each listing's name, revenue contribution, nights, ADR — sorted by revenue descending. Shows percentage of total portfolio revenue.
+
+## 4. Hook
+
+**`src/hooks/useOwnerPortfolio.ts`** — Accepts `ownerId` and `year`, queries reservations + listings, computes all KPIs, monthly chart buckets, and per-property breakdown. Uses `react-query`.
 
 ## File Summary
 
 | File | Action |
 |------|--------|
-| `src/hooks/useYoYData.ts` | New — queries both periods, computes metrics + % change |
-| `src/pages/YoYPerformance.tsx` | New — period selector + property cards grid |
-| `src/App.tsx` | Add `/yoy` route |
-| `src/components/layout/AppSidebar.tsx` | Add nav item |
+| `src/pages/Owners.tsx` | Add List/View toggle state, conditionally render table or cards |
+| `src/components/owners/OwnersCardGrid.tsx` | New — card grid with listing counts |
+| `src/components/owners/OwnerPortfolio.tsx` | New — portfolio dashboard with KPIs, chart, breakdown |
+| `src/hooks/useOwnerPortfolio.ts` | New — data hook for portfolio metrics |
+
+## Design
+
+- Toggle uses the same rounded border button group as YoY period selector
+- Cards use `glass-card-hover` class, show owner initials avatar, name, company, listing count badge
+- Portfolio dashboard uses existing `KpiCard` component for the 3 KPIs
+- Revenue chart reuses the same Recharts pattern from `RevenueChart.tsx`
+- Property breakdown uses shadcn `Table` with progress bars showing % contribution
+- Back arrow button to return from portfolio to card grid
 
