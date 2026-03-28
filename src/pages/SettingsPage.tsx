@@ -1,5 +1,6 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { InviteUserForm } from "@/components/settings/InviteUserForm";
+import { HostawayApiKeyForm } from "@/components/settings/HostawayApiKeyForm";
 
 export default function SettingsPage() {
   return (
@@ -9,8 +10,9 @@ export default function SettingsPage() {
           <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground tracking-tight">Settings</h2>
           <p className="text-sm text-muted-foreground mt-1">Manage your team and preferences</p>
         </div>
-        <div className="max-w-lg">
+        <div className="max-w-lg space-y-6">
           <InviteUserForm />
+          <HostawayApiKeyForm />
         </div>
       </div>
     </AppLayout>
