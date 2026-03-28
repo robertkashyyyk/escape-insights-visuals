@@ -98,7 +98,7 @@ export default function Auth() {
 
         <Card className="border-border/30 bg-card/50 backdrop-blur-xl shadow-2xl">
           <CardHeader className="text-center pb-4">
-            <CardTitle className="text-xl font-semibold text-foreground" style={{ fontFamily: "Outfit, sans-serif" }}>
+            <CardTitle className="text-xl font-semibold text-foreground font-display">
               Welcome back
             </CardTitle>
             <CardDescription className="text-muted-foreground">
@@ -172,7 +172,7 @@ export default function Auth() {
                     <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
                       <Mail className="h-7 w-7 text-primary" />
                     </div>
-                    <h3 className="text-foreground font-semibold text-lg" style={{ fontFamily: "Outfit, sans-serif" }}>
+                    <h3 className="text-foreground font-semibold text-lg font-display">
                       Check your inbox
                     </h3>
                     <p className="text-sm text-muted-foreground max-w-xs mx-auto">
