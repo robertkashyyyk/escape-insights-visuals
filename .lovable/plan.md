@@ -1,59 +1,54 @@
 
 
-# Plan: Import 2,471 Reservations from CSV
+# Plan: YoY Performance Page
 
-## What We Have
+## Overview
 
-- **CSV**: 2,471 reservations with Guest, Check-in, Check-out, Listing name, Listing ID (Hostaway), guest fees, tax, rental revenue, owner payout, nights
-- **Database**: 46 listings already loaded, each with `hostaway_listing_id` matching the CSV's `Listing ID` column
-- **Reservations table**: Currently empty — ready for import
+A new `/yoy` route showing a grid of property cards, each with Revenue, ADR, and Occupancy for a selected period — plus percentage change badges comparing the same period last year. Cards sorted by highest revenue growth.
 
-## Approach
+## 1. New Hook: `src/hooks/useYoYData.ts`
 
-Use an edge function to parse the CSV server-side, look up each `Listing ID` → `listings.id` via `hostaway_listing_id`, and batch-insert into `reservations`.
+Accepts `periodType` (Week / Month / Quarter) and `periodValue` (e.g. "Q1", "March", "W10") plus `year` (2026).
 
-## 1. Database Migration
+- Computes two date ranges: current period and same period in `year - 1`
+- Queries `reservations` joined with `listings` for both ranges
+- Groups by listing, calculates per-property:
+  - **Revenue** (sum of `total_amount`)
+  - **ADR** (revenue / nights)
+  - **Occupancy** (nights / days-in-period × 100)
+- Computes YoY % change for each metric: `((current - previous) / previous) * 100`
+- Returns array sorted by revenue growth descending
+- Uses `react-query` with the period params as query key
 
-Add two columns the CSV provides but the current schema lacks:
+## 2. New Page: `src/pages/YoYPerformance.tsx`
 
-```sql
-ALTER TABLE reservations ADD COLUMN owner_payout numeric;
-ALTER TABLE reservations ADD COLUMN guest_fees numeric;
-```
+**Header row:**
+- Title "YoY Performance"
+- Period selector: toggle for Week / Month / Quarter
+- Sub-selector: dropdown (Q1–Q4, Jan–Dec, or W1–W52 depending on type)
+- Year selector with left/right arrows (same pattern as Dashboard)
 
-These are useful for owner reporting later.
+**Grid below:**
+- Responsive grid: 1 col mobile, 2 cols tablet, 3 cols desktop
+- Each card is a glassmorphic card showing:
+  - Property name + location
+  - Three metric rows: Revenue, ADR, Occupancy %
+  - Each metric has current value on left, YoY badge on right
+  - Badge: green text + `TrendingUp` icon for positive, red + `TrendingDown` for negative
+  - "N/A" badge if no prior year data exists
+- Loading skeleton cards while fetching
 
-## 2. Edge Function: `import-reservations`
+## 3. Routing & Nav
 
-- Accepts the CSV as text in the request body
-- Parses each row (skipping the totals row at the end where Guest = "0")
-- Looks up `listing_id` from `listings` by matching `hostaway_listing_id` to the CSV's `Listing ID`
-- Maps columns:
-  - `guest_name` ← Guest
-  - `check_in` ← Check-in date
-  - `check_out` ← Check-out date
-  - `total_amount` ← rentalRevenue
-  - `owner_payout` ← Owner payout
-  - `guest_fees` ← Total guest fees
-  - `platform` ← "hostaway" (default, since this is a Hostaway export)
-  - `status` ← "confirmed"
-- Batch upserts (to be safe on re-runs) using a unique constraint on `(listing_id, check_in, guest_name)`
-- Returns count of inserted/skipped rows
-
-## 3. Trigger the Import
-
-Invoke the edge function with the CSV content to load all 2,471 reservations.
-
-## 4. Verify
-
-Query the database to confirm row count and spot-check a few records.
+- `src/App.tsx`: Add `/yoy` route wrapped in `ProtectedRoute` (all roles)
+- `src/components/layout/AppSidebar.tsx`: Add "YoY Performance" nav item with `TrendingUp` icon, positioned after Dashboard, available to all roles
 
 ## File Summary
 
 | File | Action |
 |------|--------|
-| Database migration | Add `owner_payout` and `guest_fees` columns to `reservations` |
-| Database migration | Add unique constraint on `(listing_id, check_in, guest_name)` |
-| `supabase/functions/import-reservations/index.ts` | New edge function |
-| Invoke edge function | One-time call with CSV data |
+| `src/hooks/useYoYData.ts` | New — queries both periods, computes metrics + % change |
+| `src/pages/YoYPerformance.tsx` | New — period selector + property cards grid |
+| `src/App.tsx` | Add `/yoy` route |
+| `src/components/layout/AppSidebar.tsx` | Add nav item |
 
