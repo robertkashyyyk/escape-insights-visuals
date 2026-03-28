@@ -47,20 +47,12 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r-0">
       <div className="flex h-16 items-center px-4 border-b border-border/30">
         {!collapsed && (
-          <div className="flex items-center gap-2.5 animate-fade-in">
-            <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center">
-              <span className="text-primary font-display font-bold text-sm">E</span>
-            </div>
-            <div>
-              <h1 className="font-display font-bold text-sm text-foreground tracking-tight">Escape Grids</h1>
-              <p className="text-[10px] text-muted-foreground font-medium tracking-wider uppercase">Analytics</p>
-            </div>
+          <div className="animate-fade-in">
+            <img src="/images/eg_logo_full.png" alt="Escape Grids" className="h-9 object-contain" />
           </div>
         )}
         {collapsed && (
-          <div className="h-8 w-8 rounded-lg bg-primary/20 flex items-center justify-center mx-auto">
-            <span className="text-primary font-display font-bold text-sm">E</span>
-          </div>
+          <img src="/images/eg_icon_64.png" alt="Escape Grids" className="h-8 w-8 object-contain mx-auto" />
         )}
       </div>
 
