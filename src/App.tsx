@@ -19,6 +19,7 @@ import OccupancyHeatmap from "./pages/OccupancyHeatmap";
 import PricingStrategy from "./pages/PricingStrategy";
 import ManagementRevenue from "./pages/ManagementRevenue";
 import FuturePipeline from "./pages/FuturePipeline";
+import RevenuePacing from "./pages/RevenuePacing";
 
 const queryClient = new QueryClient();
 
