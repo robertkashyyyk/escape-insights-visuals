@@ -23,6 +23,7 @@ const allNavItems = [
   { title: "Pricing Strategy", url: "/pricing", icon: DollarSign, roles: ["super", "senior", "admin", "client"] as AppRole[] },
   { title: "Reservations", url: "/reservations", icon: CalendarDays, roles: ["super", "senior", "admin", "client"] as AppRole[] },
   { title: "Future Pipeline", url: "/pipeline", icon: Telescope, roles: ["super", "senior", "admin", "client"] as AppRole[] },
+  { title: "Revenue Pacing", url: "/pacing", icon: Gauge, roles: ["super", "senior", "admin", "client"] as AppRole[] },
   { title: "Properties", url: "/properties", icon: Building2, roles: ["super", "senior", "admin", "client"] as AppRole[] },
   { title: "Owner Portfolios", url: "/owners", icon: Users, roles: ["super", "senior"] as AppRole[] },
   { title: "Upload Data", url: "/upload", icon: Upload, roles: ["super", "senior"] as AppRole[] },
