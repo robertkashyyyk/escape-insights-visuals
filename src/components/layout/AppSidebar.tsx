@@ -17,7 +17,7 @@ import {
 type AppRole = "super" | "senior" | "admin" | "client";
 
 const allNavItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard, roles: ["super", "senior", "admin", "client"] as AppRole[] },
+  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, roles: ["super", "senior", "admin", "client"] as AppRole[] },
   { title: "Properties", url: "/properties", icon: Building2, roles: ["super", "senior", "admin", "client"] as AppRole[] },
   { title: "Owner Portfolios", url: "/owners", icon: Users, roles: ["super", "senior"] as AppRole[] },
   { title: "Upload Data", url: "/upload", icon: Upload, roles: ["super", "senior"] as AppRole[] },
