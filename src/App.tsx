@@ -16,6 +16,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import YoYPerformance from "./pages/YoYPerformance";
 import OccupancyHeatmap from "./pages/OccupancyHeatmap";
+import PricingStrategy from "./pages/PricingStrategy";
 
 const queryClient = new QueryClient();
 
