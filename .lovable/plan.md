@@ -1,45 +1,53 @@
 
 
-# Plan: Occupancy Heatmap Page
+# Plan: Pricing Strategy Page
 
 ## Overview
 
-New `/heatmap` route showing a visual matrix — properties on Y-axis, months on X-axis, cells colored by occupancy percentage. Year toggle at top.
+New `/pricing` route with a Location Group filter and a grouped bar chart comparing Actual ADR vs Min Rate vs Base Rate across five seasonal buckets.
 
-## 1. Data Hook: `src/hooks/useOccupancyHeatmap.ts`
+## 1. Data Hook: `src/hooks/usePricingStrategy.ts`
 
-- Accepts `year: number`
-- Queries all `listings` (id, name) and `reservations` for that year
-- For each listing × month, calculates: `nights / days_in_month × 100`
-- Returns `{ listings: { id, name, months: number[] }[] }` — 12 values per listing
+- Accepts `locationGroup: string | null`
+- Queries `listings` filtered by `location_group`, gets their `min_rate` and `base_rate`
+- Queries `reservations` for those listings
+- Assigns each reservation to a season bucket based on check-in month:
+  - **Jan–Mar** (months 1–3)
+  - **Shoulder** (months 4, 5, 9)
+  - **Summer** (months 6, 7, 8)
+  - **Autumn** (months 10, 11)
+  - **December** (month 12)
+- Per bucket calculates:
+  - **Actual ADR**: total revenue / total nights
+  - **Avg Min Rate**: average of `min_rate` across matched listings
+  - **Avg Base Rate**: average of `base_rate` across matched listings
+- Also fetches distinct `location_group` values for the filter dropdown
+- Returns `{ data: BucketData[], locationGroups: string[], isLoading }`
 
-## 2. Page: `src/pages/OccupancyHeatmap.tsx`
+## 2. Page: `src/pages/PricingStrategy.tsx`
 
-**Header:** Title + year selector (ChevronLeft / year / ChevronRight)
+**Header**: Title "Pricing Strategy" + Location Group `Select` dropdown (defaults to all / first group)
 
-**Heatmap grid:**
-- Left column: property names (sticky)
-- 12 month columns (Jan–Dec)
-- Each cell shows occupancy % as text, with dynamic background:
-  - `< 40%` → red/warning tint (`bg-red-500/20` to `bg-red-500/40`)
-  - `40–75%` → amber/neutral tint (`bg-amber-500/20` to `bg-amber-500/30`)
-  - `> 75%` → green/accent tint (`bg-emerald-500/30` to `bg-emerald-500/50`)
-- Smooth color interpolation using inline `rgba` styles based on exact value
-- Horizontally scrollable on mobile with sticky property name column
+**Chart**: Recharts `BarChart` with:
+- X-axis: 5 season buckets
+- 3 grouped bars per bucket: Actual ADR (accent color), Avg Min Rate (amber), Avg Base Rate (muted)
+- `ChartTooltip` with exact € figures on hover
+- Legend below chart
+- Glassmorphic card wrapper, responsive
 
-**Loading:** Skeleton rows while data fetches
+**Loading**: Skeleton while fetching
 
 ## 3. Route & Nav
 
-- `src/App.tsx`: Add `/heatmap` route with `ProtectedRoute` (all roles)
-- `src/components/layout/AppSidebar.tsx`: Add "Occupancy Heatmap" after "YoY Performance" with `Grid3X3` icon
+- `src/App.tsx`: Add `/pricing` route with `ProtectedRoute` (all roles)
+- `src/components/layout/AppSidebar.tsx`: Add "Pricing Strategy" after "Occupancy Heatmap" with `DollarSign` icon
 
 ## File Summary
 
 | File | Action |
 |------|--------|
-| `src/hooks/useOccupancyHeatmap.ts` | New — query + aggregate occupancy by listing × month |
-| `src/pages/OccupancyHeatmap.tsx` | New — heatmap page with year toggle |
-| `src/App.tsx` | Add `/heatmap` route |
-| `src/components/layout/AppSidebar.tsx` | Add nav item after YoY |
+| `src/hooks/usePricingStrategy.ts` | New — seasonal bucket aggregation |
+| `src/pages/PricingStrategy.tsx` | New — filter + grouped bar chart |
+| `src/App.tsx` | Add `/pricing` route |
+| `src/components/layout/AppSidebar.tsx` | Add nav item |
 
