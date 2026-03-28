@@ -1,71 +1,79 @@
 
 
-# Plan: Revenue Pacing Dashboard
+# Plan: Revenue Forecaster Module
 
-## Problem
+## Overview
 
-The `reservations` table has no `reservation_date` column (the date the booking was *made*). Without it, we can't reconstruct the historical booking curve — i.e. "how much revenue was on the books for July 2025, as of 60 days before July 1st." The CSV that was imported earlier contained a "Reservation date" column, but it was not mapped during import.
+New `/forecast` route showing a stacked bar chart for the next 3 months. Each bar has a solid OTB (confirmed) portion and a semi-transparent Projected Pickup portion. A KPI badge per month shows the Projected Final Revenue.
 
-## Prerequisites
+## 1. Data Hook: `src/hooks/useRevenueForecaster.ts`
 
-**Migration**: Add `reservation_date date` column to `reservations`. Then backfill from the original CSV data (or accept nulls for now and re-import later).
+**Inputs**: None (auto-computes next 3 calendar months)
 
-**Key question**: Do you still have the CSV, or should we just add the column now and backfill later? Without `reservation_date` populated, the pacing comparison won't have historical data to work with. We could use `created_at` as a rough proxy if the CSV data was imported close to the actual reservation dates, but that would be inaccurate.
+**Logic per month**:
 
-## Implementation
+1. **OTB Revenue**: Query confirmed reservations where `check_in` falls in the target month → sum `total_amount`
+2. **Historical pickup rate by location group**:
+   - For the same month last year, query all reservations (the "final" revenue per location group)
+   - Also query reservations for that same month last year where `reservation_date <= (start_of_last_year_month - daysUntilStart)` — i.e. what was on the books at the same lead time
+   - `pickupRatio = finalRevenue / otbAtSamePoint` per location group (capped at reasonable bounds)
+   - If `reservation_date` is null for historical data, fall back to using all historical revenue as final and current OTB as the baseline (simpler ratio)
+3. **Projected pickup**: For each location group's current OTB, multiply by `pickupRatio` to get projected final, then subtract OTB = projected additional pickup
+4. **Aggregate across all location groups** per month
 
-### 1. Database Migration
+**Returns**:
+```ts
+{
+  months: Array<{
+    month: string;          // "Apr 2026"
+    otbRevenue: number;
+    projectedPickup: number;
+    projectedFinal: number;
+  }>;
+  isLoading: boolean;
+}
+```
 
-- Add `reservation_date date` column to `reservations` (nullable)
+**Query strategy**: Fetch listings with `location_group`, current year confirmed reservations for next 3 months, and last year's reservations for same 3 months (with `reservation_date` for the historical curve). Group and compute in JS.
 
-### 2. Backfill (one-time script)
+## 2. Page: `src/pages/RevenueForecaster.tsx`
 
-- Re-read the original CSV, match reservations by `(listing_id, check_in, guest_name)`, and update `reservation_date` for each row
+**Header**: "Revenue Forecaster" title + subtitle explaining the projection methodology
 
-### 3. Hook: `src/hooks/useRevenuePacing.ts`
+**Stacked Bar Chart** (Recharts `BarChart`):
+- X-axis: 3 months
+- Two stacked `<Bar>` components:
+  - `otbRevenue`: solid primary color, label "OTB Revenue"
+  - `projectedPickup`: same hue at 40% opacity, label "Projected Pickup"
+- Custom tooltip showing OTB, Projected Pickup, and Projected Final
+- Legend distinguishing the two segments
 
-Accepts `targetMonth: Date` (e.g. August 2025)
+**Projected Final KPI cards**: 3 glassmorphic cards (one per month) showing:
+- Month name
+- Projected Final Revenue (large number)
+- OTB vs Pickup breakdown as a mini progress bar
+- Confidence indicator (shows "Based on historical data" or "No historical data" if `reservation_date` is missing)
 
-Logic:
-- Calculate `daysUntilStart = differenceInDays(startOfMonth(targetMonth), today)`
-- **Current year**: Query reservations where `check_in` falls in `targetMonth` — these are already booked. Sum `total_amount` → `currentRevenue`
-- **Previous year**: Query reservations where `check_in` falls in the *same month last year* AND `reservation_date <= (startOfSameMonthLastYear - daysUntilStart)` — i.e. bookings that were on the books at the same lead time. Sum `total_amount` → `historicalRevenue`
-- Compute `pacingPct = (currentRevenue / historicalRevenue) * 100`
-- Also compute the final historical total for that month (all reservations, regardless of reservation_date) → `historicalFinalRevenue`
-- Returns `{ currentRevenue, historicalRevenue, historicalFinalRevenue, pacingPct, daysUntilStart }`
+**Loading**: Skeletons while fetching
 
-### 4. Page: `src/pages/RevenuePacing.tsx`
+## 3. Route & Nav
 
-**Header**: "Revenue Pacing" title
+- `src/App.tsx`: Add `/forecast` route with `ProtectedRoute` (all roles), after `/pacing`
+- `src/components/layout/AppSidebar.tsx`: Add "Revenue Forecaster" nav item after "Revenue Pacing" with `TrendingUp` icon (or `LineChart` — will use a distinct icon like `Target`)
 
-**Month Selector**: Dropdown of the next 6 months (e.g. Apr 2026 – Sep 2026)
+## Technical Details
 
-**Pacing Gauge**: A visual arc/gauge component showing:
-- Current booked revenue vs historical at same point
-- Green fill + "Ahead" label if pacing > 100%
-- Red fill + "Behind" label if pacing < 100%
-- Percentage displayed prominently
-
-**KPI row** (3 cards):
-- Current Booked Revenue (for selected month)
-- Same Point Last Year
-- Final Revenue Last Year (what the month ultimately achieved)
-
-**Progress bar**: Visual bar showing current revenue as % of last year's final, with a marker showing where last year was at this same lead time
-
-### 5. Route & Nav
-
-- `/pacing` route in `App.tsx` (all roles)
-- "Revenue Pacing" nav item in sidebar after "Future Pipeline" with `Gauge` icon
+- The hook fetches in two batches: current-year future reservations and previous-year reservations for the same 3 months
+- Location group grouping ensures properties in different markets use their own historical booking curves
+- If no `reservation_date` data exists for last year, the projected pickup defaults to 0 (OTB only) with a visual indicator
+- Pickup ratio is clamped between 1.0 and 5.0 to avoid extreme extrapolations from sparse data
 
 ## File Summary
 
 | File | Action |
 |------|--------|
-| Database migration | Add `reservation_date` column |
-| One-time backfill | Update existing rows from CSV |
-| `src/hooks/useRevenuePacing.ts` | New — pacing comparison logic |
-| `src/pages/RevenuePacing.tsx` | New — month selector + gauge + KPIs |
-| `src/App.tsx` | Add `/pacing` route |
+| `src/hooks/useRevenueForecaster.ts` | New — OTB + historical pickup calculation |
+| `src/pages/RevenueForecaster.tsx` | New — stacked bar chart + monthly KPI cards |
+| `src/App.tsx` | Add `/forecast` route |
 | `src/components/layout/AppSidebar.tsx` | Add nav item |
 
