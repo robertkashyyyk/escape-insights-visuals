@@ -17,53 +17,77 @@ export type Database = {
       listings: {
         Row: {
           address: string | null
+          base_rate: number | null
           bathrooms: number | null
           bedrooms: number | null
           city: string | null
           country: string | null
           created_at: string
+          hostaway_listing_id: number | null
           id: string
           image_url: string | null
+          latitude: number | null
+          location_group: string | null
+          longitude: number | null
           max_guests: number | null
+          min_rate: number | null
           name: string
           nightly_rate: number | null
           owner_id: string
+          postcode: string | null
           property_type: string | null
           status: string
+          tags: string | null
           updated_at: string
         }
         Insert: {
           address?: string | null
+          base_rate?: number | null
           bathrooms?: number | null
           bedrooms?: number | null
           city?: string | null
           country?: string | null
           created_at?: string
+          hostaway_listing_id?: number | null
           id?: string
           image_url?: string | null
+          latitude?: number | null
+          location_group?: string | null
+          longitude?: number | null
           max_guests?: number | null
+          min_rate?: number | null
           name: string
           nightly_rate?: number | null
           owner_id: string
+          postcode?: string | null
           property_type?: string | null
           status?: string
+          tags?: string | null
           updated_at?: string
         }
         Update: {
           address?: string | null
+          base_rate?: number | null
           bathrooms?: number | null
           bedrooms?: number | null
           city?: string | null
           country?: string | null
           created_at?: string
+          hostaway_listing_id?: number | null
           id?: string
           image_url?: string | null
+          latitude?: number | null
+          location_group?: string | null
+          longitude?: number | null
           max_guests?: number | null
+          min_rate?: number | null
           name?: string
           nightly_rate?: number | null
           owner_id?: string
+          postcode?: string | null
           property_type?: string | null
           status?: string
+          tags?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -106,6 +130,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          management_rate_pct: number | null
           name: string
           notes: string | null
           phone: string | null
@@ -117,6 +142,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          management_rate_pct?: number | null
           name: string
           notes?: string | null
           phone?: string | null
@@ -128,6 +154,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           id?: string
+          management_rate_pct?: number | null
           name?: string
           notes?: string | null
           phone?: string | null
