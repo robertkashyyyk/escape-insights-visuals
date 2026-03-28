@@ -123,6 +123,7 @@ export default function FuturePipeline() {
           </Table>
         )}
       </div>
+      </div>
     </AppLayout>
   );
 }
