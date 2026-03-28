@@ -20,6 +20,7 @@ import PricingStrategy from "./pages/PricingStrategy";
 import ManagementRevenue from "./pages/ManagementRevenue";
 import FuturePipeline from "./pages/FuturePipeline";
 import RevenuePacing from "./pages/RevenuePacing";
+import RevenueForecaster from "./pages/RevenueForecaster";
 
 const queryClient = new QueryClient();
 

@@ -1,4 +1,4 @@
-import { LayoutDashboard, TrendingUp, Grid3X3, DollarSign, CalendarDays, Building2, Users, Upload, Briefcase, Settings, LogOut, Telescope, Gauge } from "lucide-react";
+import { LayoutDashboard, TrendingUp, Grid3X3, DollarSign, CalendarDays, Building2, Users, Upload, Briefcase, Settings, LogOut, Telescope, Gauge, Target } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth, useRole } from "@/contexts/AuthContext";
