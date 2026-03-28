@@ -33,7 +33,7 @@ export default function OccupancyHeatmap() {
   const { data, isLoading } = useOccupancyHeatmap(year);
 
   return (
-    <AppLayout title="Occupancy Heatmap">
+    <AppLayout>
       <div className="space-y-6">
         {/* Year toggle */}
         <div className="flex items-center gap-3">
