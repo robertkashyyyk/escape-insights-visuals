@@ -198,6 +198,7 @@ export type Database = {
           listing_id: string
           owner_payout: number | null
           platform: string | null
+          reservation_date: string | null
           status: string
           total_amount: number | null
         }
@@ -211,6 +212,7 @@ export type Database = {
           listing_id: string
           owner_payout?: number | null
           platform?: string | null
+          reservation_date?: string | null
           status?: string
           total_amount?: number | null
         }
@@ -224,6 +226,7 @@ export type Database = {
           listing_id?: string
           owner_payout?: number | null
           platform?: string | null
+          reservation_date?: string | null
           status?: string
           total_amount?: number | null
         }
