@@ -1,6 +1,8 @@
-import { LayoutDashboard, Building2, Users, Upload, Settings } from "lucide-react";
+import { LayoutDashboard, Building2, Users, Upload, Settings, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
+import { useAuth, useRole } from "@/contexts/AuthContext";
+import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
   SidebarContent,
@@ -12,18 +14,26 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const navItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Properties", url: "/properties", icon: Building2 },
-  { title: "Owner Portfolios", url: "/owners", icon: Users },
-  { title: "Upload Data", url: "/upload", icon: Upload },
-  { title: "Settings", url: "/settings", icon: Settings },
+type AppRole = "super" | "senior" | "admin" | "client";
+
+const allNavItems = [
+  { title: "Dashboard", url: "/", icon: LayoutDashboard, roles: ["super", "senior", "admin", "client"] as AppRole[] },
+  { title: "Properties", url: "/properties", icon: Building2, roles: ["super", "senior", "admin", "client"] as AppRole[] },
+  { title: "Owner Portfolios", url: "/owners", icon: Users, roles: ["super", "senior"] as AppRole[] },
+  { title: "Upload Data", url: "/upload", icon: Upload, roles: ["super", "senior"] as AppRole[] },
+  { title: "Settings", url: "/settings", icon: Settings, roles: ["super"] as AppRole[] },
 ];
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const { user, profile, signOut } = useAuth();
+  const { role } = useRole();
+
+  const navItems = allNavItems.filter(
+    (item) => !role || item.roles.includes(role)
+  );
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
@@ -81,7 +91,33 @@ export function AppSidebar() {
       </SidebarContent>
 
       {!collapsed && (
-        <div className="p-4 mt-auto border-t border-border/30">
+        <div className="p-4 mt-auto border-t border-border/30 space-y-3">
+          {user && (
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center shrink-0">
+                <span className="text-xs font-semibold text-foreground">
+                  {(profile?.display_name || user.email || "?").charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-foreground font-medium truncate">
+                  {profile?.display_name || user.email}
+                </p>
+                {role && (
+                  <Badge variant="outline" className="mt-0.5 text-[9px] px-1.5 py-0 border-primary/30 text-primary capitalize">
+                    {role}
+                  </Badge>
+                )}
+              </div>
+              <button
+                onClick={signOut}
+                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+                title="Sign out"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
           <div className="glass-card p-3 rounded-lg">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium mb-1">Managed by</p>
             <p className="text-xs text-foreground font-display font-semibold">Escape Ordinary</p>
