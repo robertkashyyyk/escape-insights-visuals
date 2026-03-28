@@ -20,6 +20,7 @@ import PricingStrategy from "./pages/PricingStrategy";
 import ManagementRevenue from "./pages/ManagementRevenue";
 import FuturePipeline from "./pages/FuturePipeline";
 import RevenuePacing from "./pages/RevenuePacing";
+import RevenueForecaster from "./pages/RevenueForecaster";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
             <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
             <Route path="/pipeline" element={<ProtectedRoute><FuturePipeline /></ProtectedRoute>} />
             <Route path="/pacing" element={<ProtectedRoute><RevenuePacing /></ProtectedRoute>} />
+            <Route path="/forecast" element={<ProtectedRoute><RevenueForecaster /></ProtectedRoute>} />
             <Route path="/properties" element={<ProtectedRoute><Properties /></ProtectedRoute>} />
             <Route path="/owners" element={<ProtectedRoute requiredRoles={["super", "senior"]}><Owners /></ProtectedRoute>} />
             <Route path="/upload" element={<ProtectedRoute requiredRoles={["super", "senior"]}><UploadData /></ProtectedRoute>} />

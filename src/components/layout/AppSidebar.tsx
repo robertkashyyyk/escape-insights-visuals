@@ -1,4 +1,4 @@
-import { LayoutDashboard, TrendingUp, Grid3X3, DollarSign, CalendarDays, Building2, Users, Upload, Briefcase, Settings, LogOut, Telescope, Gauge } from "lucide-react";
+import { LayoutDashboard, TrendingUp, Grid3X3, DollarSign, CalendarDays, Building2, Users, Upload, Briefcase, Settings, LogOut, Telescope, Gauge, Target } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth, useRole } from "@/contexts/AuthContext";
@@ -24,6 +24,7 @@ const allNavItems = [
   { title: "Reservations", url: "/reservations", icon: CalendarDays, roles: ["super", "senior", "admin", "client"] as AppRole[] },
   { title: "Future Pipeline", url: "/pipeline", icon: Telescope, roles: ["super", "senior", "admin", "client"] as AppRole[] },
   { title: "Revenue Pacing", url: "/pacing", icon: Gauge, roles: ["super", "senior", "admin", "client"] as AppRole[] },
+  { title: "Revenue Forecaster", url: "/forecast", icon: Target, roles: ["super", "senior", "admin", "client"] as AppRole[] },
   { title: "Properties", url: "/properties", icon: Building2, roles: ["super", "senior", "admin", "client"] as AppRole[] },
   { title: "Owner Portfolios", url: "/owners", icon: Users, roles: ["super", "senior"] as AppRole[] },
   { title: "Upload Data", url: "/upload", icon: Upload, roles: ["super", "senior"] as AppRole[] },
