@@ -192,9 +192,11 @@ export type Database = {
           check_in: string
           check_out: string
           created_at: string
+          guest_fees: number | null
           guest_name: string
           id: string
           listing_id: string
+          owner_payout: number | null
           platform: string | null
           status: string
           total_amount: number | null
@@ -203,9 +205,11 @@ export type Database = {
           check_in: string
           check_out: string
           created_at?: string
+          guest_fees?: number | null
           guest_name: string
           id?: string
           listing_id: string
+          owner_payout?: number | null
           platform?: string | null
           status?: string
           total_amount?: number | null
@@ -214,9 +218,11 @@ export type Database = {
           check_in?: string
           check_out?: string
           created_at?: string
+          guest_fees?: number | null
           guest_name?: string
           id?: string
           listing_id?: string
+          owner_payout?: number | null
           platform?: string | null
           status?: string
           total_amount?: number | null
