@@ -18,6 +18,7 @@ import YoYPerformance from "./pages/YoYPerformance";
 import OccupancyHeatmap from "./pages/OccupancyHeatmap";
 import PricingStrategy from "./pages/PricingStrategy";
 import ManagementRevenue from "./pages/ManagementRevenue";
+import FuturePipeline from "./pages/FuturePipeline";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/heatmap" element={<ProtectedRoute><OccupancyHeatmap /></ProtectedRoute>} />
             <Route path="/pricing" element={<ProtectedRoute><PricingStrategy /></ProtectedRoute>} />
             <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
+            <Route path="/pipeline" element={<ProtectedRoute><FuturePipeline /></ProtectedRoute>} />
             <Route path="/properties" element={<ProtectedRoute><Properties /></ProtectedRoute>} />
             <Route path="/owners" element={<ProtectedRoute requiredRoles={["super", "senior"]}><Owners /></ProtectedRoute>} />
             <Route path="/upload" element={<ProtectedRoute requiredRoles={["super", "senior"]}><UploadData /></ProtectedRoute>} />
