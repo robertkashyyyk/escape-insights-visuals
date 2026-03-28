@@ -32,7 +32,9 @@ export function HeroSection() {
             <span className="text-gradient-primary">Master your property data.</span>
           </h1>
           <p className="max-w-2xl mx-auto text-base sm:text-lg text-muted-foreground leading-relaxed mb-10">
-            The intelligent analytics dashboard for short-term rental managers who want to stop doing data entry and start driving revenue. Built by the team at{" "}
+            The intelligent analytics dashboard for short-term rental managers who want to stop doing data entry and start driving revenue.
+            <br />
+            Built by the team at{" "}
             <span className="text-foreground font-medium">Escape Ordinary</span>.
           </p>
 
