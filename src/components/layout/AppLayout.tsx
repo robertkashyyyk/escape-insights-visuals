@@ -1,5 +1,6 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
+import { OrinChatFAB } from "@/components/orin/OrinChatFAB";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,6 +16,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </main>
         </div>
       </div>
+      <OrinChatFAB />
     </SidebarProvider>
   );
 }

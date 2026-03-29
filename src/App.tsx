@@ -21,6 +21,7 @@ import ManagementRevenue from "./pages/ManagementRevenue";
 import FuturePipeline from "./pages/FuturePipeline";
 import RevenuePacing from "./pages/RevenuePacing";
 import RevenueForecaster from "./pages/RevenueForecaster";
+import OrinIntelligence from "./pages/OrinIntelligence";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/orin" element={<ProtectedRoute><OrinIntelligence /></ProtectedRoute>} />
             <Route path="/yoy" element={<ProtectedRoute><YoYPerformance /></ProtectedRoute>} />
             <Route path="/heatmap" element={<ProtectedRoute><OccupancyHeatmap /></ProtectedRoute>} />
             <Route path="/pricing" element={<ProtectedRoute><PricingStrategy /></ProtectedRoute>} />

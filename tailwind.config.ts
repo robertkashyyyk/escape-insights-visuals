@@ -101,6 +101,10 @@ export default {
           "0%, 100%": { opacity: "0.4" },
           "50%": { opacity: "1" },
         },
+        "glow-amber": {
+          "0%, 100%": { boxShadow: "0 0 8px 2px hsl(38 92% 50% / 0.2)" },
+          "50%": { boxShadow: "0 0 16px 4px hsl(38 92% 50% / 0.4)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -109,6 +113,7 @@ export default {
         "scale-in": "scale-in 0.3s ease-out forwards",
         "shimmer": "shimmer 2s linear infinite",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
+        "glow-amber": "glow-amber 3s ease-in-out infinite",
       },
     },
   },
