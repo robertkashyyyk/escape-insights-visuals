@@ -24,7 +24,7 @@ const tiers: Tier[] = [
   },
   {
     name: "Premium",
-    price: "$49",
+    price: "£49",
     period: "/mo",
     features: [
       "Up to 20 properties",
@@ -36,7 +36,7 @@ const tiers: Tier[] = [
   },
   {
     name: "Professional",
-    price: "$99",
+    price: "£99",
     period: "/mo",
     features: [
       "Up to 100 properties",
