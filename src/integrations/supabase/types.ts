@@ -103,7 +103,7 @@ export type Database = {
           name: string
           nightly_rate: number | null
           operational_notes: string | null
-          owner_id: string
+          owner_id: string | null
           postcode: string | null
           primary_cleaner: string | null
           property_type: string | null
@@ -134,7 +134,7 @@ export type Database = {
           name: string
           nightly_rate?: number | null
           operational_notes?: string | null
-          owner_id: string
+          owner_id?: string | null
           postcode?: string | null
           primary_cleaner?: string | null
           property_type?: string | null
@@ -165,7 +165,7 @@ export type Database = {
           name?: string
           nightly_rate?: number | null
           operational_notes?: string | null
-          owner_id?: string
+          owner_id?: string | null
           postcode?: string | null
           primary_cleaner?: string | null
           property_type?: string | null
