@@ -252,46 +252,67 @@ export type Database = {
       }
       reservations: {
         Row: {
+          booking_lead_days: number | null
           check_in: string
           check_out: string
           created_at: string
+          day_of_week: number | null
           guest_fees: number | null
           guest_name: string
+          hostaway_reservation_id: number | null
           id: string
           listing_id: string
+          month: number | null
           owner_payout: number | null
           platform: string | null
+          quarter: number | null
           reservation_date: string | null
           status: string
           total_amount: number | null
+          week_number: number | null
+          year: number | null
         }
         Insert: {
+          booking_lead_days?: number | null
           check_in: string
           check_out: string
           created_at?: string
+          day_of_week?: number | null
           guest_fees?: number | null
           guest_name: string
+          hostaway_reservation_id?: number | null
           id?: string
           listing_id: string
+          month?: number | null
           owner_payout?: number | null
           platform?: string | null
+          quarter?: number | null
           reservation_date?: string | null
           status?: string
           total_amount?: number | null
+          week_number?: number | null
+          year?: number | null
         }
         Update: {
+          booking_lead_days?: number | null
           check_in?: string
           check_out?: string
           created_at?: string
+          day_of_week?: number | null
           guest_fees?: number | null
           guest_name?: string
+          hostaway_reservation_id?: number | null
           id?: string
           listing_id?: string
+          month?: number | null
           owner_payout?: number | null
           platform?: string | null
+          quarter?: number | null
           reservation_date?: string | null
           status?: string
           total_amount?: number | null
+          week_number?: number | null
+          year?: number | null
         }
         Relationships: [
           {
