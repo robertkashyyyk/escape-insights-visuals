@@ -78,15 +78,7 @@ const sections: NavSection[] = [
     label: "Operations",
     collapsible: true,
     items: [
-      {
-        title: "Housekeeping", url: "/housekeeping", icon: Brush, roles: allRoles,
-        children: [
-          { title: "Today's Schedule", url: "/housekeeping" },
-          { title: "Week View", url: "/housekeeping/week" },
-          { title: "Cleaner Allocation", url: "/housekeeping/allocation" },
-          { title: "Invoice Tracker", url: "/housekeeping/invoices" },
-        ],
-      },
+      { title: "Cleaning Schedule", url: "/operations/cleaning", icon: Brush, roles: allRoles },
       { title: "Property Knowledge", url: "/property-knowledge", icon: BookOpen, roles: allRoles },
     ],
   },

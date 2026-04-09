@@ -27,6 +27,7 @@ import ComingSoon from "./pages/ComingSoon";
 import Today from "./pages/Today";
 import SyncHealth from "./pages/SyncHealth";
 import MonthlyReport from "./pages/MonthlyReport";
+import CleaningSchedule from "./pages/CleaningSchedule";
 
 const queryClient = new QueryClient();
 
