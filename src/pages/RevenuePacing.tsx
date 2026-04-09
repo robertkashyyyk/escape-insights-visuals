@@ -160,6 +160,9 @@ export default function RevenuePacing() {
                       </span>
                     )}
                   </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    vs {formatGBP(portfolio.totalSamePointLY)} same point last year · LY full year total: {formatGBP(portfolio.totalLYFinal)}
+                  </p>
                 </div>
                 <div className="glass-card p-6 space-y-2">
                   <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Months Ahead</p>
