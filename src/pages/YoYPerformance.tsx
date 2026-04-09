@@ -19,9 +19,22 @@ function getPeriodOptions(type: PeriodType) {
 
 function getDefaultPeriodValue(type: PeriodType): number {
   const now = new Date();
-  if (type === "month") return now.getMonth() + 1;
-  if (type === "quarter") return Math.ceil((now.getMonth() + 1) / 3);
+  if (type === "month") {
+    const m = now.getMonth(); // 0-indexed, so this is "last month" as 1-indexed
+    return m === 0 ? 12 : m;
+  }
+  if (type === "quarter") {
+    const q = Math.ceil((now.getMonth() + 1) / 3);
+    return q === 1 ? 4 : q - 1;
+  }
   return 1;
+}
+
+function getDefaultYear(type: PeriodType): number {
+  const now = new Date();
+  if (type === "month" && now.getMonth() === 0) return now.getFullYear() - 1;
+  if (type === "quarter" && Math.ceil((now.getMonth() + 1) / 3) === 1) return now.getFullYear() - 1;
+  return now.getFullYear();
 }
 
 type MetricStatus = "pending" | "new" | "no-data" | "normal";
@@ -118,7 +131,7 @@ const fmt = (n: number) => `£${n.toLocaleString("en-GB", { minimumFractionDigit
 export default function YoYPerformance() {
   const [periodType, setPeriodType] = useState<PeriodType>("month");
   const [periodValue, setPeriodValue] = useState<number>(getDefaultPeriodValue("month"));
-  const [year, setYear] = useState(2026);
+  const [year, setYear] = useState(getDefaultYear("month"));
 
   const { data, isLoading } = useYoYData(periodType, periodValue, year);
   const options = getPeriodOptions(periodType);
@@ -126,6 +139,7 @@ export default function YoYPerformance() {
   const handleTypeChange = (type: PeriodType) => {
     setPeriodType(type);
     setPeriodValue(getDefaultPeriodValue(type));
+    setYear(getDefaultYear(type));
   };
 
   return (
