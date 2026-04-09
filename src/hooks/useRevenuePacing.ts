@@ -223,3 +223,73 @@ export function useDefaultPacingMonth(months: Date[]) {
     staleTime: 60_000,
   });
 }
+
+/* ── Portfolio Pacing (All Months) ── */
+export interface PortfolioMonthPacing {
+  month: Date;
+  label: string;
+  currentOTB: number;
+  samePointLY: number;
+  lastYearFinal: number;
+  pacingPct: number;
+}
+
+export interface PortfolioPacingData {
+  totalOTB: number;
+  totalLYFinal: number;
+  portfolioPacingPct: number;
+  monthsAhead: number;
+  months: PortfolioMonthPacing[];
+}
+
+export function usePortfolioPacing(months: Date[]) {
+  return useQuery<PortfolioPacingData>({
+    queryKey: ["portfolio-pacing", months.map(m => format(m, "yyyy-MM")).join(",")],
+    queryFn: async () => {
+      const today = new Date();
+      const todayStr = format(today, "yyyy-MM-dd");
+      const lastYearEquivDate = format(subDays(today, 365), "yyyy-MM-dd");
+
+      const results: PortfolioMonthPacing[] = [];
+
+      // Fetch all months in parallel
+      const fetches = months.map(async (m) => {
+        const ms = startOfMonth(m);
+        const me = endOfMonth(m);
+        const lyMs = startOfMonth(subYears(ms, 1));
+        const lyMe = endOfMonth(subYears(ms, 1));
+
+        const [cur, lyPoint, lyFinal] = await Promise.all([
+          fetchAllReservations(format(ms, "yyyy-MM-dd"), format(me, "yyyy-MM-dd"), todayStr),
+          fetchAllReservations(format(lyMs, "yyyy-MM-dd"), format(lyMe, "yyyy-MM-dd"), lastYearEquivDate),
+          fetchAllReservations(format(lyMs, "yyyy-MM-dd"), format(lyMe, "yyyy-MM-dd")),
+        ]);
+
+        const currentOTB = cur.reduce((s, r) => s + (r.total_amount || 0), 0);
+        const samePointLY = lyPoint.reduce((s, r) => s + (r.total_amount || 0), 0);
+        const lastYearFinal = lyFinal.reduce((s, r) => s + (r.total_amount || 0), 0);
+        const pacingPct = samePointLY > 0 ? (currentOTB / samePointLY) * 100 : currentOTB > 0 ? 999 : 0;
+
+        return {
+          month: ms,
+          label: format(ms, "MMM yyyy"),
+          currentOTB,
+          samePointLY,
+          lastYearFinal,
+          pacingPct,
+        };
+      });
+
+      const all = await Promise.all(fetches);
+      results.push(...all);
+
+      const totalOTB = results.reduce((s, m) => s + m.currentOTB, 0);
+      const totalLYFinal = results.reduce((s, m) => s + m.lastYearFinal, 0);
+      const portfolioPacingPct = totalLYFinal > 0 ? (totalOTB / totalLYFinal) * 100 : 0;
+      const monthsAhead = results.filter(m => m.pacingPct >= 100 && m.pacingPct < 900).length;
+
+      return { totalOTB, totalLYFinal, portfolioPacingPct, monthsAhead, months: results };
+    },
+    staleTime: 60_000,
+  });
+}
