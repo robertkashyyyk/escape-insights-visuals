@@ -10,7 +10,7 @@ import { useLocation } from "react-router-dom";
 import { useAuth, useRole } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { useState, useCallback } from "react";
-import { ChevronDown } from "lucide-react";
+
 import {
   Sidebar,
   SidebarContent,
