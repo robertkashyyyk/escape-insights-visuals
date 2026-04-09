@@ -52,12 +52,12 @@ export function RevenueChart({ data, isLoading }: RevenueChartProps) {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(222 15% 18%)" vertical={false} />
               <XAxis
                 dataKey="label"
-                tick={{ fill: "hsl(220 10% 55%)", fontSize: 12, fontFamily: "Inter" }}
+                tick={{ fill: "hsl(220 10% 55%)", fontSize: 12, fontFamily: "'Inter', sans-serif" }}
                 axisLine={{ stroke: "hsl(222 15% 18%)" }}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fill: "hsl(220 10% 55%)", fontSize: 11, fontFamily: "Inter" }}
+                tick={{ fill: "hsl(220 10% 55%)", fontSize: 11, fontFamily: "'Inter', sans-serif" }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => `£${(v / 1000).toFixed(0)}k`}
