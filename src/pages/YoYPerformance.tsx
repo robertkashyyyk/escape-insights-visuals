@@ -83,14 +83,16 @@ function YoYBadge({ status, change }: { status: MetricStatus; change: number | n
   );
 }
 
-function MetricRow({ label, value, change, isNew }: { label: string; value: string; change: number | null; isNew?: boolean }) {
+function MetricRow({ label, value, current, previous }: { label: string; value: string; current: number; previous: number }) {
+  const status = getMetricStatus(current, previous);
+  const change = status === "normal" ? pctChange(current, previous) : null;
   return (
     <div className="flex items-center justify-between py-2 border-b border-border/30 last:border-b-0">
       <div>
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
         <p className="text-sm font-semibold text-foreground">{value}</p>
       </div>
-      <YoYBadge change={change} isNew={isNew} />
+      <YoYBadge status={status} change={change} />
     </div>
   );
 }
