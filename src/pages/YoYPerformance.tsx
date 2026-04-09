@@ -139,6 +139,7 @@ export default function YoYPerformance() {
   const handleTypeChange = (type: PeriodType) => {
     setPeriodType(type);
     setPeriodValue(getDefaultPeriodValue(type));
+    setYear(getDefaultYear(type));
   };
 
   return (
