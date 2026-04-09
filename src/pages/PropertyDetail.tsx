@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Bed, Bath, Users, MapPin, DollarSign, Brush, Building2, Wrench, Key, ClipboardList } from "lucide-react";
+import { ArrowLeft, Bed, Bath, Users, MapPin, PoundSterling, Brush, Building2, Wrench, Key, ClipboardList } from "lucide-react";
 
 export default function PropertyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -103,7 +103,7 @@ export default function PropertyDetail() {
             <DetailRow label="Location Group" value={listing.location_group} />
           </DetailCard>
 
-          <DetailCard title="Pricing" icon={DollarSign}>
+          <DetailCard title="Pricing" icon={PoundSterling}>
             <DetailRow label="Nightly Rate" value={listing.nightly_rate != null ? `£${Number(listing.nightly_rate).toFixed(0)}` : null} />
             <DetailRow label="Base Rate" value={listing.base_rate != null ? `£${Number(listing.base_rate).toFixed(0)}` : null} />
             <DetailRow label="Min Rate" value={listing.min_rate != null ? `£${Number(listing.min_rate).toFixed(0)}` : null} />

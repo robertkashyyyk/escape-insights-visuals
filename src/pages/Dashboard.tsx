@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DollarSign, Calendar, TrendingUp, Moon, Hash } from "lucide-react";
+import { PoundSterling, Calendar, TrendingUp, Moon, Hash } from "lucide-react";
 import { startOfYear, endOfYear } from "date-fns";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
@@ -39,7 +39,7 @@ export default function Dashboard() {
           title="Total Revenue"
           value={isLoading ? "..." : `£${(kpis?.totalRevenue ?? 0).toLocaleString()}`}
           subtitle="All properties"
-          icon={DollarSign}
+          icon={PoundSterling}
           accentColor="primary"
           delay={0}
         />
