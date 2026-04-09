@@ -194,11 +194,11 @@ function HeatmapCell({ cell, propertyName, month, year }: { cell: MonthCell; pro
         <div className="h-px bg-border/30 my-1" />
         <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px]">
           <span className="text-muted-foreground">Occupancy</span>
-          <span className="text-foreground font-medium text-right">{cell.occupancy}%</span>
+          <span className="text-foreground font-medium text-right">{cell?.occupancy ?? 0}%</span>
           <span className="text-muted-foreground">Nights</span>
-          <span className="text-foreground font-medium text-right">{cell.nightsBooked} / {cell.nightsAvailable}</span>
+          <span className="text-foreground font-medium text-right">{cell?.nightsBooked ?? 0} / {cell?.nightsAvailable ?? 0}</span>
           <span className="text-muted-foreground">Revenue</span>
-          <span className="text-foreground font-medium text-right">£{cell.revenue.toLocaleString()}</span>
+          <span className="text-foreground font-medium text-right">£{(cell?.revenue ?? 0).toLocaleString()}</span>
         </div>
       </TooltipContent>
     </Tooltip>
