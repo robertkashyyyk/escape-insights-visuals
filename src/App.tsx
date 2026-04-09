@@ -22,6 +22,7 @@ import FuturePipeline from "./pages/FuturePipeline";
 import RevenuePacing from "./pages/RevenuePacing";
 import RevenueForecaster from "./pages/RevenueForecaster";
 import OrinIntelligence from "./pages/OrinIntelligence";
+import ComingSoon from "./pages/ComingSoon";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +50,20 @@ const App = () => (
             <Route path="/upload" element={<ProtectedRoute requiredRoles={["super", "senior"]}><UploadData /></ProtectedRoute>} />
             <Route path="/management" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ManagementRevenue /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute requiredRoles={["super"]}><SettingsPage /></ProtectedRoute>} />
+            <Route path="/housekeeping" element={<ProtectedRoute><ComingSoon title="Housekeeping — Today's Schedule" /></ProtectedRoute>} />
+            <Route path="/housekeeping/week" element={<ProtectedRoute><ComingSoon title="Housekeeping — Week View" /></ProtectedRoute>} />
+            <Route path="/housekeeping/allocation" element={<ProtectedRoute><ComingSoon title="Cleaner Allocation" /></ProtectedRoute>} />
+            <Route path="/housekeeping/invoices" element={<ProtectedRoute><ComingSoon title="Housekeeping Invoice Tracker" /></ProtectedRoute>} />
+            <Route path="/property-knowledge" element={<ProtectedRoute><ComingSoon title="Property Knowledge" /></ProtectedRoute>} />
+            <Route path="/owner-reports" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ComingSoon title="Owner Reports — Monthly Report" /></ProtectedRoute>} />
+            <Route path="/owner-reports/invoice" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ComingSoon title="Owner Reports — Invoice Generator" /></ProtectedRoute>} />
+            <Route path="/xero-sync" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ComingSoon title="Xero Sync" /></ProtectedRoute>} />
+            <Route path="/guests" element={<ProtectedRoute><ComingSoon title="Guest Database" /></ProtectedRoute>} />
+            <Route path="/campaigns" element={<ProtectedRoute><ComingSoon title="Active Campaigns" /></ProtectedRoute>} />
+            <Route path="/campaigns/segments" element={<ProtectedRoute><ComingSoon title="Campaign Segments" /></ProtectedRoute>} />
+            <Route path="/campaigns/history" element={<ProtectedRoute><ComingSoon title="Campaign History" /></ProtectedRoute>} />
+            <Route path="/mailchimp-sync" element={<ProtectedRoute><ComingSoon title="Mailchimp Sync" /></ProtectedRoute>} />
+            <Route path="/leads" element={<ProtectedRoute><ComingSoon title="Leads & Enquiries" /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
