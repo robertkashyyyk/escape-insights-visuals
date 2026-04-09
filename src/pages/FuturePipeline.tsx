@@ -108,12 +108,12 @@ export default function FuturePipeline() {
               <Skeleton className="h-72 rounded-lg" />
             ) : (
               <ResponsiveContainer width="100%" height={288}>
-                <BarChart data={data?.monthlyData ?? []} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                <BarChart data={data?.chartData ?? []} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
-                  <XAxis dataKey="month" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} interval={window === 30 ? 6 : 0} angle={window === 30 ? -45 : 0} textAnchor={window === 30 ? "end" : "middle"} height={window === 30 ? 50 : 30} />
                   <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `£${(v / 1000).toFixed(0)}k`} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} maxBarSize={48} />
+                  <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} maxBarSize={window === 30 ? 20 : 48} />
                 </BarChart>
               </ResponsiveContainer>
             )}
