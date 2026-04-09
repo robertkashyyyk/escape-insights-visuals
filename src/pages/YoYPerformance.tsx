@@ -24,7 +24,14 @@ function getDefaultPeriodValue(type: PeriodType): number {
   return 1;
 }
 
-function YoYBadge({ change }: { change: number | null }) {
+function YoYBadge({ change, isNew }: { change: number | null; isNew?: boolean }) {
+  if (isNew) {
+    return (
+      <Badge variant="outline" className="text-[11px] px-2 py-0.5 border-primary/30 text-primary bg-primary/10 gap-1 font-semibold">
+        New
+      </Badge>
+    );
+  }
   if (change === null) {
     return (
       <Badge variant="outline" className="text-[11px] px-2 py-0.5 border-border text-muted-foreground gap-1">
