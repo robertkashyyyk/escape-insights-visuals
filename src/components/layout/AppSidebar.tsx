@@ -144,6 +144,32 @@ export function AppSidebar() {
   const { role } = useRole();
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
+  const getInitialSectionState = (): Record<string, boolean> => {
+    try {
+      const stored = sessionStorage.getItem("sidebar-sections");
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return {};
+  };
+
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
+    const stored = getInitialSectionState();
+    const collapsibleLabels = sections.filter(s => s.collapsible).map(s => s.label);
+    const defaults: Record<string, boolean> = {};
+    collapsibleLabels.forEach(label => {
+      defaults[label] = stored[label] !== undefined ? stored[label] : true;
+    });
+    return defaults;
+  });
+
+  const toggleSection = useCallback((label: string) => {
+    setCollapsedSections(prev => {
+      const next = { ...prev, [label]: !prev[label] };
+      try { sessionStorage.setItem("sidebar-sections", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
+
   const isRouteActive = (url: string) => {
     if (url.includes("?")) return location.pathname === url.split("?")[0];
     return location.pathname === url;
