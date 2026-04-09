@@ -40,6 +40,7 @@ interface NavItem {
 interface NavSection {
   label: string;
   items: NavItem[];
+  collapsible?: boolean;
 }
 
 const allRoles: AppRole[] = ["super", "senior", "admin", "client"];
