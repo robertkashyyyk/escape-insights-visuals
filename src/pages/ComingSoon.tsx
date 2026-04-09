@@ -1,4 +1,4 @@
-import AppLayout from "@/components/layout/AppLayout";
+import { AppLayout } from "@/components/layout/AppLayout";
 import { Construction } from "lucide-react";
 
 interface ComingSoonProps {
