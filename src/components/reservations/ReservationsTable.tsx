@@ -298,9 +298,24 @@ export function ReservationsTable() {
       {/* Pagination */}
       {!isLoading && filtered.length > 0 && (
         <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
-            Showing {showFrom}–{showTo} of {filtered.length} reservations
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-muted-foreground">
+              Showing {showFrom}–{showTo} of {filtered.length} reservations
+            </p>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Rows:</span>
+              <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(0); }}>
+                <SelectTrigger className="w-[70px] h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAGE_SIZE_OPTIONS.map((size) => (
+                    <SelectItem key={size} value={String(size)} className="text-xs">{size}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" className="h-8 w-8" disabled={safePage === 0} onClick={() => setPage((p) => p - 1)}>
               <ChevronLeft className="h-4 w-4" />
