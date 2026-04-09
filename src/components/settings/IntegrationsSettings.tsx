@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { Key, Link2 } from "lucide-react";
+import { Key, Link2, RefreshCw } from "lucide-react";
 
 function IntegrationPlaceholder({ name, description }: { name: string; description: string }) {
   return (
@@ -34,6 +34,7 @@ export function IntegrationsSettings() {
   const [clientSecret, setClientSecret] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
@@ -68,6 +69,27 @@ export function IntegrationsSettings() {
     }
   };
 
+  const handleSync = async () => {
+    setSyncing(true);
+    toast({ title: "Sync started", description: "Pulling all reservations and listings from Hostaway. This may take a minute..." });
+    try {
+      const { data, error } = await supabase.functions.invoke("hostaway-sync", { method: "POST" });
+      if (error) throw error;
+      if (data?.success) {
+        toast({
+          title: "Sync complete",
+          description: `${data.listings} listings and ${data.reservations} reservations synced.`,
+        });
+      } else {
+        throw new Error(data?.error || "Unknown sync error");
+      }
+    } catch (err: any) {
+      toast({ title: "Sync failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div className="space-y-4 max-w-xl">
       <Card className="border-border/30 bg-card/50 backdrop-blur-sm">
@@ -88,9 +110,17 @@ export function IntegrationsSettings() {
             <Label className="text-xs text-muted-foreground">Client Secret</Label>
             <Input type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} placeholder={loading ? "Loading..." : "Enter Client Secret"} disabled={loading} className="bg-secondary/50 border-border/40" />
           </div>
-          <Button onClick={handleSave} disabled={saving || loading} size="sm">
-            {saving ? "Saving..." : "Save Credentials"}
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleSave} disabled={saving || loading} size="sm">
+              {saving ? "Saving..." : "Save Credentials"}
+            </Button>
+            {connected && (
+              <Button onClick={handleSync} disabled={syncing} size="sm" variant="outline" className="gap-2">
+                <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+                {syncing ? "Syncing..." : "Sync Now"}
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 
