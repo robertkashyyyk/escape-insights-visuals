@@ -124,7 +124,7 @@ export default function RevenuePacing() {
               title="Current Booked Revenue"
               value={formatGBP(data?.currentRevenue ?? 0)}
               subtitle={format(targetMonth, "MMMM yyyy")}
-              icon={DollarSign}
+              icon={PoundSterling}
               accentColor="primary"
               delay={0}
             />

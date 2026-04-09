@@ -38,7 +38,7 @@ export default function FuturePipeline() {
             <KpiCard
               title="Future Revenue"
               value={formatCurrency(data?.totalRevenue || 0)}
-              icon={DollarSign}
+              icon={PoundSterling}
               accentColor="primary"
               delay={0}
             />

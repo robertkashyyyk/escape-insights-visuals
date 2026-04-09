@@ -103,7 +103,7 @@ export default function PropertyDetail() {
             <DetailRow label="Location Group" value={listing.location_group} />
           </DetailCard>
 
-          <DetailCard title="Pricing" icon={DollarSign}>
+          <DetailCard title="Pricing" icon={PoundSterling}>
             <DetailRow label="Nightly Rate" value={listing.nightly_rate != null ? `£${Number(listing.nightly_rate).toFixed(0)}` : null} />
             <DetailRow label="Base Rate" value={listing.base_rate != null ? `£${Number(listing.base_rate).toFixed(0)}` : null} />
             <DetailRow label="Min Rate" value={listing.min_rate != null ? `£${Number(listing.min_rate).toFixed(0)}` : null} />

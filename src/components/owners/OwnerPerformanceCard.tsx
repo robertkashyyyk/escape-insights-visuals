@@ -78,7 +78,7 @@ export function OwnerPerformanceCard({ owner, year, onEdit }: Props) {
 
         {/* Middle — KPIs */}
         <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
-          <KpiBlock label="Revenue" value={fmt(owner.totalRevenue)} icon={DollarSign} />
+          <KpiBlock label="Revenue" value={fmt(owner.totalRevenue)} icon={PoundSterling} />
           <KpiBlock label="Mgmt Fee" value={fmt(owner.managementFee)} icon={Receipt} />
           <KpiBlock label="Blended ADR" value={fmt(owner.blendedAdr)} icon={BedDouble} />
           <KpiBlock label="Occupancy" value={`${owner.avgOccupancy.toFixed(1)}%`} icon={Percent} />

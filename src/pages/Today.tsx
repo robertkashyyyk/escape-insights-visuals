@@ -171,7 +171,7 @@ export default function Today() {
                 <PulseCard
                   title="Revenue MTD"
                   value={`£${(data?.revenueMTD ?? 0).toLocaleString()}`}
-                  icon={<DollarSign className="h-4 w-4" />}
+                  icon={<PoundSterling className="h-4 w-4" />}
                 />
                 <PulseCard
                   title="Occupancy This Week"

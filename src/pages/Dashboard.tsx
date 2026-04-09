@@ -39,7 +39,7 @@ export default function Dashboard() {
           title="Total Revenue"
           value={isLoading ? "..." : `£${(kpis?.totalRevenue ?? 0).toLocaleString()}`}
           subtitle="All properties"
-          icon={DollarSign}
+          icon={PoundSterling}
           accentColor="primary"
           delay={0}
         />

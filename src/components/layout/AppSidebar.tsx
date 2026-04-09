@@ -62,7 +62,7 @@ const sections: NavSection[] = [
       { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, roles: allRoles },
       { title: "YoY Performance", url: "/yoy", icon: TrendingUp, roles: allRoles },
       { title: "Occupancy Heatmap", url: "/heatmap", icon: Grid3X3, roles: allRoles },
-      { title: "Pricing Strategy", url: "/pricing", icon: DollarSign, roles: allRoles },
+      { title: "Pricing Strategy", url: "/pricing", icon: PoundSterling, roles: allRoles },
       { title: "Revenue Pacing", url: "/pacing", icon: Gauge, roles: allRoles },
       { title: "Revenue Forecaster", url: "/forecast", icon: Target, roles: allRoles },
     ],

@@ -69,7 +69,7 @@ export function OwnerPortfolio({ owner, onBack }: OwnerPortfolioProps) {
             <KpiCard
               title="Portfolio Revenue"
               value={fmt(data?.totalRevenue ?? 0)}
-              icon={DollarSign}
+              icon={PoundSterling}
               accentColor="primary"
               delay={0}
             />
