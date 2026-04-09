@@ -17,7 +17,7 @@ const tiers: Tier[] = [
     price: "Free",
     features: [
       "Up to 5 properties",
-      "Basic dashboard & CSV uploads",
+      "Basic dashboard & API sync",
       "Perfect for independent hosts",
     ],
     cta: "Get Started",

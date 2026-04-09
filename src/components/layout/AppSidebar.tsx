@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, TrendingUp, Grid3X3, PoundSterling, CalendarDays,
-  Building2, Users, Upload, Briefcase, Settings, LogOut, Telescope,
+  Building2, Users, Briefcase, Settings, LogOut, Telescope,
   Gauge, Target, Sparkles, Home, ChevronRight, Brush, BookOpen,
   FileText, Link, UserSearch, Mail, Send, Megaphone, ClipboardList,
   LucideIcon,
@@ -72,7 +72,6 @@ const sections: NavSection[] = [
     items: [
       { title: "Reservations", url: "/reservations", icon: CalendarDays, roles: allRoles },
       { title: "Future Pipeline", url: "/pipeline", icon: Telescope, roles: allRoles },
-      { title: "Upload Data", url: "/upload", icon: Upload, roles: managementRoles },
     ],
   },
   {

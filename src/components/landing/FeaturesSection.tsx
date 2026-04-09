@@ -13,7 +13,7 @@ const features: Feature[] = [
     icon: Upload,
     title: "Seamless Ingestion",
     description:
-      "Upload your Hostaway reservations in seconds. We automatically parse, clean, and enrich your data with intelligent date tracking.",
+      "Connect your Hostaway account and we automatically sync, parse, and enrich your reservation data with intelligent date tracking.",
   },
   {
     icon: BarChart3,

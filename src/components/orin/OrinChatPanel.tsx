@@ -25,7 +25,6 @@ const ROUTE_LABELS: Record<string, string> = {
   "/pipeline": "Future Pipeline",
   "/orin": "The Orin Brief",
   "/settings": "Settings",
-  "/upload": "Upload Data",
 };
 
 const SUGGESTED_PROMPTS = [
