@@ -131,7 +131,7 @@ const fmt = (n: number) => `£${n.toLocaleString("en-GB", { minimumFractionDigit
 export default function YoYPerformance() {
   const [periodType, setPeriodType] = useState<PeriodType>("month");
   const [periodValue, setPeriodValue] = useState<number>(getDefaultPeriodValue("month"));
-  const [year, setYear] = useState(2026);
+  const [year, setYear] = useState(getDefaultYear("month"));
 
   const { data, isLoading } = useYoYData(periodType, periodValue, year);
   const options = getPeriodOptions(periodType);
