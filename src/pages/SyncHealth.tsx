@@ -1,19 +1,22 @@
 import { AppLayout } from "@/components/layout/AppLayout";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { RefreshCw, AlertTriangle, CheckCircle2, XCircle, Clock, Building2, Users } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { RefreshCw, AlertTriangle, CheckCircle2, XCircle, Clock, Building2, Users, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SyncHealth() {
-  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [syncing, setSyncing] = useState(false);
 
-  // Sync logs
   const { data: syncLogs, isLoading: logsLoading } = useQuery({
     queryKey: ["sync-logs"],
     queryFn: async () => {
@@ -27,19 +30,17 @@ export default function SyncHealth() {
     refetchInterval: 10000,
   });
 
-  // Unowned listings
   const { data: unownedListings } = useQuery({
     queryKey: ["unowned-listings"],
     queryFn: async () => {
       const { data } = await supabase
         .from("listings")
-        .select("id, name, city, hostaway_listing_id")
+        .select("id, name, city, hostaway_listing_id, location_group")
         .is("owner_id", null);
       return data || [];
     },
   });
 
-  // Owners for assignment
   const { data: owners } = useQuery({
     queryKey: ["owners-list"],
     queryFn: async () => {
@@ -49,7 +50,35 @@ export default function SyncHealth() {
   });
 
   const handleAssignOwner = async (listingId: string, ownerId: string) => {
-    await supabase.from("listings").update({ owner_id: ownerId }).eq("id", listingId);
+    const { error } = await supabase.from("listings").update({ owner_id: ownerId }).eq("id", listingId);
+    if (error) {
+      toast({ title: "Failed to assign owner", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Owner assigned" });
+      queryClient.invalidateQueries({ queryKey: ["unowned-listings"] });
+      queryClient.invalidateQueries({ queryKey: ["sync-health-count"] });
+    }
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    toast({ title: "Sync started", description: "Pulling data from Hostaway..." });
+    try {
+      const { data, error } = await supabase.functions.invoke("hostaway-sync", { method: "POST" });
+      if (error) throw error;
+      if (data?.success) {
+        toast({ title: "Sync complete", description: `${data.listings} listings, ${data.reservations} reservations synced.` });
+        queryClient.invalidateQueries({ queryKey: ["sync-logs"] });
+        queryClient.invalidateQueries({ queryKey: ["unowned-listings"] });
+        queryClient.invalidateQueries({ queryKey: ["sync-health-count"] });
+      } else {
+        throw new Error(data?.error || "Unknown error");
+      }
+    } catch (err: any) {
+      toast({ title: "Sync failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const latestSync = syncLogs?.[0];
@@ -93,12 +122,18 @@ export default function SyncHealth() {
               Monitor Hostaway sync status, errors, and data integrity
             </p>
           </div>
-          {issueCount > 0 && (
-            <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 gap-1.5">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              {issueCount} issue{issueCount > 1 ? "s" : ""} need attention
-            </Badge>
-          )}
+          <div className="flex items-center gap-3">
+            {issueCount > 0 && (
+              <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {issueCount} issue{issueCount > 1 ? "s" : ""} 
+              </Badge>
+            )}
+            <Button onClick={handleSync} disabled={syncing} size="sm" className="gap-2">
+              <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Syncing..." : "Sync Now"}
+            </Button>
+          </div>
         </div>
 
         {/* Summary cards */}
@@ -157,7 +192,7 @@ export default function SyncHealth() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                 <Users className="h-4 w-4 text-amber-400" />
-                Listings Without Owners
+                Listings Without Owners ({unownedListings.length})
               </CardTitle>
               <CardDescription>Assign an owner to each listing so their reservations appear correctly</CardDescription>
             </CardHeader>
@@ -166,7 +201,7 @@ export default function SyncHealth() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Listing</TableHead>
-                    <TableHead>City</TableHead>
+                    <TableHead>Location</TableHead>
                     <TableHead>Hostaway ID</TableHead>
                     <TableHead>Assign Owner</TableHead>
                   </TableRow>
@@ -175,7 +210,7 @@ export default function SyncHealth() {
                   {unownedListings.map((listing) => (
                     <TableRow key={listing.id}>
                       <TableCell className="font-medium">{listing.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{listing.city || "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{listing.location_group || listing.city || "—"}</TableCell>
                       <TableCell className="text-muted-foreground">{listing.hostaway_listing_id}</TableCell>
                       <TableCell>
                         <Select onValueChange={(val) => handleAssignOwner(listing.id, val)}>
@@ -208,7 +243,7 @@ export default function SyncHealth() {
             {logsLoading ? (
               <p className="text-sm text-muted-foreground">Loading...</p>
             ) : !syncLogs || syncLogs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No syncs recorded yet. Run your first sync from Settings → Integrations.</p>
+              <p className="text-sm text-muted-foreground">No syncs recorded yet.</p>
             ) : (
               <Table>
                 <TableHeader>
@@ -227,7 +262,7 @@ export default function SyncHealth() {
                     const duration = log.completed_at && log.started_at
                       ? Math.round((new Date(log.completed_at).getTime() - new Date(log.started_at).getTime()) / 1000)
                       : null;
-                    const errorCount = Array.isArray(log.errors) ? log.errors.length : 0;
+                    const errors = Array.isArray(log.errors) ? log.errors : [];
                     return (
                       <TableRow key={log.id}>
                         <TableCell>{statusBadge(log.status)}</TableCell>
@@ -239,8 +274,24 @@ export default function SyncHealth() {
                         <TableCell className="text-sm">{log.reservations_synced}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{log.reservations_skipped}</TableCell>
                         <TableCell>
-                          {errorCount > 0 ? (
-                            <Badge variant="outline" className="text-red-400 border-red-500/30">{errorCount}</Badge>
+                          {errors.length > 0 ? (
+                            <Collapsible>
+                              <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="gap-1 h-6 px-2 text-red-400 hover:text-red-300">
+                                  {errors.length} <ChevronDown className="h-3 w-3" />
+                                </Button>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="mt-2">
+                                <div className="max-h-32 overflow-y-auto rounded border border-border/30 bg-secondary/30 p-2 space-y-1">
+                                  {errors.slice(0, 10).map((err: string, i: number) => (
+                                    <p key={i} className="text-xs text-red-400/80 font-mono break-all">{err}</p>
+                                  ))}
+                                  {errors.length > 10 && (
+                                    <p className="text-xs text-muted-foreground">...and {errors.length - 10} more</p>
+                                  )}
+                                </div>
+                              </CollapsibleContent>
+                            </Collapsible>
                           ) : (
                             <span className="text-sm text-muted-foreground">0</span>
                           )}
