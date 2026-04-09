@@ -3,7 +3,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { useRevenuePacing } from "@/hooks/useRevenuePacing";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DollarSign, Clock, TrendingUp } from "lucide-react";
+import { PoundSterling, Clock, TrendingUp } from "lucide-react";
 import { addMonths, startOfMonth, format } from "date-fns";
 
 const formatGBP = (v: number) =>

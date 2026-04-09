@@ -1,7 +1,7 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { useOTBData } from "@/hooks/useOTBData";
-import { DollarSign, CalendarDays, Clock } from "lucide-react";
+import { PoundSterling, CalendarDays, Clock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";

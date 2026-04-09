@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Bed, Bath, Users, MapPin, DollarSign, Brush, Building2, Wrench, Key, ClipboardList } from "lucide-react";
+import { ArrowLeft, Bed, Bath, Users, MapPin, PoundSterling, Brush, Building2, Wrench, Key, ClipboardList } from "lucide-react";
 
 export default function PropertyDetail() {
   const { id } = useParams<{ id: string }>();

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { DollarSign, Calendar, TrendingUp, Moon, Hash } from "lucide-react";
+import { PoundSterling, Calendar, TrendingUp, Moon, Hash } from "lucide-react";
 import { startOfYear, endOfYear } from "date-fns";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";

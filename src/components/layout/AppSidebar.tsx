@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, TrendingUp, Grid3X3, DollarSign, CalendarDays,
+  LayoutDashboard, TrendingUp, Grid3X3, PoundSterling, CalendarDays,
   Building2, Users, Upload, Briefcase, Settings, LogOut, Telescope,
   Gauge, Target, Sparkles, Home, ChevronRight, Brush, BookOpen,
   FileText, Link, UserSearch, Mail, Send, Megaphone, ClipboardList,

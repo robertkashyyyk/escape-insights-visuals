@@ -1,4 +1,4 @@
-import { Pencil, DollarSign, Percent, BedDouble, Receipt } from "lucide-react";
+import { Pencil, PoundSterling, Percent, BedDouble, Receipt } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { OwnerPerformanceRow } from "@/hooks/useOwnerPerformance";
 

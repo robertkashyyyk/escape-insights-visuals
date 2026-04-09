@@ -1,7 +1,7 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { format } from "date-fns";
 import { useTodayData } from "@/hooks/useTodayData";
-import { Sparkles, LogOut, LogIn, AlertTriangle, DollarSign, CalendarCheck, BarChart3, Loader2 } from "lucide-react";
+import { Sparkles, LogOut, LogIn, AlertTriangle, PoundSterling, CalendarCheck, BarChart3, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export default function Today() {

@@ -4,7 +4,7 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, ChevronLeft, ChevronRight, DollarSign, Percent, BedDouble } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, PoundSterling, Percent, BedDouble } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";

@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Home, DollarSign } from "lucide-react";
+import { TrendingUp, Home, PoundSterling } from "lucide-react";
 
 const kpis = [
   { label: "Revenue", value: "£142K", icon: DollarSign, delay: 0.3 },
