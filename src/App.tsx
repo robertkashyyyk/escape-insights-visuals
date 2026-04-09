@@ -25,6 +25,7 @@ import RevenueForecaster from "./pages/RevenueForecaster";
 import OrinIntelligence from "./pages/OrinIntelligence";
 import ComingSoon from "./pages/ComingSoon";
 import Today from "./pages/Today";
+import SyncHealth from "./pages/SyncHealth";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ const App = () => (
             
             <Route path="/management" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ManagementRevenue /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute requiredRoles={["super"]}><SettingsPage /></ProtectedRoute>} />
+            <Route path="/sync-health" element={<ProtectedRoute requiredRoles={["super", "senior"]}><SyncHealth /></ProtectedRoute>} />
             <Route path="/housekeeping" element={<ProtectedRoute><ComingSoon title="Housekeeping — Today's Schedule" /></ProtectedRoute>} />
             <Route path="/housekeeping/week" element={<ProtectedRoute><ComingSoon title="Housekeeping — Week View" /></ProtectedRoute>} />
             <Route path="/housekeeping/allocation" element={<ProtectedRoute><ComingSoon title="Cleaner Allocation" /></ProtectedRoute>} />

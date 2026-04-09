@@ -324,6 +324,45 @@ export type Database = {
           },
         ]
       }
+      sync_logs: {
+        Row: {
+          completed_at: string | null
+          errors: Json | null
+          id: string
+          listings_synced: number | null
+          reservations_skipped: number | null
+          reservations_synced: number | null
+          started_at: string
+          status: string
+          sync_type: string
+          triggered_by: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          errors?: Json | null
+          id?: string
+          listings_synced?: number | null
+          reservations_skipped?: number | null
+          reservations_synced?: number | null
+          started_at?: string
+          status?: string
+          sync_type?: string
+          triggered_by?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          errors?: Json | null
+          id?: string
+          listings_synced?: number | null
+          reservations_skipped?: number | null
+          reservations_synced?: number | null
+          started_at?: string
+          status?: string
+          sync_type?: string
+          triggered_by?: string | null
+        }
+        Relationships: []
+      }
       upload_batches: {
         Row: {
           created_at: string
