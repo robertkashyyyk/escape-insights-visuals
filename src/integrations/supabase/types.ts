@@ -420,6 +420,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      manage_hostaway_cron: {
+        Args: {
+          anon_key?: string
+          interval_hours: number
+          supabase_url?: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "super" | "senior" | "admin" | "client"
