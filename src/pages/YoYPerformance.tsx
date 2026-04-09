@@ -55,14 +55,14 @@ function YoYBadge({ change, isNew }: { change: number | null; isNew?: boolean })
   );
 }
 
-function MetricRow({ label, value, change }: { label: string; value: string; change: number | null }) {
+function MetricRow({ label, value, change, isNew }: { label: string; value: string; change: number | null; isNew?: boolean }) {
   return (
     <div className="flex items-center justify-between py-2 border-b border-border/30 last:border-b-0">
       <div>
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
         <p className="text-sm font-semibold text-foreground">{value}</p>
       </div>
-      <YoYBadge change={change} />
+      <YoYBadge change={change} isNew={isNew} />
     </div>
   );
 }
