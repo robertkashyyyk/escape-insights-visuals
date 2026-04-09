@@ -184,7 +184,7 @@ function HeatmapCell({ cell, propertyName, month, year }: { cell: MonthCell; pro
         <div className="p-[2px]">
           <div
             className="w-full rounded-[3px] transition-all duration-150 hover:scale-110 hover:z-10 cursor-default"
-            style={{ backgroundColor: getCellColor(cell.occupancy), minHeight: "32px" }}
+            style={{ backgroundColor: getCellColor(cell?.occupancy ?? 0), minHeight: "32px" }}
           />
         </div>
       </TooltipTrigger>
