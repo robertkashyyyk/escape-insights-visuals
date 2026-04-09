@@ -69,7 +69,7 @@ export default function RevenuePacing() {
 
   return (
     <AppLayout>
-      <div className="space-y-8 animate-fade-in">
+      <div className="p-4 md:p-6 lg:p-8 space-y-8 animate-fade-in">
         {/* Header */}
         <div>
           <h1 className="text-2xl font-display font-bold text-foreground tracking-tight">
