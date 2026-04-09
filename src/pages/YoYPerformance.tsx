@@ -24,11 +24,39 @@ function getDefaultPeriodValue(type: PeriodType): number {
   return 1;
 }
 
-function YoYBadge({ change, isNew }: { change: number | null; isNew?: boolean }) {
-  if (isNew) {
+type MetricStatus = "pending" | "new" | "no-data" | "normal";
+
+function getMetricStatus(current: number, previous: number): MetricStatus {
+  if (current === 0 && previous > 0) return "pending";
+  if (current > 0 && previous === 0) return "new";
+  if (current === 0 && previous === 0) return "no-data";
+  return "normal";
+}
+
+function pctChange(current: number, previous: number): number | null {
+  if (previous === 0) return null;
+  return ((current - previous) / previous) * 100;
+}
+
+function YoYBadge({ status, change }: { status: MetricStatus; change: number | null }) {
+  if (status === "pending") {
+    return (
+      <Badge variant="outline" className="text-[11px] px-2 py-0.5 border-amber-500/30 text-amber-400 bg-amber-500/10 gap-1 font-semibold">
+        <Minus className="h-3 w-3" /> Pending
+      </Badge>
+    );
+  }
+  if (status === "new") {
     return (
       <Badge variant="outline" className="text-[11px] px-2 py-0.5 border-primary/30 text-primary bg-primary/10 gap-1 font-semibold">
         New
+      </Badge>
+    );
+  }
+  if (status === "no-data") {
+    return (
+      <Badge variant="outline" className="text-[11px] px-2 py-0.5 border-border text-muted-foreground gap-1">
+        <Minus className="h-3 w-3" /> No Data
       </Badge>
     );
   }
