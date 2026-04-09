@@ -9,7 +9,8 @@ import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth, useRole } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { ChevronDown } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
