@@ -25,6 +25,7 @@ import RevenueForecaster from "./pages/RevenueForecaster";
 import OrinIntelligence from "./pages/OrinIntelligence";
 import ComingSoon from "./pages/ComingSoon";
 import Today from "./pages/Today";
+import SyncHealth from "./pages/SyncHealth";
 
 const queryClient = new QueryClient();
 
