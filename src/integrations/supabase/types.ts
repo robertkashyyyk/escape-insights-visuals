@@ -40,6 +40,7 @@ export type Database = {
       }
       listings: {
         Row: {
+          access_details: string | null
           address: string | null
           base_rate: number | null
           bathrooms: number | null
@@ -53,18 +54,23 @@ export type Database = {
           latitude: number | null
           location_group: string | null
           longitude: number | null
+          management_rate_override: number | null
           max_guests: number | null
           min_rate: number | null
           name: string
           nightly_rate: number | null
+          operational_notes: string | null
           owner_id: string
           postcode: string | null
+          primary_cleaner: string | null
           property_type: string | null
           status: string
           tags: string | null
+          troubleshooting_notes: string | null
           updated_at: string
         }
         Insert: {
+          access_details?: string | null
           address?: string | null
           base_rate?: number | null
           bathrooms?: number | null
@@ -78,18 +84,23 @@ export type Database = {
           latitude?: number | null
           location_group?: string | null
           longitude?: number | null
+          management_rate_override?: number | null
           max_guests?: number | null
           min_rate?: number | null
           name: string
           nightly_rate?: number | null
+          operational_notes?: string | null
           owner_id: string
           postcode?: string | null
+          primary_cleaner?: string | null
           property_type?: string | null
           status?: string
           tags?: string | null
+          troubleshooting_notes?: string | null
           updated_at?: string
         }
         Update: {
+          access_details?: string | null
           address?: string | null
           base_rate?: number | null
           bathrooms?: number | null
@@ -103,15 +114,19 @@ export type Database = {
           latitude?: number | null
           location_group?: string | null
           longitude?: number | null
+          management_rate_override?: number | null
           max_guests?: number | null
           min_rate?: number | null
           name?: string
           nightly_rate?: number | null
+          operational_notes?: string | null
           owner_id?: string
           postcode?: string | null
+          primary_cleaner?: string | null
           property_type?: string | null
           status?: string
           tags?: string | null
+          troubleshooting_notes?: string | null
           updated_at?: string
         }
         Relationships: [
