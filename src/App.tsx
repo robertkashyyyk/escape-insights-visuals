@@ -58,10 +58,7 @@ const App = () => (
             <Route path="/management" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ManagementRevenue /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute requiredRoles={["super"]}><SettingsPage /></ProtectedRoute>} />
             <Route path="/sync-health" element={<ProtectedRoute requiredRoles={["super", "senior"]}><SyncHealth /></ProtectedRoute>} />
-            <Route path="/housekeeping" element={<ProtectedRoute><ComingSoon title="Housekeeping — Today's Schedule" /></ProtectedRoute>} />
-            <Route path="/housekeeping/week" element={<ProtectedRoute><ComingSoon title="Housekeeping — Week View" /></ProtectedRoute>} />
-            <Route path="/housekeeping/allocation" element={<ProtectedRoute><ComingSoon title="Cleaner Allocation" /></ProtectedRoute>} />
-            <Route path="/housekeeping/invoices" element={<ProtectedRoute><ComingSoon title="Housekeeping Invoice Tracker" /></ProtectedRoute>} />
+            <Route path="/operations/cleaning" element={<ProtectedRoute><CleaningSchedule /></ProtectedRoute>} />
             <Route path="/property-knowledge" element={<ProtectedRoute><ComingSoon title="Property Knowledge" /></ProtectedRoute>} />
             <Route path="/owner-reports" element={<ProtectedRoute requiredRoles={["super", "senior"]}><MonthlyReport /></ProtectedRoute>} />
             <Route path="/owner-reports/invoice" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ComingSoon title="Owner Reports — Invoice Generator" /></ProtectedRoute>} />
