@@ -80,6 +80,7 @@ const sections: NavSection[] = [
   },
   {
     label: "Operations",
+    collapsible: true,
     items: [
       {
         title: "Housekeeping", url: "/housekeeping", icon: Brush, roles: allRoles,
@@ -95,6 +96,7 @@ const sections: NavSection[] = [
   },
   {
     label: "Finance",
+    collapsible: true,
     items: [
       { title: "Management Revenue", url: "/management", icon: Briefcase, roles: managementRoles },
       {
@@ -109,6 +111,7 @@ const sections: NavSection[] = [
   },
   {
     label: "Guests & Marketing",
+    collapsible: true,
     items: [
       { title: "Guest Database", url: "/guests", icon: UserSearch, roles: allRoles },
       {
@@ -124,6 +127,7 @@ const sections: NavSection[] = [
   },
   {
     label: "Portfolio",
+    collapsible: true,
     items: [
       { title: "Properties", url: "/properties", icon: Building2, roles: allRoles },
       { title: "Owner Portfolios", url: "/owners", icon: Users, roles: managementRoles },
@@ -131,7 +135,6 @@ const sections: NavSection[] = [
     ],
   },
 ];
-
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
