@@ -1,17 +1,32 @@
 
 
-## Fix Quarterly Deep Dive Date
+## Plan: Clean Slate for Hostaway Sync
 
-The placeholder text says the Q1 report will be available on "1 April 2026", but today is 9 April 2026 — so it should already be "available." We need to update this to reference the next upcoming quarter instead.
+### What we're doing
+1. **Delete all 2,459 existing reservations** from the database so the Hostaway sync can repopulate from scratch with proper `hostaway_reservation_id` keys — no deduplication headaches.
+2. **Remove the Upload Data feature** entirely since the Hostaway API sync replaces manual CSV imports.
 
-### Change
+### Step 1 — Delete all reservations
+Use the Supabase data tool to run:
+```sql
+DELETE FROM reservations;
+```
+This clears the table so the first Hostaway sync writes clean data with proper IDs.
 
-**`src/pages/OrinIntelligence.tsx`** — In the `QuarterlyPlaceholder` component, update the copy to reference **Q2 2026** as the next upcoming report, with availability on **1 July 2026**. The current Q1 report should either show as "available" or the placeholder should simply point forward to the next quarter.
+### Step 2 — Remove Upload Data page and references
+Files to modify:
+- **Delete** `src/pages/UploadData.tsx`
+- **`src/App.tsx`** — Remove the UploadData import and `/upload` route
+- **`src/components/layout/AppSidebar.tsx`** — Remove the "Upload Data" nav item (line 75) and the `Upload` icon import
+- **`src/components/orin/OrinChatPanel.tsx`** — Remove `/upload` from the route map (line 28)
 
-Proposed updated copy:
-- Heading: **"Q2 2026 Quarterly Deep Dive"**
-- Body: "Your Q2 2026 Quarterly Deep Dive will be available on **1 July 2026**..."
-- Footer: "Next report: 1 October 2026"
+### Step 3 — Update references to uploading
+- **`src/pages/FuturePipeline.tsx`** — Change the empty-state message and button from "Upload a CSV" / link to `/upload` → "Connect Hostaway in Settings → Integrations to sync your bookings" with a link to `/settings`
+- **`src/components/settings/HostawayApiKeyForm.tsx`** — Update description text that mentions "manual CSV uploads"
+- **`src/components/landing/FeaturesSection.tsx`** — Update the "Seamless Ingestion" feature description from CSV upload language to API sync language
+- **`src/components/landing/PricingSection.tsx`** — Change "Basic dashboard & CSV uploads" to "Basic dashboard & API sync"
 
-This keeps the locked/coming-soon state but with correct future dates.
+### What stays
+- The `upload_batches` table — it's still used by the Hostaway sync to log each run
+- The Hostaway sync edge function and "Sync Now" button in Settings
 
