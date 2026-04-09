@@ -48,7 +48,7 @@ export function HostawayApiKeyForm() {
           <Key className="h-4 w-4 text-primary" />
           Hostaway Integration
         </CardTitle>
-        <CardDescription>Enter your Hostaway API key to enable automatic data sync instead of manual CSV uploads.</CardDescription>
+        <CardDescription>Enter your Hostaway credentials to enable automatic data sync.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-1.5">

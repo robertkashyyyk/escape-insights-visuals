@@ -11,7 +11,7 @@ import Properties from "./pages/Properties";
 import PropertyDetail from "./pages/PropertyDetail";
 import Owners from "./pages/Owners";
 import Reservations from "./pages/Reservations";
-import UploadData from "./pages/UploadData";
+
 import SettingsPage from "./pages/SettingsPage";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -51,7 +51,7 @@ const App = () => (
             <Route path="/properties" element={<ProtectedRoute><Properties /></ProtectedRoute>} />
             <Route path="/properties/:id" element={<ProtectedRoute><PropertyDetail /></ProtectedRoute>} />
             <Route path="/owners" element={<ProtectedRoute requiredRoles={["super", "senior"]}><Owners /></ProtectedRoute>} />
-            <Route path="/upload" element={<ProtectedRoute requiredRoles={["super", "senior"]}><UploadData /></ProtectedRoute>} />
+            
             <Route path="/management" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ManagementRevenue /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute requiredRoles={["super"]}><SettingsPage /></ProtectedRoute>} />
             <Route path="/housekeeping" element={<ProtectedRoute><ComingSoon title="Housekeeping — Today's Schedule" /></ProtectedRoute>} />

@@ -5,7 +5,7 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { useOTBData } from "@/hooks/useOTBData";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PoundSterling, CalendarDays, Clock, Building2, LogIn, Upload, AlertTriangle } from "lucide-react";
+import { PoundSterling, CalendarDays, Clock, Building2, LogIn, Settings, AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { format, parseISO } from "date-fns";
@@ -72,12 +72,12 @@ export default function FuturePipeline() {
             <div className="flex-1">
               <p className="text-sm font-medium text-foreground">No future bookings found in the database.</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Upload a current Hostaway CSV export (with check-in dates beyond today) to populate this view.
+                Connect Hostaway in Settings → Integrations to sync your bookings.
               </p>
             </div>
             <Button asChild size="sm" className="shrink-0">
-              <Link to="/upload">
-                <Upload className="h-4 w-4 mr-1.5" /> Upload Data
+              <Link to="/settings">
+                <Settings className="h-4 w-4 mr-1.5" /> Go to Settings
               </Link>
             </Button>
           </div>
