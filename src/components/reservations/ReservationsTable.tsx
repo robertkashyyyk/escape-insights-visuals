@@ -63,18 +63,22 @@ export function ReservationsTable() {
   });
 
   // Derive filter options from data
-  const { propertyOptions, platformOptions } = useMemo(() => {
-    if (!reservations) return { propertyOptions: [], platformOptions: [] };
+  const { propertyOptions, platformOptions, yearOptions } = useMemo(() => {
+    if (!reservations) return { propertyOptions: [], platformOptions: [], yearOptions: [] };
     const props = new Map<string, string>();
     const plats = new Set<string>();
+    const years = new Set<number>();
     for (const r of reservations) {
       const listing = r.listings as any;
       if (listing?.id && listing?.name) props.set(listing.id, listing.name);
       if (r.platform) plats.add(r.platform);
+      const yr = parseISO(r.check_in).getFullYear();
+      if (!isNaN(yr)) years.add(yr);
     }
     return {
       propertyOptions: [...props.entries()].sort((a, b) => a[1].localeCompare(b[1])),
       platformOptions: [...plats].sort(),
+      yearOptions: [...years].sort((a, b) => a - b),
     };
   }, [reservations]);
 
@@ -201,7 +205,7 @@ export function ReservationsTable() {
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
-        <FilterSelect value={yearFilter} onChange={(v) => { setYearFilter(v); setPage(0); }} placeholder="Year" options={[{ value: "all", label: "All Years" }, { value: "2025", label: "2025" }, { value: "2026", label: "2026" }]} />
+        <FilterSelect value={yearFilter} onChange={(v) => { setYearFilter(v); setPage(0); }} placeholder="Year" options={[{ value: "all", label: "All Years" }, ...yearOptions.map((y) => ({ value: String(y), label: String(y) }))]} />
         <FilterSelect
           value={propertyFilter}
           onChange={(v) => { setPropertyFilter(v); setPage(0); }}
