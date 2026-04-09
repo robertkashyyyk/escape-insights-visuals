@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Pencil } from "lucide-react";
+import { Plus, Search, Pencil, AlertTriangle } from "lucide-react";
 import { OwnerForm } from "./OwnerForm";
 
 export function OwnersTable() {
@@ -67,7 +68,7 @@ export function OwnersTable() {
                 <TableHead>Company</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead>
-                <TableHead className="text-right">Mgmt Rate %</TableHead>
+                <TableHead className="text-right">Mgmt Rate</TableHead>
                 <TableHead className="text-center">Listings</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
@@ -78,21 +79,39 @@ export function OwnersTable() {
                   <TableCell colSpan={7} className="text-center text-muted-foreground py-8">No owners found</TableCell>
                 </TableRow>
               )}
-              {filtered?.map((o) => (
-                <TableRow key={o.id}>
-                  <TableCell className="font-medium">{o.name}</TableCell>
-                  <TableCell>{o.company || "—"}</TableCell>
-                  <TableCell>{o.email || "—"}</TableCell>
-                  <TableCell>{o.phone || "—"}</TableCell>
-                  <TableCell className="text-right">{o.management_rate_pct != null ? `${o.management_rate_pct}%` : "—"}</TableCell>
-                  <TableCell className="text-center">{listingCounts?.[o.id] ?? 0}</TableCell>
-                  <TableCell>
-                    <button onClick={() => setEditingId(o.id)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {filtered?.map((o) => {
+                const hasRate = o.management_rate_pct != null;
+                const vatOn = (o as any).vat_inclusive;
+                const effective = hasRate && vatOn ? (o.management_rate_pct! * 1.2).toFixed(1) : hasRate ? o.management_rate_pct!.toFixed(1) : null;
+
+                return (
+                  <TableRow key={o.id}>
+                    <TableCell className="font-medium">{o.name}</TableCell>
+                    <TableCell>{o.company || "—"}</TableCell>
+                    <TableCell>{o.email || "—"}</TableCell>
+                    <TableCell>{o.phone || "—"}</TableCell>
+                    <TableCell className="text-right">
+                      {hasRate ? (
+                        <span>
+                          {effective}%
+                          {vatOn && <span className="text-[10px] text-primary ml-1">+VAT</span>}
+                        </span>
+                      ) : (
+                        <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-[10px] gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Rate not set
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">{listingCounts?.[o.id] ?? 0}</TableCell>
+                    <TableCell>
+                      <button onClick={() => setEditingId(o.id)} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}
