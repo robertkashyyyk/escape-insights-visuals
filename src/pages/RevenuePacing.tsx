@@ -375,9 +375,9 @@ export default function RevenuePacing() {
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={velocityData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                          <XAxis dataKey="daysOut" reversed tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `${v}d`} label={{ value: "Days before month start →", position: "insideBottom", offset: -2, style: { fontSize: 10, fill: "hsl(var(--muted-foreground))" } }} />
+                          <XAxis dataKey="daysOut" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => v === 0 ? "0" : `${v}d`} ticks={[-120, -90, -60, -30, -14, -7, 0].filter(t => velocityData.some(d => d.daysOut <= t + 5 && d.daysOut >= t - 5) || velocityData[0]?.daysOut <= t)} />
                           <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} tickFormatter={(v) => `£${(v / 1000).toFixed(0)}k`} />
-                          <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 12 }} formatter={(value: number, name: string) => [formatGBP(value), name === "thisYear" ? "This Year" : "Last Year"]} labelFormatter={(v) => `${v} days out`} />
+                          <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: 12 }} formatter={(value: number, name: string) => [formatGBP(value), name === "thisYear" ? "This Year" : "Last Year"]} labelFormatter={(v) => `${v} days`} />
                           <Line type="monotone" dataKey="thisYear" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={false} name="thisYear" />
                           <Line type="monotone" dataKey="lastYear" stroke="hsl(var(--muted-foreground))" strokeWidth={2} strokeDasharray="6 3" dot={false} name="lastYear" />
                         </LineChart>
