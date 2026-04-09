@@ -77,12 +77,16 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        <div className="lg:col-span-3">
-          <RevenueChart data={data?.chartData ?? []} isLoading={isLoading} />
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
+        <div className="lg:col-span-3 flex">
+          <div className="flex-1">
+            <RevenueChart data={data?.chartData ?? []} isLoading={isLoading} />
+          </div>
         </div>
-        <div className="lg:col-span-2">
-          <TopProperties properties={data?.topProperties ?? []} isLoading={isLoading} />
+        <div className="lg:col-span-2 flex">
+          <div className="flex-1">
+            <TopProperties properties={data?.topProperties ?? []} isLoading={isLoading} />
+          </div>
         </div>
       </div>
     </div>

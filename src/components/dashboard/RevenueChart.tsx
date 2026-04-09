@@ -33,7 +33,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export function RevenueChart({ data, isLoading }: RevenueChartProps) {
   return (
-    <div className="glass-card p-6 opacity-0 animate-fade-in" style={{ animationDelay: "300ms" }}>
+    <div className="glass-card p-6 h-full opacity-0 animate-fade-in" style={{ animationDelay: "300ms" }}>
       <div className="mb-6">
         <h3 className="font-display font-bold text-lg text-foreground">Revenue</h3>
         <p className="text-xs text-muted-foreground mt-0.5">Rental revenue across all properties</p>

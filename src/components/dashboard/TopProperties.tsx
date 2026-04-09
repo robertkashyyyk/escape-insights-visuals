@@ -16,7 +16,7 @@ interface TopPropertiesProps {
 
 export function TopProperties({ properties, isLoading }: TopPropertiesProps) {
   return (
-    <div className="glass-card p-6 opacity-0 animate-fade-in" style={{ animationDelay: "400ms" }}>
+    <div className="glass-card p-6 h-full opacity-0 animate-fade-in" style={{ animationDelay: "400ms" }}>
       <div className="flex items-center justify-between mb-5">
         <div>
           <h3 className="font-display font-bold text-lg text-foreground">Top Properties</h3>
