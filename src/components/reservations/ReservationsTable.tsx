@@ -14,7 +14,7 @@ import { differenceInDays, format, parseISO } from "date-fns";
 type SortKey = "guest_name" | "property" | "check_in" | "check_out" | "nights" | "lead_time" | "amount" | "platform" | "status";
 type SortDir = "asc" | "desc";
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 250];
 
 const LOCATION_GROUPS = ["Castle Hume", "Belfast", "Enniskillen", "North Coast", "Portstewart Coast", "Larne", "Kesh", "Other"];
 
@@ -37,16 +37,28 @@ export function ReservationsTable() {
   const [sortKey, setSortKey] = useState<SortKey>("check_in");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
 
   const { data: reservations, isLoading } = useQuery({
     queryKey: ["reservations_enhanced"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("reservations")
-        .select("*, listings(id, name, location_group)")
-        .order("check_in", { ascending: false });
-      if (error) throw error;
-      return data;
+      // Fetch all reservations using pagination to bypass 1000-row limit
+      const allData: any[] = [];
+      const batchSize = 1000;
+      let offset = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("reservations")
+          .select("*, listings(id, name, location_group)")
+          .order("check_in", { ascending: false })
+          .range(offset, offset + batchSize - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        allData.push(...data);
+        if (data.length < batchSize) break;
+        offset += batchSize;
+      }
+      return allData;
     },
   });
 
@@ -135,11 +147,11 @@ export function ReservationsTable() {
   const avgLeadTime = leadsWithData.length > 0 ? leadsWithData.reduce((s, r) => s + r.leadDays!, 0) / leadsWithData.length : 0;
 
   // Pagination
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages - 1);
-  const pagedRows = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
-  const showFrom = filtered.length === 0 ? 0 : safePage * PAGE_SIZE + 1;
-  const showTo = Math.min((safePage + 1) * PAGE_SIZE, filtered.length);
+  const pagedRows = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
+  const showFrom = filtered.length === 0 ? 0 : safePage * pageSize + 1;
+  const showTo = Math.min((safePage + 1) * pageSize, filtered.length);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -286,9 +298,24 @@ export function ReservationsTable() {
       {/* Pagination */}
       {!isLoading && filtered.length > 0 && (
         <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
-            Showing {showFrom}–{showTo} of {filtered.length} reservations
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-muted-foreground">
+              Showing {showFrom}–{showTo} of {filtered.length} reservations
+            </p>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Rows:</span>
+              <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(0); }}>
+                <SelectTrigger className="w-[70px] h-7 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAGE_SIZE_OPTIONS.map((size) => (
+                    <SelectItem key={size} value={String(size)} className="text-xs">{size}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" className="h-8 w-8" disabled={safePage === 0} onClick={() => setPage((p) => p - 1)}>
               <ChevronLeft className="h-4 w-4" />
