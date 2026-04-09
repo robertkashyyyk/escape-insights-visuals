@@ -1,13 +1,21 @@
-import { LayoutDashboard, TrendingUp, Grid3X3, DollarSign, CalendarDays, Building2, Users, Upload, Briefcase, Settings, LogOut, Telescope, Gauge, Target, Sparkles } from "lucide-react";
+import {
+  LayoutDashboard, TrendingUp, Grid3X3, DollarSign, CalendarDays,
+  Building2, Users, Upload, Briefcase, Settings, LogOut, Telescope,
+  Gauge, Target, Sparkles, Home, ChevronRight, Brush, BookOpen,
+  FileText, Link, UserSearch, Mail, Send, Megaphone, ClipboardList,
+  LucideIcon,
+} from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth, useRole } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -16,21 +24,111 @@ import {
 
 type AppRole = "super" | "senior" | "admin" | "client";
 
-const allNavItems = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, roles: ["super", "senior", "admin", "client"] as AppRole[] },
-  { title: "Orin Intelligence", url: "/orin", icon: Sparkles, roles: ["super", "senior", "admin", "client"] as AppRole[] },
-  { title: "YoY Performance", url: "/yoy", icon: TrendingUp, roles: ["super", "senior", "admin", "client"] as AppRole[] },
-  { title: "Occupancy Heatmap", url: "/heatmap", icon: Grid3X3, roles: ["super", "senior", "admin", "client"] as AppRole[] },
-  { title: "Pricing Strategy", url: "/pricing", icon: DollarSign, roles: ["super", "senior", "admin", "client"] as AppRole[] },
-  { title: "Reservations", url: "/reservations", icon: CalendarDays, roles: ["super", "senior", "admin", "client"] as AppRole[] },
-  { title: "Future Pipeline", url: "/pipeline", icon: Telescope, roles: ["super", "senior", "admin", "client"] as AppRole[] },
-  { title: "Revenue Pacing", url: "/pacing", icon: Gauge, roles: ["super", "senior", "admin", "client"] as AppRole[] },
-  { title: "Revenue Forecaster", url: "/forecast", icon: Target, roles: ["super", "senior", "admin", "client"] as AppRole[] },
-  { title: "Properties", url: "/properties", icon: Building2, roles: ["super", "senior", "admin", "client"] as AppRole[] },
-  { title: "Owner Portfolios", url: "/owners", icon: Users, roles: ["super", "senior"] as AppRole[] },
-  { title: "Upload Data", url: "/upload", icon: Upload, roles: ["super", "senior"] as AppRole[] },
-  { title: "Management Revenue", url: "/management", icon: Briefcase, roles: ["super", "senior"] as AppRole[] },
-  { title: "Settings", url: "/settings", icon: Settings, roles: ["super"] as AppRole[] },
+interface NavChild {
+  title: string;
+  url: string;
+}
+
+interface NavItem {
+  title: string;
+  url: string;
+  icon: LucideIcon;
+  roles: AppRole[];
+  children?: NavChild[];
+}
+
+interface NavSection {
+  label: string;
+  items: NavItem[];
+}
+
+const allRoles: AppRole[] = ["super", "senior", "admin", "client"];
+const managementRoles: AppRole[] = ["super", "senior"];
+
+const sections: NavSection[] = [
+  {
+    label: "Intelligence",
+    items: [
+      {
+        title: "The Orin Brief", url: "/orin", icon: Sparkles, roles: allRoles,
+        children: [
+          { title: "Monthly Brief", url: "/orin?view=monthly" },
+          { title: "Quarterly Deep Dive", url: "/orin?view=quarterly" },
+        ],
+      },
+    ],
+  },
+  {
+    label: "Performance",
+    items: [
+      { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, roles: allRoles },
+      { title: "YoY Performance", url: "/yoy", icon: TrendingUp, roles: allRoles },
+      { title: "Occupancy Heatmap", url: "/heatmap", icon: Grid3X3, roles: allRoles },
+      { title: "Pricing Strategy", url: "/pricing", icon: DollarSign, roles: allRoles },
+      { title: "Revenue Pacing", url: "/pacing", icon: Gauge, roles: allRoles },
+      { title: "Revenue Forecaster", url: "/forecast", icon: Target, roles: allRoles },
+    ],
+  },
+  {
+    label: "Bookings",
+    items: [
+      { title: "Reservations", url: "/reservations", icon: CalendarDays, roles: allRoles },
+      { title: "Future Pipeline", url: "/pipeline", icon: Telescope, roles: allRoles },
+      { title: "Upload Data", url: "/upload", icon: Upload, roles: managementRoles },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      {
+        title: "Housekeeping", url: "/housekeeping", icon: Brush, roles: allRoles,
+        children: [
+          { title: "Today's Schedule", url: "/housekeeping" },
+          { title: "Week View", url: "/housekeeping/week" },
+          { title: "Cleaner Allocation", url: "/housekeeping/allocation" },
+          { title: "Invoice Tracker", url: "/housekeeping/invoices" },
+        ],
+      },
+      { title: "Property Knowledge", url: "/property-knowledge", icon: BookOpen, roles: allRoles },
+    ],
+  },
+  {
+    label: "Finance",
+    items: [
+      { title: "Management Revenue", url: "/management", icon: Briefcase, roles: managementRoles },
+      {
+        title: "Owner Reports", url: "/owner-reports", icon: FileText, roles: managementRoles,
+        children: [
+          { title: "Monthly Report (15th)", url: "/owner-reports" },
+          { title: "Invoice Generator", url: "/owner-reports/invoice" },
+        ],
+      },
+      { title: "Xero Sync", url: "/xero-sync", icon: Link, roles: managementRoles },
+    ],
+  },
+  {
+    label: "Guests & Marketing",
+    items: [
+      { title: "Guest Database", url: "/guests", icon: UserSearch, roles: allRoles },
+      {
+        title: "Campaigns", url: "/campaigns", icon: Megaphone, roles: allRoles,
+        children: [
+          { title: "Active Campaigns", url: "/campaigns" },
+          { title: "Segments", url: "/campaigns/segments" },
+          { title: "Campaign History", url: "/campaigns/history" },
+        ],
+      },
+      { title: "Mailchimp Sync", url: "/mailchimp-sync", icon: Send, roles: allRoles },
+    ],
+  },
+  {
+    label: "Portfolio",
+    items: [
+      { title: "Properties", url: "/properties", icon: Building2, roles: allRoles },
+      { title: "Owner Portfolios", url: "/owners", icon: Users, roles: managementRoles },
+      { title: "Leads & Enquiries", url: "/leads", icon: ClipboardList, roles: allRoles },
+    ],
+  },
 ];
 
 export function AppSidebar() {
@@ -39,13 +137,32 @@ export function AppSidebar() {
   const location = useLocation();
   const { user, profile, signOut } = useAuth();
   const { role } = useRole();
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
-  const navItems = allNavItems.filter(
-    (item) => !role || item.roles.includes(role)
-  );
+  const isRouteActive = (url: string) => {
+    if (url.includes("?")) return location.pathname === url.split("?")[0];
+    return location.pathname === url;
+  };
+
+  const isParentActive = (item: NavItem) => {
+    if (isRouteActive(item.url)) return true;
+    return item.children?.some((c) => isRouteActive(c.url)) ?? false;
+  };
+
+  const toggleExpand = (title: string) => {
+    setExpandedItems((prev) => ({ ...prev, [title]: !prev[title] }));
+  };
+
+  const filteredSections = sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !role || item.roles.includes(role)),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
+      {/* Logo */}
       <div className="flex h-16 items-center px-4 border-b border-border/30">
         {!collapsed && (
           <div className="animate-fade-in">
@@ -57,40 +174,153 @@ export function AppSidebar() {
         )}
       </div>
 
-      <SidebarContent className="pt-4">
+      <SidebarContent className="pt-2">
+        {/* Today — always visible at top */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => {
-                const isActive = location.pathname === item.url;
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild>
-                      <NavLink
-                        to={item.url}
-                        end
-                        className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                          isActive
-                            ? "bg-primary/10 text-primary"
-                            : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                        }`}
-                        activeClassName=""
-                      >
-                        <item.icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${isActive ? "text-primary" : ""}`} />
-                        {!collapsed && <span>{item.title}</span>}
-                        {isActive && !collapsed && (
-                          <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary animate-pulse-glow" />
-                        )}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <NavLink
+                    to="/dashboard"
+                    end
+                    className={`group flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                      location.pathname === "/dashboard"
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                    }`}
+                    activeClassName=""
+                  >
+                    <Home className={`h-5 w-5 shrink-0 ${location.pathname === "/dashboard" ? "text-primary" : ""}`} />
+                    {!collapsed && <span>Today</span>}
+                    {location.pathname === "/dashboard" && !collapsed && (
+                      <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary animate-pulse-glow" />
+                    )}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Grouped sections */}
+        {filteredSections.map((section) => (
+          <SidebarGroup key={section.label}>
+            {!collapsed && (
+              <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium px-3 mb-1">
+                {section.label}
+              </SidebarGroupLabel>
+            )}
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {section.items.map((item) => {
+                  const active = isParentActive(item);
+                  const hasChildren = item.children && item.children.length > 0;
+                  const isExpanded = expandedItems[item.title] ?? active;
+
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      {hasChildren ? (
+                        <>
+                          <SidebarMenuButton
+                            onClick={() => toggleExpand(item.title)}
+                            className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 w-full cursor-pointer ${
+                              active
+                                ? "bg-primary/10 text-primary"
+                                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                            }`}
+                          >
+                            <item.icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${active ? "text-primary" : ""}`} />
+                            {!collapsed && (
+                              <>
+                                <span className="flex-1 text-left">{item.title}</span>
+                                <ChevronRight
+                                  className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${
+                                    isExpanded ? "rotate-90" : ""
+                                  }`}
+                                />
+                              </>
+                            )}
+                          </SidebarMenuButton>
+                          {!collapsed && isExpanded && (
+                            <div className="ml-7 mt-0.5 space-y-0.5 border-l border-border/30 pl-3">
+                              {item.children!.map((child) => {
+                                const childActive = isRouteActive(child.url);
+                                return (
+                                  <NavLink
+                                    key={child.url}
+                                    to={child.url}
+                                    className={`block px-2 py-1.5 rounded-md text-xs transition-colors ${
+                                      childActive
+                                        ? "text-primary font-medium"
+                                        : "text-muted-foreground hover:text-foreground"
+                                    }`}
+                                    activeClassName=""
+                                  >
+                                    {child.title}
+                                  </NavLink>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <SidebarMenuButton asChild>
+                          <NavLink
+                            to={item.url}
+                            end
+                            className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                              active
+                                ? "bg-primary/10 text-primary"
+                                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                            }`}
+                            activeClassName=""
+                          >
+                            <item.icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${active ? "text-primary" : ""}`} />
+                            {!collapsed && <span>{item.title}</span>}
+                            {active && !collapsed && (
+                              <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary animate-pulse-glow" />
+                            )}
+                          </NavLink>
+                        </SidebarMenuButton>
+                      )}
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
+
+        {/* Settings */}
+        {(!role || role === "super") && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <NavLink
+                      to="/settings"
+                      end
+                      className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        location.pathname === "/settings"
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                      }`}
+                      activeClassName=""
+                    >
+                      <Settings className={`h-[18px] w-[18px] shrink-0 ${location.pathname === "/settings" ? "text-primary" : ""}`} />
+                      {!collapsed && <span>Settings</span>}
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
+      {/* Footer */}
       {!collapsed && (
         <div className="p-4 mt-auto border-t border-border/30 space-y-3">
           {user && (
