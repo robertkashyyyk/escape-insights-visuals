@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Building2 } from "lucide-react";
+import { Building2, AlertTriangle } from "lucide-react";
 
 interface OwnersCardGridProps {
   onSelectOwner: (owner: { id: string; name: string; company: string | null }) => void;
@@ -54,6 +54,9 @@ export function OwnersCardGrid({ onSelectOwner }: OwnersCardGridProps) {
           .join("")
           .slice(0, 2)
           .toUpperCase();
+        const hasRate = owner.management_rate_pct != null;
+        const vatOn = (owner as any).vat_inclusive;
+        const effective = hasRate && vatOn ? (owner.management_rate_pct! * 1.2).toFixed(1) : hasRate ? owner.management_rate_pct!.toFixed(1) : null;
 
         return (
           <button
@@ -72,11 +75,23 @@ export function OwnersCardGrid({ onSelectOwner }: OwnersCardGridProps) {
                 {owner.company && (
                   <p className="text-xs text-muted-foreground truncate mt-0.5">{owner.company}</p>
                 )}
-                <div className="flex items-center gap-1.5 mt-2">
-                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                    {count} {count === 1 ? "listing" : "listings"}
-                  </Badge>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                      {count} {count === 1 ? "listing" : "listings"}
+                    </Badge>
+                  </div>
+                  {hasRate ? (
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                      {effective}%{vatOn ? " +VAT" : ""}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-[10px] gap-0.5 px-1.5 py-0">
+                      <AlertTriangle className="h-2.5 w-2.5" />
+                      Rate not set
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>
