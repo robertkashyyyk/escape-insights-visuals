@@ -90,6 +90,7 @@ export type Database = {
           city: string | null
           country: string | null
           created_at: string
+          google_place_id: string | null
           hostaway_listing_id: number | null
           id: string
           image_url: string | null
@@ -120,6 +121,7 @@ export type Database = {
           city?: string | null
           country?: string | null
           created_at?: string
+          google_place_id?: string | null
           hostaway_listing_id?: number | null
           id?: string
           image_url?: string | null
@@ -150,6 +152,7 @@ export type Database = {
           city?: string | null
           country?: string | null
           created_at?: string
+          google_place_id?: string | null
           hostaway_listing_id?: number | null
           id?: string
           image_url?: string | null
