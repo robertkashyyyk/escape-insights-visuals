@@ -242,6 +242,7 @@ export interface PortfolioMonthPacing {
 
 export interface PortfolioPacingData {
   totalOTB: number;
+  totalSamePointLY: number;
   totalLYFinal: number;
   portfolioPacingPct: number;
   monthsAhead: number;
@@ -290,11 +291,12 @@ export function usePortfolioPacing(months: Date[]) {
       results.push(...all);
 
       const totalOTB = results.reduce((s, m) => s + m.currentOTB, 0);
+      const totalSamePointLY = results.reduce((s, m) => s + m.samePointLY, 0);
       const totalLYFinal = results.reduce((s, m) => s + m.lastYearFinal, 0);
-      const portfolioPacingPct = totalLYFinal > 0 ? (totalOTB / totalLYFinal) * 100 : 0;
+      const portfolioPacingPct = totalSamePointLY > 0 ? (totalOTB / totalSamePointLY) * 100 : 0;
       const monthsAhead = results.filter(m => m.pacingPct >= 100 && m.pacingPct < 900).length;
 
-      return { totalOTB, totalLYFinal, portfolioPacingPct, monthsAhead, months: results };
+      return { totalOTB, totalSamePointLY, totalLYFinal, portfolioPacingPct, monthsAhead, months: results };
     },
     staleTime: 60_000,
   });
