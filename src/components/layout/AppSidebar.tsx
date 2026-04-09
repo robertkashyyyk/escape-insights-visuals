@@ -53,10 +53,6 @@ const sections: NavSection[] = [
     items: [
       {
         title: "The Orin Brief", url: "/orin", icon: Sparkles, roles: allRoles,
-        children: [
-          { title: "Monthly Brief", url: "/orin?view=monthly" },
-          { title: "Quarterly Deep Dive", url: "/orin?view=quarterly" },
-        ],
       },
     ],
   },
