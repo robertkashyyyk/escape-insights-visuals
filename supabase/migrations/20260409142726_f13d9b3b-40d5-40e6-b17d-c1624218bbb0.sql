@@ -1,0 +1,1 @@
+ALTER TABLE listings ADD CONSTRAINT listings_hostaway_listing_id_key UNIQUE (hostaway_listing_id);
