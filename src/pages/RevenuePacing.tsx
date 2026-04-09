@@ -68,7 +68,7 @@ export default function RevenuePacing() {
         map.set(p.daysOut, { daysOut: p.daysOut, thisYear: 0, lastYear: p.cumulative });
       }
     }
-    return Array.from(map.values()).sort((a, b) => b.daysOut - a.daysOut);
+    return Array.from(map.values()).sort((a, b) => a.daysOut - b.daysOut);
   }, [data]);
 
   // Portfolio chart data

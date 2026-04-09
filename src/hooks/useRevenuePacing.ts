@@ -77,33 +77,39 @@ function buildVelocityData(
   if (!reservations.length) return [];
 
   // For each reservation, compute how many days before monthStart it was booked
+  // daysOut is positive = days before month start
   const points = reservations
     .filter((r) => r.reservation_date)
     .map((r) => ({
       daysOut: differenceInDays(monthStart, new Date(r.reservation_date)),
       amount: r.total_amount || 0,
     }))
-    .filter((p) => p.daysOut >= -30 && p.daysOut <= maxDaysBack)
-    .sort((a, b) => b.daysOut - a.daysOut); // sort from furthest out to closest
+    .filter((p) => p.daysOut >= 0 && p.daysOut <= maxDaysBack);
 
   if (!points.length) return [];
 
-  // Build cumulative from furthest out (e.g. 120 days out) to closest (0 or negative)
+  // Group amounts by daysOut
   const grouped: Record<number, number> = {};
   for (const p of points) {
     grouped[p.daysOut] = (grouped[p.daysOut] || 0) + p.amount;
   }
 
+  // Sort descending (furthest first: 120, 119, ... 1, 0)
+  // Build cumulative: start from furthest out, accumulate toward day 0
   const sortedDays = Object.keys(grouped)
     .map(Number)
-    .sort((a, b) => b - a); // descending (furthest first)
+    .sort((a, b) => b - a);
 
   let cumulative = 0;
   const result: VelocityPoint[] = [];
   for (const d of sortedDays) {
     cumulative += grouped[d];
-    result.push({ daysOut: d, cumulative });
+    // Use negative daysOut for x-axis: -120 (left) to 0 (right)
+    result.push({ daysOut: -d, cumulative });
   }
+
+  // Sort ascending by daysOut for chart (-120, -119, ... 0)
+  result.sort((a, b) => a.daysOut - b.daysOut);
 
   return result;
 }
