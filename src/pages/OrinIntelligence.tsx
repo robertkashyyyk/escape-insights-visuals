@@ -148,14 +148,14 @@ function QuarterlyPlaceholder() {
           <Lock className="h-7 w-7 text-muted-foreground/50" />
         </div>
         <h3 className="text-lg font-bold text-foreground mb-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-          Q1 2026 Quarterly Deep Dive
+          Q2 2026 Quarterly Deep Dive
         </h3>
         <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-          Your Q1 2026 Quarterly Deep Dive will be available on <span className="text-foreground font-medium">1 April 2026</span>. Orin analyses the full quarter — revenue trends, occupancy patterns, pricing performance, and owner portfolio rankings.
+          Your Q2 2026 Quarterly Deep Dive will be available on <span className="text-foreground font-medium">1 July 2026</span>. Orin analyses the full quarter — revenue trends, occupancy patterns, pricing performance, and owner portfolio rankings.
         </p>
         <div className="mt-6 inline-flex items-center gap-2 text-xs text-muted-foreground/50">
           <Calendar className="h-3.5 w-3.5" />
-          Next report: 1 July 2026
+          Next report: 1 October 2026
         </div>
       </div>
     </div>
