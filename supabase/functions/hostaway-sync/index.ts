@@ -16,10 +16,21 @@ Deno.serve(async (req) => {
   );
 
   const batchId = crypto.randomUUID();
+  const syncLogId = crypto.randomUUID();
   let totalReservations = 0;
   let totalListings = 0;
+  let skippedReservations = 0;
+  const errors: string[] = [];
 
   try {
+    // Create sync log entry
+    await supabase.from("sync_logs").insert({
+      id: syncLogId,
+      sync_type: "full",
+      status: "running",
+      started_at: new Date().toISOString(),
+    });
+
     // 1. Get credentials
     const { data: settings } = await supabase
       .from("app_settings")
@@ -87,12 +98,15 @@ Deno.serve(async (req) => {
         image_url: l.imageUrl || l.thumbnailUrl || null,
       }));
 
-      // Batch upsert all listings at once
       const { error } = await supabase.from("listings").upsert(rows, {
         onConflict: "hostaway_listing_id",
         ignoreDuplicates: false,
       });
-      if (error) console.warn(`Listing batch upsert error:`, error.message);
+      if (error) {
+        const msg = `Listing batch upsert error: ${error.message}`;
+        console.warn(msg);
+        errors.push(msg);
+      }
 
       totalListings += listings.length;
       listingOffset += LIMIT;
@@ -123,13 +137,13 @@ Deno.serve(async (req) => {
       const reservations = body.result || [];
       if (reservations.length === 0) break;
 
-      // Build batch of rows
       const rows: Record<string, unknown>[] = [];
       for (const r of reservations) {
         const hostawayListingId = r.listingMapId || r.listingId;
         const listingUuid = listingMap.get(hostawayListingId);
         if (!listingUuid) {
           console.warn(`No listing for hostaway_listing_id=${hostawayListingId}, skipping reservation ${r.id}`);
+          skippedReservations++;
           continue;
         }
 
@@ -193,17 +207,21 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Upsert in chunks of BATCH_SIZE
       for (let i = 0; i < rows.length; i += BATCH_SIZE) {
         const chunk = rows.slice(i, i + BATCH_SIZE);
         const { error } = await supabase.from("reservations").upsert(chunk, {
           onConflict: "hostaway_reservation_id",
           ignoreDuplicates: false,
         });
-        if (error) console.warn(`Reservation batch upsert error (offset=${resOffset}, chunk=${i}):`, error.message);
+        if (error) {
+          const msg = `Reservation batch error (offset=${resOffset}, chunk=${i}): ${error.message}`;
+          console.warn(msg);
+          errors.push(msg);
+        }
       }
 
-      totalReservations += reservations.length;
+      totalReservations += rows.length;
+      skippedReservations += reservations.length - rows.length;
       resOffset += LIMIT;
       console.log(`Processed ${totalReservations} reservations so far (offset=${resOffset})`);
       if (reservations.length < LIMIT) break;
@@ -215,13 +233,28 @@ Deno.serve(async (req) => {
       .update({ status: "completed", row_count: totalReservations })
       .eq("id", batchId);
 
-    console.log(`Sync complete: ${totalListings} listings, ${totalReservations} reservations`);
+    // Update sync log
+    await supabase
+      .from("sync_logs")
+      .update({
+        status: errors.length > 0 ? "completed_with_errors" : "success",
+        listings_synced: totalListings,
+        reservations_synced: totalReservations,
+        reservations_skipped: skippedReservations,
+        errors: errors.length > 0 ? errors.slice(0, 50) : [],
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", syncLogId);
+
+    console.log(`Sync complete: ${totalListings} listings, ${totalReservations} reservations, ${skippedReservations} skipped`);
 
     return new Response(
       JSON.stringify({
         success: true,
         listings: totalListings,
         reservations: totalReservations,
+        skipped: skippedReservations,
+        errors: errors.length,
         batchId,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -233,6 +266,18 @@ Deno.serve(async (req) => {
       .from("upload_batches")
       .update({ status: "failed", row_count: totalReservations })
       .eq("id", batchId);
+
+    await supabase
+      .from("sync_logs")
+      .update({
+        status: "error",
+        errors: [...errors, (err as Error).message].slice(0, 50),
+        completed_at: new Date().toISOString(),
+        listings_synced: totalListings,
+        reservations_synced: totalReservations,
+        reservations_skipped: skippedReservations,
+      })
+      .eq("id", syncLogId);
 
     return new Response(
       JSON.stringify({ success: false, error: (err as Error).message }),
