@@ -11,8 +11,13 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Bed, Bath, Users, MapPin, PoundSterling, Brush, Building2, Wrench, Key, ClipboardList, Clock } from "lucide-react";
 
+const DURATION_OPTIONS = [60, 90, 120, 150, 180];
+
 export default function PropertyDetail() {
   const { id } = useParams<{ id: string }>();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [customDuration, setCustomDuration] = useState<string>("");
 
   const { data: listing, isLoading } = useQuery({
     queryKey: ["listing", id],
