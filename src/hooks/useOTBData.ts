@@ -4,8 +4,8 @@ import { format, differenceInDays, addMonths, addDays, startOfMonth, endOfMonth,
 
 type PeriodWindow = 30 | 60 | 90 | 180;
 
-interface MonthlyBucket {
-  month: string;
+interface ChartBucket {
+  label: string;
   revenue: number;
 }
 
