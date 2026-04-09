@@ -1,75 +1,225 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { startOfMonth, endOfMonth, subYears, differenceInDays, format } from "date-fns";
+import { startOfMonth, endOfMonth, subYears, differenceInDays, format, addDays, subDays } from "date-fns";
+
+interface PacingData {
+  currentOTB: number;
+  currentBookingCount: number;
+  samePointLastYear: number;
+  lastYearFinal: number;
+  pacingPct: number;
+  daysOut: number;
+  isStarted: boolean;
+  propertyBreakdown: PropertyPacing[];
+  velocityCurrent: VelocityPoint[];
+  velocityLastYear: VelocityPoint[];
+}
+
+export interface PropertyPacing {
+  listingId: string;
+  propertyName: string;
+  locationGroup: string | null;
+  currentOTB: number;
+  samePointLY: number;
+  pacingPct: number;
+}
+
+export interface VelocityPoint {
+  daysOut: number;
+  cumulative: number;
+}
+
+async function fetchAllReservations(
+  checkInStart: string,
+  checkInEnd: string,
+  reservationDateCutoff?: string
+) {
+  let allData: any[] = [];
+  let from = 0;
+  const batchSize = 1000;
+
+  while (true) {
+    let q = supabase
+      .from("reservations")
+      .select("total_amount, reservation_date, listing_id")
+      .gte("check_in", checkInStart)
+      .lte("check_in", checkInEnd)
+      .eq("status", "confirmed")
+      .range(from, from + batchSize - 1);
+
+    if (reservationDateCutoff) {
+      q = q.lte("reservation_date", reservationDateCutoff);
+    }
+
+    const { data } = await q;
+    if (!data || data.length === 0) break;
+    allData = allData.concat(data);
+    if (data.length < batchSize) break;
+    from += batchSize;
+  }
+
+  return allData;
+}
+
+async function fetchListings() {
+  const { data } = await supabase
+    .from("listings")
+    .select("id, name, location_group")
+    .eq("status", "active");
+  return data || [];
+}
+
+function buildVelocityData(
+  reservations: any[],
+  monthStart: Date,
+  maxDaysBack: number
+): VelocityPoint[] {
+  if (!reservations.length) return [];
+
+  // For each reservation, compute how many days before monthStart it was booked
+  const points = reservations
+    .filter((r) => r.reservation_date)
+    .map((r) => ({
+      daysOut: differenceInDays(monthStart, new Date(r.reservation_date)),
+      amount: r.total_amount || 0,
+    }))
+    .filter((p) => p.daysOut >= -30 && p.daysOut <= maxDaysBack)
+    .sort((a, b) => b.daysOut - a.daysOut); // sort from furthest out to closest
+
+  if (!points.length) return [];
+
+  // Build cumulative from furthest out (e.g. 120 days out) to closest (0 or negative)
+  const grouped: Record<number, number> = {};
+  for (const p of points) {
+    grouped[p.daysOut] = (grouped[p.daysOut] || 0) + p.amount;
+  }
+
+  const sortedDays = Object.keys(grouped)
+    .map(Number)
+    .sort((a, b) => b - a); // descending (furthest first)
+
+  let cumulative = 0;
+  const result: VelocityPoint[] = [];
+  for (const d of sortedDays) {
+    cumulative += grouped[d];
+    result.push({ daysOut: d, cumulative });
+  }
+
+  return result;
+}
 
 export function useRevenuePacing(targetMonth: Date) {
-  return useQuery({
-    queryKey: ["revenue-pacing", format(targetMonth, "yyyy-MM")],
+  return useQuery<PacingData>({
+    queryKey: ["revenue-pacing-v2", format(targetMonth, "yyyy-MM")],
     queryFn: async () => {
       const monthStart = startOfMonth(targetMonth);
       const monthEnd = endOfMonth(targetMonth);
       const today = new Date();
-      const daysUntilStart = Math.max(0, differenceInDays(monthStart, today));
 
-      // Current year: all reservations with check_in in targetMonth
-      const { data: currentData } = await supabase
-        .from("reservations")
-        .select("total_amount, reservation_date")
-        .gte("check_in", format(monthStart, "yyyy-MM-dd"))
-        .lte("check_in", format(monthEnd, "yyyy-MM-dd"));
+      const isStarted = today >= monthStart;
+      const daysOut = isStarted
+        ? differenceInDays(today, monthStart)
+        : differenceInDays(monthStart, today);
 
-      const currentRevenue = (currentData || []).reduce(
-        (sum, r) => sum + (r.total_amount || 0),
-        0
-      );
+      const todayStr = format(today, "yyyy-MM-dd");
+      const lastYearEquivDate = format(subDays(today, 365), "yyyy-MM-dd");
 
-      // Previous year same month
-      const lastYearStart = startOfMonth(subYears(monthStart, 1));
-      const lastYearEnd = endOfMonth(subYears(monthStart, 1));
+      const lastYearMonthStart = startOfMonth(subYears(monthStart, 1));
+      const lastYearMonthEnd = endOfMonth(subYears(monthStart, 1));
 
-      // Historical: bookings that were on the books at the same lead time
-      // reservation_date <= (lastYearStart - daysUntilStart) equivalent point
-      const cutoffDate = new Date(lastYearStart);
-      cutoffDate.setDate(cutoffDate.getDate() - daysUntilStart);
+      const monthStartStr = format(monthStart, "yyyy-MM-dd");
+      const monthEndStr = format(monthEnd, "yyyy-MM-dd");
+      const lyStartStr = format(lastYearMonthStart, "yyyy-MM-dd");
+      const lyEndStr = format(lastYearMonthEnd, "yyyy-MM-dd");
 
-      const { data: historicalAtPoint } = await supabase
-        .from("reservations")
-        .select("total_amount, reservation_date")
-        .gte("check_in", format(lastYearStart, "yyyy-MM-dd"))
-        .lte("check_in", format(lastYearEnd, "yyyy-MM-dd"))
-        .lte("reservation_date", format(cutoffDate, "yyyy-MM-dd"));
+      // Fetch all data in parallel
+      const [currentRes, lyAtPointRes, lyFinalRes, listings] = await Promise.all([
+        fetchAllReservations(monthStartStr, monthEndStr, todayStr),
+        fetchAllReservations(lyStartStr, lyEndStr, lastYearEquivDate),
+        fetchAllReservations(lyStartStr, lyEndStr),
+        fetchListings(),
+      ]);
 
-      const historicalRevenue = (historicalAtPoint || []).reduce(
-        (sum, r) => sum + (r.total_amount || 0),
-        0
-      );
-
-      // Final historical total (all reservations for that month last year)
-      const { data: historicalAll } = await supabase
-        .from("reservations")
-        .select("total_amount")
-        .gte("check_in", format(lastYearStart, "yyyy-MM-dd"))
-        .lte("check_in", format(lastYearEnd, "yyyy-MM-dd"));
-
-      const historicalFinalRevenue = (historicalAll || []).reduce(
-        (sum, r) => sum + (r.total_amount || 0),
-        0
-      );
+      const currentOTB = currentRes.reduce((s, r) => s + (r.total_amount || 0), 0);
+      const currentBookingCount = currentRes.length;
+      const samePointLastYear = lyAtPointRes.reduce((s, r) => s + (r.total_amount || 0), 0);
+      const lastYearFinal = lyFinalRes.reduce((s, r) => s + (r.total_amount || 0), 0);
 
       const pacingPct =
-        historicalRevenue > 0
-          ? (currentRevenue / historicalRevenue) * 100
-          : currentRevenue > 0
-          ? 100
+        samePointLastYear > 0
+          ? (currentOTB / samePointLastYear) * 100
+          : currentOTB > 0
+          ? 999
           : 0;
 
+      // Property-level breakdown
+      const listingMap = new Map(listings.map((l) => [l.id, l]));
+
+      const currentByListing: Record<string, number> = {};
+      for (const r of currentRes) {
+        currentByListing[r.listing_id] = (currentByListing[r.listing_id] || 0) + (r.total_amount || 0);
+      }
+
+      const lyByListing: Record<string, number> = {};
+      for (const r of lyAtPointRes) {
+        lyByListing[r.listing_id] = (lyByListing[r.listing_id] || 0) + (r.total_amount || 0);
+      }
+
+      const allListingIds = new Set([...Object.keys(currentByListing), ...Object.keys(lyByListing)]);
+      const propertyBreakdown: PropertyPacing[] = Array.from(allListingIds)
+        .map((lid) => {
+          const listing = listingMap.get(lid);
+          const cur = currentByListing[lid] || 0;
+          const ly = lyByListing[lid] || 0;
+          return {
+            listingId: lid,
+            propertyName: listing?.name || "Unknown Property",
+            locationGroup: listing?.location_group || null,
+            currentOTB: cur,
+            samePointLY: ly,
+            pacingPct: ly > 0 ? (cur / ly) * 100 : cur > 0 ? 999 : 0,
+          };
+        })
+        .sort((a, b) => a.pacingPct - b.pacingPct);
+
+      // Velocity chart data
+      const velocityCurrent = buildVelocityData(currentRes, monthStart, 120);
+      const velocityLastYear = buildVelocityData(lyFinalRes, lastYearMonthStart, 120);
+
       return {
-        currentRevenue,
-        historicalRevenue,
-        historicalFinalRevenue,
+        currentOTB,
+        currentBookingCount,
+        samePointLastYear,
+        lastYearFinal,
         pacingPct,
-        daysUntilStart,
+        daysOut,
+        isStarted,
+        propertyBreakdown,
+        velocityCurrent,
+        velocityLastYear,
       };
     },
+  });
+}
+
+// Hook to find the default month (earliest future month with bookings)
+export function useDefaultPacingMonth(months: Date[]) {
+  return useQuery({
+    queryKey: ["pacing-default-month", months.map((m) => format(m, "yyyy-MM")).join(",")],
+    queryFn: async () => {
+      for (let i = 0; i < months.length; i++) {
+        const start = format(startOfMonth(months[i]), "yyyy-MM-dd");
+        const end = format(endOfMonth(months[i]), "yyyy-MM-dd");
+        const { count } = await supabase
+          .from("reservations")
+          .select("id", { count: "exact", head: true })
+          .gte("check_in", start)
+          .lte("check_in", end)
+          .eq("status", "confirmed");
+        if (count && count > 0) return i;
+      }
+      return 0;
+    },
+    staleTime: 60_000,
   });
 }
