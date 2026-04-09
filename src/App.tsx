@@ -26,6 +26,7 @@ import OrinIntelligence from "./pages/OrinIntelligence";
 import ComingSoon from "./pages/ComingSoon";
 import Today from "./pages/Today";
 import SyncHealth from "./pages/SyncHealth";
+import MonthlyReport from "./pages/MonthlyReport";
 
 const queryClient = new QueryClient();
 
@@ -61,7 +62,7 @@ const App = () => (
             <Route path="/housekeeping/allocation" element={<ProtectedRoute><ComingSoon title="Cleaner Allocation" /></ProtectedRoute>} />
             <Route path="/housekeeping/invoices" element={<ProtectedRoute><ComingSoon title="Housekeeping Invoice Tracker" /></ProtectedRoute>} />
             <Route path="/property-knowledge" element={<ProtectedRoute><ComingSoon title="Property Knowledge" /></ProtectedRoute>} />
-            <Route path="/owner-reports" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ComingSoon title="Owner Reports — Monthly Report" /></ProtectedRoute>} />
+            <Route path="/owner-reports" element={<ProtectedRoute requiredRoles={["super", "senior"]}><MonthlyReport /></ProtectedRoute>} />
             <Route path="/owner-reports/invoice" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ComingSoon title="Owner Reports — Invoice Generator" /></ProtectedRoute>} />
             <Route path="/xero-sync" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ComingSoon title="Xero Sync" /></ProtectedRoute>} />
             <Route path="/guests" element={<ProtectedRoute><ComingSoon title="Guest Database" /></ProtectedRoute>} />
