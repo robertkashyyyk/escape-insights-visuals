@@ -140,7 +140,7 @@ export default function MonthlyReport() {
 
   return (
     <AppLayout>
-      <div className="space-y-6 max-w-5xl">
+      <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-5xl">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-display font-bold text-foreground">Monthly Report</h1>

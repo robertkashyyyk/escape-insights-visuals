@@ -38,7 +38,7 @@ export default function RevenueForecaster() {
 
   return (
     <AppLayout>
-      <div className="space-y-8 animate-fade-in">
+      <div className="p-4 md:p-6 lg:p-8 space-y-8 animate-fade-in">
         <div>
           <h1 className="text-2xl font-display font-bold text-foreground tracking-tight">
             Revenue Forecaster

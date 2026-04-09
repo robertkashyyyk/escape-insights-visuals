@@ -144,7 +144,7 @@ export default function YoYPerformance() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="p-4 md:p-6 lg:p-8 space-y-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-display font-bold text-foreground">YoY Performance</h1>
