@@ -24,7 +24,14 @@ function getDefaultPeriodValue(type: PeriodType): number {
   return 1;
 }
 
-function YoYBadge({ change }: { change: number | null }) {
+function YoYBadge({ change, isNew }: { change: number | null; isNew?: boolean }) {
+  if (isNew) {
+    return (
+      <Badge variant="outline" className="text-[11px] px-2 py-0.5 border-primary/30 text-primary bg-primary/10 gap-1 font-semibold">
+        New
+      </Badge>
+    );
+  }
   if (change === null) {
     return (
       <Badge variant="outline" className="text-[11px] px-2 py-0.5 border-border text-muted-foreground gap-1">
@@ -48,14 +55,14 @@ function YoYBadge({ change }: { change: number | null }) {
   );
 }
 
-function MetricRow({ label, value, change }: { label: string; value: string; change: number | null }) {
+function MetricRow({ label, value, change, isNew }: { label: string; value: string; change: number | null; isNew?: boolean }) {
   return (
     <div className="flex items-center justify-between py-2 border-b border-border/30 last:border-b-0">
       <div>
         <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</p>
         <p className="text-sm font-semibold text-foreground">{value}</p>
       </div>
-      <YoYBadge change={change} />
+      <YoYBadge change={change} isNew={isNew} />
     </div>
   );
 }
@@ -163,12 +170,13 @@ export default function YoYPerformance() {
                       <p className="text-[11px] text-muted-foreground mt-0.5">{p.city}</p>
                     )}
                     <div className="mt-4">
-                      <MetricRow label="Revenue" value={fmt(p.currentRevenue)} change={p.revenueChange} />
-                      <MetricRow label="ADR" value={fmt(p.currentAdr)} change={p.adrChange} />
+                      <MetricRow label="Revenue" value={fmt(p.currentRevenue)} change={p.revenueChange} isNew={p.isNew} />
+                      <MetricRow label="ADR" value={fmt(p.currentAdr)} change={p.adrChange} isNew={p.isNew} />
                       <MetricRow
                         label="Occupancy"
                         value={`${p.currentOccupancy.toFixed(1)}%`}
                         change={p.occupancyChange}
+                        isNew={p.isNew}
                       />
                     </div>
                   </CardContent>

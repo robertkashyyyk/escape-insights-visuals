@@ -29,6 +29,7 @@ interface PropertyYoY {
   revenueChange: number | null;
   adrChange: number | null;
   occupancyChange: number | null;
+  isNew: boolean;
 }
 
 function getDateRange(periodType: PeriodType, periodValue: number, year: number) {
@@ -109,6 +110,7 @@ export function useYoYData(periodType: PeriodType, periodValue: number, year: nu
 
         const cur = curAgg.get(id) || { revenue: 0, nights: 0 };
         const prev = prevAgg.get(id) || { revenue: 0, nights: 0 };
+        const hadPriorData = prevAgg.has(id);
 
         const curAdr = cur.nights > 0 ? cur.revenue / cur.nights : 0;
         const prevAdr = prev.nights > 0 ? prev.revenue / prev.nights : 0;
@@ -125,9 +127,10 @@ export function useYoYData(periodType: PeriodType, periodValue: number, year: nu
           previousAdr: prevAdr,
           currentOccupancy: Math.min(curOcc, 100),
           previousOccupancy: Math.min(prevOcc, 100),
-          revenueChange: pctChange(cur.revenue, prev.revenue),
-          adrChange: pctChange(curAdr, prevAdr),
-          occupancyChange: pctChange(curOcc, prevOcc),
+          revenueChange: hadPriorData ? pctChange(cur.revenue, prev.revenue) : null,
+          adrChange: hadPriorData ? pctChange(curAdr, prevAdr) : null,
+          occupancyChange: hadPriorData ? pctChange(curOcc, prevOcc) : null,
+          isNew: !hadPriorData,
         });
       }
 
