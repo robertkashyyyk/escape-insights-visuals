@@ -1,0 +1,106 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { differenceInDays, parseISO, format } from "date-fns";
+
+export interface OwnerPerformanceRow {
+  id: string;
+  name: string;
+  company: string | null;
+  email: string | null;
+  phone: string | null;
+  managementRatePct: number | null;
+  vatInclusive: boolean;
+  notes: string | null;
+  propertyCount: number;
+  locationGroups: string[];
+  totalRevenue: number;
+  managementFee: number;
+  blendedAdr: number;
+  avgOccupancy: number;
+  totalNights: number;
+  monthlyRevenue: number[]; // 12 entries Jan-Dec
+  hasData: boolean;
+}
+
+export function useOwnerPerformance(year: number) {
+  return useQuery({
+    queryKey: ["owner_performance", year],
+    queryFn: async (): Promise<OwnerPerformanceRow[]> => {
+      const yearStart = `${year}-01-01`;
+      const yearEnd = `${year}-12-31`;
+
+      // Fetch all owners, listings, and reservations in parallel
+      const [ownersRes, listingsRes, reservationsRes] = await Promise.all([
+        supabase.from("property_owners").select("*").order("name"),
+        supabase.from("listings").select("id, owner_id, status, location_group"),
+        supabase
+          .from("reservations")
+          .select("listing_id, check_in, check_out, total_amount, status")
+          .gte("check_in", yearStart)
+          .lte("check_in", yearEnd),
+      ]);
+
+      const owners = ownersRes.data ?? [];
+      const listings = listingsRes.data ?? [];
+      const reservations = (reservationsRes.data ?? []).filter(
+        (r) => r.status !== "cancelled" && r.status !== "declined"
+      );
+
+      // Build lookup maps
+      const listingsByOwner: Record<string, typeof listings> = {};
+      const listingToOwner: Record<string, string> = {};
+      for (const l of listings) {
+        if (!listingsByOwner[l.owner_id]) listingsByOwner[l.owner_id] = [];
+        listingsByOwner[l.owner_id].push(l);
+        listingToOwner[l.id] = l.owner_id;
+      }
+
+      // Aggregate reservations by owner
+      const ownerAgg: Record<string, { revenue: number; nights: number; monthly: number[] }> = {};
+      for (const r of reservations) {
+        const ownerId = listingToOwner[r.listing_id];
+        if (!ownerId) continue;
+        if (!ownerAgg[ownerId]) ownerAgg[ownerId] = { revenue: 0, nights: 0, monthly: new Array(12).fill(0) };
+        const nights = Math.max(1, differenceInDays(parseISO(r.check_out), parseISO(r.check_in)));
+        const rev = r.total_amount ?? 0;
+        ownerAgg[ownerId].revenue += rev;
+        ownerAgg[ownerId].nights += nights;
+        const monthIdx = parseISO(r.check_in).getMonth();
+        ownerAgg[ownerId].monthly[monthIdx] += rev;
+      }
+
+      return owners.map((o) => {
+        const ownerListings = listingsByOwner[o.id] ?? [];
+        const activeCount = ownerListings.filter((l) => l.status === "active").length;
+        const locationGroups = [...new Set(ownerListings.map((l) => l.location_group).filter(Boolean))] as string[];
+        const agg = ownerAgg[o.id] ?? { revenue: 0, nights: 0, monthly: new Array(12).fill(0) };
+
+        const ratePct = o.management_rate_pct ?? 0;
+        const vatMultiplier = o.vat_inclusive ? 1.2 : 1.0;
+        const managementFee = agg.revenue * (ratePct / 100) * vatMultiplier;
+        const blendedAdr = agg.nights > 0 ? agg.revenue / agg.nights : 0;
+        const avgOccupancy = activeCount > 0 ? (agg.nights / (activeCount * 365)) * 100 : 0;
+
+        return {
+          id: o.id,
+          name: o.name,
+          company: o.company,
+          email: o.email,
+          phone: o.phone,
+          managementRatePct: o.management_rate_pct,
+          vatInclusive: o.vat_inclusive,
+          notes: o.notes,
+          propertyCount: ownerListings.length,
+          locationGroups,
+          totalRevenue: agg.revenue,
+          managementFee,
+          blendedAdr,
+          avgOccupancy,
+          totalNights: agg.nights,
+          monthlyRevenue: agg.monthly,
+          hasData: agg.revenue > 0,
+        };
+      });
+    },
+  });
+}
