@@ -1,33 +1,23 @@
 
 
-## Fix: Add Missing Unique Constraint for Hostaway Sync
+## Fix: Dynamic Year Filter for Reservations Table
 
 ### Problem
-The sync logs show every listing upsert failing with:
-`"there is no unique or exclusion constraint matching the ON CONFLICT specification"`
+The Reservations page has hardcoded year options (2025, 2026), but the database contains reservations from 2021–2027.
 
-The edge function does `upsert(..., { onConflict: "hostaway_listing_id" })` but the `listings` table has no unique constraint on that column. Reservations are syncing (800+ processed) but can't link to listings properly since none were upserted.
+### Other Pages Checked
+- **Dashboard DateFilter** — uses chevron arrows to increment/decrement year freely. No issue.
+- **YoY Performance** — same chevron pattern. No issue.
+- **Owners** — same chevron pattern. No issue.
+- **Revenue Pacing** — uses month tabs, no year dropdown. No issue.
+
+Only the Reservations table needs fixing.
 
 ### Fix
+Derive year options dynamically from the fetched reservation data. After processing all rows, extract the distinct years present and build the dropdown options from that set, sorted ascending.
 
-**Step 1 — Add unique constraint via migration**
-```sql
-ALTER TABLE listings
-ADD CONSTRAINT listings_hostaway_listing_id_key UNIQUE (hostaway_listing_id);
-```
-
-This single migration fixes the root cause. No edge function code changes needed — the upsert logic is already correct, it just needs the constraint to exist.
-
-**Step 2 — Re-run sync**
-After the constraint is added, the user hits "Sync Now" again. This time:
-- All 50 listings will upsert correctly
-- Reservations will match to listings via `hostaway_listing_id`
-- The `hostaway_reservation_id` unique constraint (added in a prior migration) handles reservation dedup
-
-### Files changed
-- One new migration file only
-
-### What stays the same
-- Edge function code — no changes needed
-- All existing data unaffected
+### Changes
+**`src/components/reservations/ReservationsTable.tsx`** (single file)
+- After `processedRows` is computed, derive `yearOptions` from `new Set(processedRows.map(r => r.year))`, sorted ascending.
+- Replace the hardcoded `[2025, 2026]` options array with the dynamic list.
 
