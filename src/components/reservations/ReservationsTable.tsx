@@ -205,7 +205,7 @@ export function ReservationsTable() {
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
-        <FilterSelect value={yearFilter} onChange={(v) => { setYearFilter(v); setPage(0); }} placeholder="Year" options={[{ value: "all", label: "All Years" }, { value: "2025", label: "2025" }, { value: "2026", label: "2026" }]} />
+        <FilterSelect value={yearFilter} onChange={(v) => { setYearFilter(v); setPage(0); }} placeholder="Year" options={[{ value: "all", label: "All Years" }, ...yearOptions.map((y) => ({ value: String(y), label: String(y) }))]} />
         <FilterSelect
           value={propertyFilter}
           onChange={(v) => { setPropertyFilter(v); setPage(0); }}
