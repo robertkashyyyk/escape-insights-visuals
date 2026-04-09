@@ -107,9 +107,22 @@ export function IntegrationsSettings() {
     setCronInterval(value);
     setSavingCron(true);
     const now = new Date().toISOString();
+
+    // Save the setting
     const { error } = await (supabase.from("app_settings") as any).upsert([
       { key: "hostaway_sync_interval", value, updated_by: user?.id, updated_at: now },
     ], { onConflict: "key" });
+
+    // Actually schedule/unschedule the cron job via edge function
+    try {
+      const hours = value === "off" ? 0 : parseInt(value, 10);
+      await supabase.functions.invoke("manage-cron", {
+        body: { interval_hours: hours },
+      });
+    } catch (cronErr: any) {
+      console.warn("Cron scheduling failed (will retry on next save):", cronErr);
+    }
+
     setSavingCron(false);
     if (error) {
       toast({ title: "Error saving schedule", description: error.message, variant: "destructive" });
