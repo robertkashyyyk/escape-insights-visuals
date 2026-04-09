@@ -3,16 +3,16 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { useRevenuePacing } from "@/hooks/useRevenuePacing";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PoundSterling, Clock, TrendingUp } from "lucide-react";
-import { addMonths, startOfMonth, format } from "date-fns";
+import { PoundSterling, Clock, TrendingUp, AlertCircle } from "lucide-react";
+import { addMonths, subMonths, startOfMonth, format, differenceInDays } from "date-fns";
 
 const formatGBP = (v: number) =>
   `£${v.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
 export default function RevenuePacing() {
   const months = useMemo(() => {
-    const now = new Date();
-    return Array.from({ length: 6 }, (_, i) => startOfMonth(addMonths(now, i)));
+    const lastMonth = startOfMonth(subMonths(new Date(), 1));
+    return Array.from({ length: 6 }, (_, i) => startOfMonth(addMonths(lastMonth, i)));
   }, []);
 
   const [selectedIdx, setSelectedIdx] = useState(0);
@@ -29,6 +29,17 @@ export default function RevenuePacing() {
   const historicalPointPct = data?.historicalFinalRevenue && data.historicalRevenue
     ? Math.min((data.historicalRevenue / data.historicalFinalRevenue) * 100, 100)
     : 0;
+
+  // Fix 1: compute days-out subtitle
+  const today = new Date();
+  const monthStart = startOfMonth(targetMonth);
+  const isCurrentOrPast = today >= monthStart;
+  const daysSubtitle = isCurrentOrPast
+    ? `${differenceInDays(today, monthStart)} days into ${format(targetMonth, "MMMM")}`
+    : `${differenceInDays(monthStart, today)} days until ${format(targetMonth, "MMMM")} starts`;
+
+  // Fix 2: empty state
+  const hasNoBookings = !isLoading && data && data.currentRevenue === 0;
 
   return (
     <AppLayout>
@@ -60,6 +71,13 @@ export default function RevenuePacing() {
 
         {isLoading ? (
           <Skeleton className="h-64 w-full" />
+        ) : hasNoBookings ? (
+          <div className="glass-card p-8 flex flex-col items-center gap-3 border border-primary/30 bg-primary/5">
+            <AlertCircle className="h-10 w-10 text-primary" />
+            <p className="text-sm text-center text-muted-foreground max-w-md">
+              No bookings on the books yet for <span className="font-semibold text-foreground">{format(targetMonth, "MMMM yyyy")}</span>. This view will populate once bookings are confirmed for this period.
+            </p>
+          </div>
         ) : (
           <div className="glass-card p-8 flex flex-col items-center">
             <svg viewBox="0 0 200 120" className="w-64 h-32 mb-4">
@@ -68,9 +86,7 @@ export default function RevenuePacing() {
               <text x="100" y="85" textAnchor="middle" className="fill-foreground font-display font-bold" fontSize="28">{Math.round(pacingPct)}%</text>
               <text x="100" y="105" textAnchor="middle" fontSize="11" className={isAhead ? "fill-success" : "fill-destructive"} fontWeight="600">{isAhead ? "AHEAD" : "BEHIND"}</text>
             </svg>
-            <p className="text-xs text-muted-foreground">
-              {data?.daysUntilStart ?? 0} days until {format(targetMonth, "MMMM")} starts
-            </p>
+            <p className="text-xs text-muted-foreground">{daysSubtitle}</p>
           </div>
         )}
 
@@ -81,12 +97,12 @@ export default function RevenuePacing() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <KpiCard title="Current Booked Revenue" value={formatGBP(data?.currentRevenue ?? 0)} subtitle={format(targetMonth, "MMMM yyyy")} icon={PoundSterling} accentColor="primary" delay={0} />
-            <KpiCard title="Same Point Last Year" value={formatGBP(data?.historicalRevenue ?? 0)} subtitle={`At ${data?.daysUntilStart ?? 0} days out`} icon={Clock} accentColor="accent" delay={100} />
+            <KpiCard title="Same Point Last Year" value={formatGBP(data?.historicalRevenue ?? 0)} subtitle={daysSubtitle} icon={Clock} accentColor="accent" delay={100} />
             <KpiCard title="Final Revenue Last Year" value={formatGBP(data?.historicalFinalRevenue ?? 0)} subtitle={format(startOfMonth(new Date(targetMonth.getFullYear() - 1, targetMonth.getMonth())), "MMMM yyyy")} icon={TrendingUp} accentColor="chart-3" delay={200} />
           </div>
         )}
 
-        {!isLoading && data && (
+        {!isLoading && data && !hasNoBookings && (
           <div className="glass-card p-6 space-y-3">
             <p className="text-sm font-medium text-foreground">Progress vs Last Year's Final</p>
             <div className="relative">
