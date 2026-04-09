@@ -1,19 +1,54 @@
 import { AppLayout } from "@/components/layout/AppLayout";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GeneralSettings } from "@/components/settings/GeneralSettings";
+import { IntegrationsSettings } from "@/components/settings/IntegrationsSettings";
+import { CleanersSettings } from "@/components/settings/CleanersSettings";
+import { FinanceSettings } from "@/components/settings/FinanceSettings";
+import { AccountSettings } from "@/components/settings/AccountSettings";
 import { InviteUserForm } from "@/components/settings/InviteUserForm";
-import { HostawayApiKeyForm } from "@/components/settings/HostawayApiKeyForm";
+import { Settings, Plug, SprayCan, PoundSterling, User } from "lucide-react";
 
 export default function SettingsPage() {
   return (
     <AppLayout>
       <div className="p-4 md:p-6 lg:p-8 space-y-6">
         <div>
-          <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground tracking-tight">Settings</h2>
-          <p className="text-sm text-muted-foreground mt-1">Manage your team and preferences</p>
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Settings</h2>
+          <p className="text-sm text-muted-foreground mt-1">Manage your workspace, integrations, and team</p>
         </div>
-        <div className="max-w-lg space-y-6">
-          <InviteUserForm />
-          <HostawayApiKeyForm />
-        </div>
+
+        <Tabs defaultValue="general" className="space-y-6">
+          <TabsList className="bg-secondary/50 border border-border/30 h-auto flex-wrap">
+            <TabsTrigger value="general" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+              <Settings className="h-3.5 w-3.5" />General
+            </TabsTrigger>
+            <TabsTrigger value="integrations" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+              <Plug className="h-3.5 w-3.5" />Integrations
+            </TabsTrigger>
+            <TabsTrigger value="cleaners" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+              <SprayCan className="h-3.5 w-3.5" />Cleaners
+            </TabsTrigger>
+            <TabsTrigger value="finance" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+              <PoundSterling className="h-3.5 w-3.5" />Finance
+            </TabsTrigger>
+            <TabsTrigger value="account" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+              <User className="h-3.5 w-3.5" />Account
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="general"><GeneralSettings /></TabsContent>
+          <TabsContent value="integrations"><IntegrationsSettings /></TabsContent>
+          <TabsContent value="cleaners"><CleanersSettings /></TabsContent>
+          <TabsContent value="finance"><FinanceSettings /></TabsContent>
+          <TabsContent value="account">
+            <div className="space-y-6">
+              <AccountSettings />
+              <div className="max-w-xl">
+                <InviteUserForm />
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );

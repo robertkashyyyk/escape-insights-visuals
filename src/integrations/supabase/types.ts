@@ -38,6 +38,48 @@ export type Database = {
         }
         Relationships: []
       }
+      cleaners: {
+        Row: {
+          active: boolean
+          created_at: string
+          email: string | null
+          id: string
+          max_cleans_per_day: number | null
+          name: string
+          non_working_days: string[] | null
+          phone: string | null
+          rate_per_clean: number | null
+          region: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          email?: string | null
+          id?: string
+          max_cleans_per_day?: number | null
+          name: string
+          non_working_days?: string[] | null
+          phone?: string | null
+          rate_per_clean?: number | null
+          region?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          email?: string | null
+          id?: string
+          max_cleans_per_day?: number | null
+          name?: string
+          non_working_days?: string[] | null
+          phone?: string | null
+          rate_per_clean?: number | null
+          region?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       listings: {
         Row: {
           access_details: string | null
