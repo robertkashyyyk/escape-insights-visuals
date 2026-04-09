@@ -1,119 +1,206 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useOccupancyHeatmap } from "@/hooks/useOccupancyHeatmap";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useOccupancyHeatmap, type ListingOccupancy, type MonthCell } from "@/hooks/useOccupancyHeatmap";
 import { AppLayout } from "@/components/layout/AppLayout";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-function getCellStyle(value: number) {
-  if (value === 0) return { backgroundColor: "rgba(100, 116, 139, 0.1)" };
-  if (value < 40) {
-    const intensity = 0.15 + (value / 40) * 0.25;
-    return { backgroundColor: `rgba(239, 68, 68, ${intensity})` };
-  }
-  if (value <= 75) {
-    const intensity = 0.15 + ((value - 40) / 35) * 0.2;
-    return { backgroundColor: `rgba(245, 158, 11, ${intensity})` };
-  }
-  const intensity = 0.25 + ((value - 75) / 25) * 0.35;
-  return { backgroundColor: `rgba(16, 185, 129, ${intensity})` };
-}
+const SCALE: { max: number; bg: string; label: string }[] = [
+  { max: 20, bg: "hsl(222 15% 14%)", label: "0–20%" },
+  { max: 40, bg: "hsl(215 15% 25%)", label: "21–40%" },
+  { max: 60, bg: "hsl(180 20% 30%)", label: "41–60%" },
+  { max: 80, bg: "hsl(38 60% 40%)", label: "61–80%" },
+  { max: 100, bg: "hsl(38 92% 50%)", label: "81–100%" },
+];
 
-function getCellTextClass(value: number) {
-  if (value === 0) return "text-muted-foreground";
-  if (value < 40) return "text-red-400";
-  if (value <= 75) return "text-amber-400";
-  return "text-emerald-400";
+function getCellColor(pct: number): string {
+  for (const s of SCALE) {
+    if (pct <= s.max) return s.bg;
+  }
+  return SCALE[SCALE.length - 1].bg;
 }
 
 export default function OccupancyHeatmap() {
   const [year, setYear] = useState(new Date().getFullYear());
+  const [locationFilter, setLocationFilter] = useState("all");
   const { data, isLoading } = useOccupancyHeatmap(year);
+
+  const grouped = useMemo(() => {
+    if (!data?.listings) return [];
+    const filtered = locationFilter === "all"
+      ? data.listings
+      : data.listings.filter((l) => l.locationGroup === locationFilter);
+
+    const groups = new Map<string, ListingOccupancy[]>();
+    filtered.forEach((l) => {
+      const arr = groups.get(l.locationGroup) || [];
+      arr.push(l);
+      groups.set(l.locationGroup, arr);
+    });
+    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [data, locationFilter]);
 
   return (
     <AppLayout>
-      <div className="space-y-6">
-        {/* Year toggle */}
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => setYear((y) => y - 1)}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-lg font-display font-bold text-foreground min-w-[4rem] text-center">{year}</span>
-          <Button variant="ghost" size="icon" onClick={() => setYear((y) => y + 1)}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+      <div className="p-4 md:p-6 lg:p-8 space-y-6">
+        {/* Header */}
+        <div>
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            Occupancy Heatmap
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">Visual occupancy density across your portfolio</p>
         </div>
 
-        {/* Legend */}
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <div className="h-3 w-6 rounded" style={{ backgroundColor: "rgba(239, 68, 68, 0.3)" }} />
-            <span>&lt; 40%</span>
+        {/* Controls */}
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setYear((y) => y - 1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-lg font-bold text-foreground min-w-[4rem] text-center" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              {year}
+            </span>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setYear((y) => y + 1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-3 w-6 rounded" style={{ backgroundColor: "rgba(245, 158, 11, 0.25)" }} />
-            <span>40–75%</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="h-3 w-6 rounded" style={{ backgroundColor: "rgba(16, 185, 129, 0.4)" }} />
-            <span>&gt; 75%</span>
+
+          <Select value={locationFilter} onValueChange={setLocationFilter}>
+            <SelectTrigger className="w-48 bg-secondary/50 border-border/40 h-9 text-sm">
+              <SelectValue placeholder="All locations" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Locations</SelectItem>
+              {data?.locationGroups?.map((g) => (
+                <SelectItem key={g} value={g}>{g}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Legend */}
+          <div className="flex items-center gap-1 ml-auto">
+            <span className="text-xs text-muted-foreground mr-1.5">0%</span>
+            {SCALE.map((s) => (
+              <div key={s.label} className="h-4 w-8 rounded-sm" style={{ backgroundColor: s.bg }} title={s.label} />
+            ))}
+            <span className="text-xs text-muted-foreground ml-1.5">100%</span>
           </div>
         </div>
 
         {/* Heatmap */}
-        <div className="glass-card rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px]">
-              <thead>
-                <tr className="border-b border-border/30">
-                  <th className="sticky left-0 z-10 bg-card text-left text-xs font-medium text-muted-foreground px-4 py-3 w-48">
-                    Property
-                  </th>
-                  {MONTHS.map((m) => (
-                    <th key={m} className="text-center text-xs font-medium text-muted-foreground px-2 py-3 w-16">
-                      {m}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading
-                  ? Array.from({ length: 8 }).map((_, i) => (
-                      <tr key={i} className="border-b border-border/10">
-                        <td className="sticky left-0 z-10 bg-card px-4 py-2.5">
-                          <Skeleton className="h-4 w-32" />
-                        </td>
-                        {Array.from({ length: 12 }).map((_, j) => (
-                          <td key={j} className="px-2 py-2.5">
-                            <Skeleton className="h-8 w-full rounded" />
-                          </td>
-                        ))}
-                      </tr>
-                    ))
-                  : data?.listings.map((listing) => (
-                      <tr key={listing.id} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
-                        <td className="sticky left-0 z-10 bg-card px-4 py-2.5 text-sm font-medium text-foreground truncate max-w-[12rem]">
-                          {listing.name}
-                        </td>
-                        {listing.months.map((val, i) => (
-                          <td key={i} className="px-1 py-1.5">
-                            <div
-                              className={`flex items-center justify-center rounded-md h-9 text-xs font-semibold transition-colors ${getCellTextClass(val)}`}
-                              style={getCellStyle(val)}
-                            >
-                              {val}%
-                            </div>
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-              </tbody>
-            </table>
+        {isLoading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <Skeleton key={i} className="h-8 w-full rounded" />
+            ))}
           </div>
-        </div>
+        ) : (
+          <TooltipProvider delayDuration={100}>
+            <div className="rounded-xl border border-border/20 bg-card/30 backdrop-blur-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <div className="min-w-[720px]">
+                  {/* Month header */}
+                  <div className="flex border-b border-border/20">
+                    <div className="w-48 shrink-0 px-4 py-2.5">
+                      <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                        Property
+                      </span>
+                    </div>
+                    <div className="flex-1 grid grid-cols-12">
+                      {MONTHS.map((m) => (
+                        <div key={m} className="text-center py-2.5">
+                          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                            {m}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Rows grouped by location */}
+                  {grouped.map(([group, listings], gi) => (
+                    <div key={group}>
+                      {/* Group divider */}
+                      {(locationFilter === "all" || grouped.length > 1) && (
+                        <div className="flex items-center px-4 py-1.5 bg-secondary/20 border-b border-border/10">
+                          <span className="text-[9px] uppercase tracking-[0.15em] text-muted-foreground font-semibold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                            {group}
+                          </span>
+                          <span className="text-[9px] text-muted-foreground/50 ml-2">{listings.length}</span>
+                        </div>
+                      )}
+
+                      {listings.map((listing) => (
+                        <div key={listing.id} className="flex border-b border-border/10 hover:bg-secondary/10 transition-colors">
+                          {/* Property name */}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="w-48 shrink-0 px-4 flex items-center">
+                                <span
+                                  className="text-xs text-foreground/80 truncate block max-w-[11rem]"
+                                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                                >
+                                  {listing.name}
+                                </span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="bg-popover border-border/40 text-xs">
+                              {listing.name}
+                            </TooltipContent>
+                          </Tooltip>
+
+                          {/* Cells */}
+                          <div className="flex-1 grid grid-cols-12">
+                            {listing.months.map((cell, mi) => (
+                              <HeatmapCell key={mi} cell={cell} propertyName={listing.name} month={MONTHS[mi]} year={year} />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+
+                  {grouped.length === 0 && (
+                    <div className="text-center py-12 text-sm text-muted-foreground">No properties found</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </TooltipProvider>
+        )}
       </div>
     </AppLayout>
+  );
+}
+
+function HeatmapCell({ cell, propertyName, month, year }: { cell: MonthCell; propertyName: string; month: string; year: number }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="p-[2px]">
+          <div
+            className="w-full rounded-[3px] transition-all duration-150 hover:scale-110 hover:z-10 cursor-default"
+            style={{ backgroundColor: getCellColor(cell.occupancy), minHeight: "32px" }}
+          />
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="bg-popover border-border/40 p-3 space-y-1">
+        <p className="font-semibold text-foreground text-xs" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{propertyName}</p>
+        <p className="text-muted-foreground text-[11px]">{month} {year}</p>
+        <div className="h-px bg-border/30 my-1" />
+        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px]">
+          <span className="text-muted-foreground">Occupancy</span>
+          <span className="text-foreground font-medium text-right">{cell.occupancy}%</span>
+          <span className="text-muted-foreground">Nights</span>
+          <span className="text-foreground font-medium text-right">{cell.nightsBooked} / {cell.nightsAvailable}</span>
+          <span className="text-muted-foreground">Revenue</span>
+          <span className="text-foreground font-medium text-right">£{cell.revenue.toLocaleString()}</span>
+        </div>
+      </TooltipContent>
+    </Tooltip>
   );
 }
