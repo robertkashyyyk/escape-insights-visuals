@@ -1,0 +1,1 @@
+ALTER TABLE public.property_owners ADD COLUMN IF NOT EXISTS vat_inclusive boolean NOT NULL DEFAULT false;
