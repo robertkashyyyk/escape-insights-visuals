@@ -8,22 +8,22 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { BarChart, Bar, XAxis, YAxis, Tooltip as ReTooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { startOfMonth, endOfMonth, subMonths, startOfQuarter, endOfQuarter, format, subQuarters } from "date-fns";
+import { cn } from "@/lib/utils";
 import {
   PoundSterling, Moon, PercentCircle, Briefcase, Building2,
-  TrendingUp, TrendingDown, Minus, FileDown, Gauge,
+  TrendingUp, TrendingDown, Minus, FileDown, Gauge, CalendarIcon, Telescope,
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
 
 const fmt = (n: number) => `£${n.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
 type PeriodMode = "month" | "quarter" | "custom";
 
 function getDefaultMonth(): Date {
-  // Most recent completed month
-  const now = new Date();
-  return startOfMonth(subMonths(now, 1));
+  return startOfMonth(subMonths(new Date(), 1));
 }
 
 function YoYBadge({ current, previous }: { current: number; previous: number }) {
@@ -82,8 +82,29 @@ function KpiCard({ icon: Icon, label, value, accentClass }: {
   );
 }
 
+function DatePicker({ date, onSelect, label }: { date: Date | undefined; onSelect: (d: Date | undefined) => void; label: string }) {
+  return (
+    <div className="space-y-1">
+      <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            className={cn("w-[150px] h-9 justify-start text-left text-xs font-normal border-border/50", !date && "text-muted-foreground")}
+          >
+            <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
+            {date ? format(date, "d MMM yyyy") : "Pick date"}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar mode="single" selected={date} onSelect={onSelect} initialFocus className={cn("p-3 pointer-events-auto")} />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 export default function MonthlyReport() {
-  // Owners list
   const { data: owners } = useQuery({
     queryKey: ["owners_list"],
     queryFn: async () => {
@@ -96,10 +117,9 @@ export default function MonthlyReport() {
   const [periodMode, setPeriodMode] = useState<PeriodMode>("month");
   const [selectedMonth, setSelectedMonth] = useState(getDefaultMonth());
   const [selectedQuarter, setSelectedQuarter] = useState(() => startOfQuarter(subQuarters(new Date(), 1)));
-  const [customStart, setCustomStart] = useState("");
-  const [customEnd, setCustomEnd] = useState("");
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
 
-  // Auto-select first owner
   const ownerId = selectedOwnerId ?? owners?.[0]?.id ?? null;
 
   const { periodStart, periodEnd } = useMemo(() => {
@@ -109,16 +129,14 @@ export default function MonthlyReport() {
     if (periodMode === "quarter") {
       return { periodStart: selectedQuarter, periodEnd: endOfQuarter(selectedQuarter) };
     }
-    // custom
-    if (customStart && customEnd) {
-      return { periodStart: new Date(customStart), periodEnd: new Date(customEnd) };
+    if (customStartDate && customEndDate) {
+      return { periodStart: customStartDate, periodEnd: customEndDate };
     }
     return { periodStart: selectedMonth, periodEnd: endOfMonth(selectedMonth) };
-  }, [periodMode, selectedMonth, selectedQuarter, customStart, customEnd]);
+  }, [periodMode, selectedMonth, selectedQuarter, customStartDate, customEndDate]);
 
   const { data: report, isLoading } = useMonthlyReport(ownerId, periodStart, periodEnd);
 
-  // Build month options (last 24 months)
   const monthOptions = useMemo(() => {
     const opts: { value: string; label: string }[] = [];
     for (let i = 1; i <= 24; i++) {
@@ -128,7 +146,6 @@ export default function MonthlyReport() {
     return opts;
   }, []);
 
-  // Quarter options
   const quarterOptions = useMemo(() => {
     const opts: { value: string; label: string }[] = [];
     for (let i = 1; i <= 8; i++) {
@@ -156,7 +173,6 @@ export default function MonthlyReport() {
 
         {/* Controls */}
         <div className="flex flex-wrap items-end gap-3">
-          {/* Owner */}
           <div className="space-y-1">
             <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Owner</label>
             <Select value={ownerId ?? ""} onValueChange={setSelectedOwnerId}>
@@ -171,7 +187,6 @@ export default function MonthlyReport() {
             </Select>
           </div>
 
-          {/* Period mode */}
           <div className="space-y-1">
             <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Period</label>
             <div className="flex rounded-lg border border-border/50 overflow-hidden h-9">
@@ -191,7 +206,6 @@ export default function MonthlyReport() {
             </div>
           </div>
 
-          {/* Month/Quarter/Custom selector */}
           {periodMode === "month" && (
             <div className="space-y-1">
               <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Month</label>
@@ -224,29 +238,12 @@ export default function MonthlyReport() {
           )}
           {periodMode === "custom" && (
             <>
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">From</label>
-                <Input
-                  type="date"
-                  value={customStart}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                  className="w-[150px] h-9 text-xs border-border/50"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">To</label>
-                <Input
-                  type="date"
-                  value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                  className="w-[150px] h-9 text-xs border-border/50"
-                />
-              </div>
+              <DatePicker date={customStartDate} onSelect={setCustomStartDate} label="From" />
+              <DatePicker date={customEndDate} onSelect={setCustomEndDate} label="To" />
             </>
           )}
         </div>
 
-        {/* Loading state */}
         {isLoading && (
           <div className="space-y-4">
             <Skeleton className="h-24 w-full" />
@@ -256,14 +253,12 @@ export default function MonthlyReport() {
           </div>
         )}
 
-        {/* No data */}
         {!isLoading && !report && ownerId && (
           <div className="glass-card p-8 text-center">
             <p className="text-muted-foreground text-sm">No data available for this owner and period.</p>
           </div>
         )}
 
-        {/* Report content */}
         {report && (
           <div className="space-y-6 animate-fade-in">
             {/* Section 1 — Header */}
@@ -292,7 +287,7 @@ export default function MonthlyReport() {
               <KpiCard icon={Gauge} label="Avg Nightly Rate" value={fmt(report.avgNightlyRate)} accentClass="bg-chart-5/10" />
             </div>
 
-            {/* Section 3 — YoY Comparison */}
+            {/* Section 3 — YoY Comparison (Fix 1: show prior year values) */}
             <div className="glass-card p-6">
               <h3 className="text-sm font-display font-semibold text-foreground mb-4">vs Prior Year</h3>
               <div className="space-y-0">
@@ -301,12 +296,19 @@ export default function MonthlyReport() {
                   { label: "ADR", current: report.currentAdr, previous: report.prevAdr, format: fmt },
                   { label: "Occupancy", current: report.currentOccupancy, previous: report.prevOccupancy, format: (v: number) => `${v.toFixed(1)}%` },
                 ].map((row) => (
-                  <div key={row.label} className="flex items-center justify-between py-3 border-b border-border/30 last:border-b-0">
-                    <div>
+                  <div key={row.label} className="flex items-center justify-between py-3 border-b border-border/30 last:border-b-0 gap-3">
+                    <div className="min-w-0">
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{row.label}</p>
                       <p className="text-sm font-semibold text-foreground">{row.format(row.current)}</p>
                     </div>
-                    <YoYBadge current={row.current} previous={row.previous} />
+                    <div className="flex items-center gap-3 shrink-0">
+                      {(row.current > 0 || row.previous > 0) && row.previous > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          vs {row.format(row.previous)} in {report.prevPeriodLabel}
+                        </span>
+                      )}
+                      <YoYBadge current={row.current} previous={row.previous} />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -316,7 +318,6 @@ export default function MonthlyReport() {
             <div className="glass-card p-6">
               <h3 className="text-sm font-display font-semibold text-foreground mb-4">Property Breakdown</h3>
               <div className="space-y-0">
-                {/* Header row */}
                 <div className="grid grid-cols-12 gap-2 pb-2 border-b border-border/40 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
                   <div className="col-span-4">Property</div>
                   <div className="col-span-1 text-right">Nights</div>
@@ -347,25 +348,10 @@ export default function MonthlyReport() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={report.monthlyTrend} barSize={28}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
-                      axisLine={false}
-                      tickLine={false}
-                      tickFormatter={(v) => `£${(v / 1000).toFixed(0)}k`}
-                    />
+                    <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `£${(v / 1000).toFixed(0)}k`} />
                     <ReTooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                        fontSize: "12px",
-                      }}
+                      contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
                       formatter={(v: number) => [fmt(v), "Revenue"]}
                     />
                     <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
@@ -373,6 +359,56 @@ export default function MonthlyReport() {
                 </ResponsiveContainer>
               </div>
             </div>
+
+            {/* Section 6 — Forward Bookings (Fix 3) */}
+            {report.showForward && (
+              <div className="glass-card p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <h3 className="text-sm font-display font-semibold text-foreground">Forward Bookings</h3>
+                  <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px] px-1.5 py-0">OTB</Badge>
+                </div>
+
+                {/* Forward KPIs */}
+                <div className="grid grid-cols-3 gap-3 mb-5">
+                  <div className="bg-secondary/30 rounded-lg p-4">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">Confirmed Revenue</p>
+                    <p className="text-lg font-display font-bold text-foreground">{fmt(report.forwardRevenue)}</p>
+                  </div>
+                  <div className="bg-secondary/30 rounded-lg p-4">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">Future Nights</p>
+                    <p className="text-lg font-display font-bold text-foreground">{report.forwardNights}</p>
+                  </div>
+                  <div className="bg-secondary/30 rounded-lg p-4">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-1">Next Check-in</p>
+                    <p className="text-lg font-display font-bold text-foreground">
+                      {report.nextCheckinDate ? format(new Date(report.nextCheckinDate), "d MMM") : "—"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Forward chart */}
+                {report.forwardMonths.some(m => m.revenue > 0) && (
+                  <div className="h-36 mb-3">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={report.forwardMonths} barSize={32}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                        <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `£${(v / 1000).toFixed(0)}k`} />
+                        <ReTooltip
+                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
+                          formatter={(v: number) => [fmt(v), "Revenue"]}
+                        />
+                        <Bar dataKey="revenue" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                <p className="text-[10px] text-muted-foreground/60 italic">
+                  Based on confirmed bookings only. Excludes projected pickup.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
