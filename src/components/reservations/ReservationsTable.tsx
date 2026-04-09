@@ -14,7 +14,7 @@ import { differenceInDays, format, parseISO } from "date-fns";
 type SortKey = "guest_name" | "property" | "check_in" | "check_out" | "nights" | "lead_time" | "amount" | "platform" | "status";
 type SortDir = "asc" | "desc";
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 250];
 
 const LOCATION_GROUPS = ["Castle Hume", "Belfast", "Enniskillen", "North Coast", "Portstewart Coast", "Larne", "Kesh", "Other"];
 
@@ -37,16 +37,28 @@ export function ReservationsTable() {
   const [sortKey, setSortKey] = useState<SortKey>("check_in");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
 
   const { data: reservations, isLoading } = useQuery({
     queryKey: ["reservations_enhanced"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("reservations")
-        .select("*, listings(id, name, location_group)")
-        .order("check_in", { ascending: false });
-      if (error) throw error;
-      return data;
+      // Fetch all reservations using pagination to bypass 1000-row limit
+      const allData: any[] = [];
+      const batchSize = 1000;
+      let offset = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("reservations")
+          .select("*, listings(id, name, location_group)")
+          .order("check_in", { ascending: false })
+          .range(offset, offset + batchSize - 1);
+        if (error) throw error;
+        if (!data || data.length === 0) break;
+        allData.push(...data);
+        if (data.length < batchSize) break;
+        offset += batchSize;
+      }
+      return allData;
     },
   });
 

@@ -15,6 +15,19 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
+  // Check for incremental mode (cron sends this, manual sync does full)
+  let syncMode = "full";
+  let lookbackDays = 0;
+  try {
+    const body = await req.json();
+    if (body?.mode === "incremental" || body?.lookback_days) {
+      syncMode = "incremental";
+      lookbackDays = body.lookback_days || 14; // Default 14-day lookback
+    }
+  } catch {
+    // No body = full sync
+  }
+
   const batchId = crypto.randomUUID();
   const syncLogId = crypto.randomUUID();
   let totalReservations = 0;
@@ -23,10 +36,9 @@ Deno.serve(async (req) => {
   const errors: string[] = [];
 
   try {
-    // Create sync log entry
     await supabase.from("sync_logs").insert({
       id: syncLogId,
-      sync_type: "full",
+      sync_type: syncMode,
       status: "running",
       started_at: new Date().toISOString(),
     });
@@ -63,15 +75,14 @@ Deno.serve(async (req) => {
     const token = tokenBody.access_token;
     const authHeaders = { Authorization: `Bearer ${token}`, "Cache-Control": "no-cache" };
 
-    // Log batch start
     await supabase.from("upload_batches").insert({
       id: batchId,
-      file_name: "hostaway-api-sync",
+      file_name: `hostaway-api-sync-${syncMode}`,
       status: "processing",
       row_count: 0,
     });
 
-    // 3. Sync listings (all pages, batched upserts)
+    // 3. Sync listings (always full — small dataset)
     console.log("Syncing listings...");
     let listingOffset = 0;
     while (true) {
@@ -114,7 +125,7 @@ Deno.serve(async (req) => {
     }
     console.log(`Synced ${totalListings} listings`);
 
-    // 4. Build listing ID map (hostaway_listing_id → uuid)
+    // 4. Build listing ID map
     const { data: dbListings } = await supabase
       .from("listings")
       .select("id, hostaway_listing_id")
@@ -125,11 +136,22 @@ Deno.serve(async (req) => {
       if (dl.hostaway_listing_id) listingMap.set(dl.hostaway_listing_id, dl.id);
     }
 
-    // 5. Sync reservations (all pages, batched upserts)
-    console.log("Syncing reservations...");
+    // 5. Sync reservations
+    // For incremental: only fetch reservations modified in the last N days
+    let reservationUrlBase = `${HOSTAWAY_API}/reservations?limit=${LIMIT}&sortOrder=arrivalDate&includeResources=0`;
+    if (syncMode === "incremental" && lookbackDays > 0) {
+      const sinceDate = new Date();
+      sinceDate.setDate(sinceDate.getDate() - lookbackDays);
+      const sinceStr = sinceDate.toISOString().split("T")[0];
+      reservationUrlBase += `&modifiedDateFrom=${sinceStr}`;
+      console.log(`Incremental sync: fetching reservations modified since ${sinceStr}`);
+    } else {
+      console.log("Full sync: fetching all reservations");
+    }
+
     let resOffset = 0;
     while (true) {
-      const url = `${HOSTAWAY_API}/reservations?limit=${LIMIT}&offset=${resOffset}&sortOrder=arrivalDate&includeResources=0`;
+      const url = `${reservationUrlBase}&offset=${resOffset}`;
       const res = await fetch(url, { headers: authHeaders });
       const body = await res.json();
       if (!res.ok) throw new Error(`Reservations fetch failed: ${JSON.stringify(body)}`);
@@ -227,13 +249,11 @@ Deno.serve(async (req) => {
       if (reservations.length < LIMIT) break;
     }
 
-    // Update batch log
     await supabase
       .from("upload_batches")
       .update({ status: "completed", row_count: totalReservations })
       .eq("id", batchId);
 
-    // Update sync log
     await supabase
       .from("sync_logs")
       .update({
@@ -246,11 +266,12 @@ Deno.serve(async (req) => {
       })
       .eq("id", syncLogId);
 
-    console.log(`Sync complete: ${totalListings} listings, ${totalReservations} reservations, ${skippedReservations} skipped`);
+    console.log(`Sync complete (${syncMode}): ${totalListings} listings, ${totalReservations} reservations, ${skippedReservations} skipped`);
 
     return new Response(
       JSON.stringify({
         success: true,
+        mode: syncMode,
         listings: totalListings,
         reservations: totalReservations,
         skipped: skippedReservations,
