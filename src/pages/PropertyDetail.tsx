@@ -128,6 +128,56 @@ export default function PropertyDetail() {
             <DetailRow label="Listing ID" value={listing.id} mono />
             <DetailRow label="Tags" value={listing.tags} />
           </DetailCard>
+
+          <DetailCard title="Settings" icon={Clock}>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Cleaning Duration</span>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={
+                      DURATION_OPTIONS.includes((listing as any).cleaning_duration_minutes)
+                        ? String((listing as any).cleaning_duration_minutes)
+                        : "custom"
+                    }
+                    onValueChange={async (v) => {
+                      if (v === "custom") return;
+                      const mins = parseInt(v);
+                      await (supabase.from("listings") as any).update({ cleaning_duration_minutes: mins }).eq("id", listing.id);
+                      queryClient.invalidateQueries({ queryKey: ["listing", id] });
+                      toast({ title: `Cleaning duration set to ${mins} min` });
+                    }}
+                  >
+                    <SelectTrigger className="w-36 h-8 text-xs bg-secondary/50 border-border/40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DURATION_OPTIONS.map(m => (
+                        <SelectItem key={m} value={String(m)}>{m} min</SelectItem>
+                      ))}
+                      <SelectItem value="custom">Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {!DURATION_OPTIONS.includes((listing as any).cleaning_duration_minutes) && (
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number" min={15} max={480}
+                        className="w-20 h-8 text-xs bg-secondary/50 border-border/40"
+                        defaultValue={(listing as any).cleaning_duration_minutes ?? 90}
+                        onBlur={async (e) => {
+                          const mins = parseInt(e.target.value) || 90;
+                          await (supabase.from("listings") as any).update({ cleaning_duration_minutes: mins }).eq("id", listing.id);
+                          queryClient.invalidateQueries({ queryKey: ["listing", id] });
+                          toast({ title: `Cleaning duration set to ${mins} min` });
+                        }}
+                      />
+                      <span className="text-xs text-muted-foreground">min</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </DetailCard>
         </div>
 
         <div className="space-y-4">
