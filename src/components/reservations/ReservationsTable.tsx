@@ -147,11 +147,11 @@ export function ReservationsTable() {
   const avgLeadTime = leadsWithData.length > 0 ? leadsWithData.reduce((s, r) => s + r.leadDays!, 0) / leadsWithData.length : 0;
 
   // Pagination
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages - 1);
-  const pagedRows = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
-  const showFrom = filtered.length === 0 ? 0 : safePage * PAGE_SIZE + 1;
-  const showTo = Math.min((safePage + 1) * PAGE_SIZE, filtered.length);
+  const pagedRows = filtered.slice(safePage * pageSize, (safePage + 1) * pageSize);
+  const showFrom = filtered.length === 0 ? 0 : safePage * pageSize + 1;
+  const showTo = Math.min((safePage + 1) * pageSize, filtered.length);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
