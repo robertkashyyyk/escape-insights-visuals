@@ -1,17 +1,16 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, SprayCan } from "lucide-react";
 
-const REGIONS = ["Fermanagh", "North Coast", "Belfast", "Other"];
+const LOCATION_GROUPS = ["Castle Hume", "Belfast", "Enniskillen", "North Coast", "Portstewart Coast", "Larne", "Kesh", "Other"];
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 interface Cleaner {
@@ -20,13 +19,21 @@ interface Cleaner {
   phone: string | null;
   email: string | null;
   region: string;
+  location_groups: string[];
+  workload_share: Record<string, number>;
   non_working_days: string[];
   max_cleans_per_day: number | null;
   rate_per_clean: number | null;
   active: boolean;
 }
 
-const empty: Omit<Cleaner, "id"> = { name: "", phone: "", email: "", region: "Other", non_working_days: [], max_cleans_per_day: 3, rate_per_clean: 0, active: true };
+type CleanerForm = Omit<Cleaner, "id" | "region">;
+
+const empty: CleanerForm = {
+  name: "", phone: "", email: "",
+  location_groups: [], workload_share: {},
+  non_working_days: [], max_cleans_per_day: 3, rate_per_clean: 0, active: true,
+};
 
 export function CleanersSettings() {
   const { toast } = useToast();
@@ -34,43 +41,87 @@ export function CleanersSettings() {
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Cleaner | null>(null);
-  const [form, setForm] = useState<Omit<Cleaner, "id">>(empty);
+  const [form, setForm] = useState<CleanerForm>(empty);
 
-  const fetch = async () => {
+  const fetchCleaners = async () => {
     const { data } = await supabase.from("cleaners" as any).select("*").order("name");
-    if (data) setCleaners(data as any);
+    if (data) setCleaners((data as any[]).map(c => ({
+      ...c,
+      location_groups: c.location_groups || [],
+      workload_share: c.workload_share || {},
+    })));
     setLoading(false);
   };
 
-  useEffect(() => { fetch(); }, []);
+  useEffect(() => { fetchCleaners(); }, []);
 
   const openNew = () => { setEditing(null); setForm(empty); setOpen(true); };
-  const openEdit = (c: Cleaner) => { setEditing(c); setForm({ name: c.name, phone: c.phone, email: c.email, region: c.region, non_working_days: c.non_working_days || [], max_cleans_per_day: c.max_cleans_per_day, rate_per_clean: c.rate_per_clean, active: c.active }); setOpen(true); };
+  const openEdit = (c: Cleaner) => {
+    setEditing(c);
+    setForm({
+      name: c.name, phone: c.phone, email: c.email,
+      location_groups: c.location_groups || [],
+      workload_share: c.workload_share || {},
+      non_working_days: c.non_working_days || [],
+      max_cleans_per_day: c.max_cleans_per_day,
+      rate_per_clean: c.rate_per_clean, active: c.active,
+    });
+    setOpen(true);
+  };
 
   const handleSave = async () => {
     if (!form.name.trim()) return;
+    const payload = {
+      name: form.name, phone: form.phone, email: form.email,
+      location_groups: form.location_groups,
+      workload_share: form.workload_share,
+      non_working_days: form.non_working_days,
+      max_cleans_per_day: form.max_cleans_per_day,
+      rate_per_clean: form.rate_per_clean, active: form.active,
+      region: form.location_groups[0] || "Other",
+    };
     if (editing) {
-      await (supabase.from("cleaners" as any) as any).update(form).eq("id", editing.id);
+      await (supabase.from("cleaners" as any) as any).update(payload).eq("id", editing.id);
       toast({ title: "Cleaner updated" });
     } else {
-      await (supabase.from("cleaners" as any) as any).insert(form);
+      await (supabase.from("cleaners" as any) as any).insert(payload);
       toast({ title: "Cleaner added" });
     }
     setOpen(false);
-    fetch();
+    fetchCleaners();
   };
 
   const handleDelete = async (id: string) => {
     await (supabase.from("cleaners" as any) as any).delete().eq("id", id);
     toast({ title: "Cleaner removed" });
-    fetch();
+    fetchCleaners();
   };
 
   const toggleDay = (day: string) => {
-    setForm((f) => ({
+    setForm(f => ({
       ...f,
-      non_working_days: f.non_working_days.includes(day) ? f.non_working_days.filter((d) => d !== day) : [...f.non_working_days, day],
+      non_working_days: f.non_working_days.includes(day)
+        ? f.non_working_days.filter(d => d !== day)
+        : [...f.non_working_days, day],
     }));
+  };
+
+  const toggleLocationGroup = (group: string) => {
+    setForm(f => {
+      const has = f.location_groups.includes(group);
+      const newGroups = has ? f.location_groups.filter(g => g !== group) : [...f.location_groups, group];
+      const newShare = { ...f.workload_share };
+      if (has) {
+        delete newShare[group];
+      } else {
+        newShare[group] = 100;
+      }
+      return { ...f, location_groups: newGroups, workload_share: newShare };
+    });
+  };
+
+  const setWorkloadShare = (group: string, value: number) => {
+    setForm(f => ({ ...f, workload_share: { ...f.workload_share, [group]: value } }));
   };
 
   return (
@@ -89,7 +140,7 @@ export function CleanersSettings() {
         </Card>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
-          {cleaners.map((c) => (
+          {cleaners.map(c => (
             <Card key={c.id} className="border-border/30 bg-card/50 backdrop-blur-sm">
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-center justify-between">
@@ -105,7 +156,16 @@ export function CleanersSettings() {
                 <div className="text-xs text-muted-foreground space-y-0.5">
                   {c.phone && <p>📞 {c.phone}</p>}
                   {c.email && <p>✉️ {c.email}</p>}
-                  <p>📍 {c.region} · Max {c.max_cleans_per_day}/day · £{c.rate_per_clean}/clean</p>
+                  <p>Max {c.max_cleans_per_day}/day · £{c.rate_per_clean}/clean</p>
+                  {c.location_groups?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {c.location_groups.map(g => (
+                        <Badge key={g} variant="outline" className="text-[10px] border-primary/30 text-primary px-1.5 py-0">
+                          {g}{c.workload_share?.[g] != null ? ` ${c.workload_share[g]}%` : ""}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                   {c.non_working_days?.length > 0 && <p>🚫 Off: {c.non_working_days.join(", ")}</p>}
                 </div>
               </CardContent>
@@ -115,48 +175,82 @@ export function CleanersSettings() {
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="bg-card border-border/30">
+        <DialogContent className="bg-card border-border/30 max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{editing ? "Edit Cleaner" : "Add Cleaner"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label className="text-xs">Name *</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="bg-secondary/50 border-border/40" />
+              <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="bg-secondary/50 border-border/40" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Phone</Label>
-                <Input value={form.phone || ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="bg-secondary/50 border-border/40" />
+                <Input value={form.phone || ""} onChange={e => setForm({ ...form, phone: e.target.value })} className="bg-secondary/50 border-border/40" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Email</Label>
-                <Input value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} className="bg-secondary/50 border-border/40" />
+                <Input value={form.email || ""} onChange={e => setForm({ ...form, email: e.target.value })} className="bg-secondary/50 border-border/40" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">Region</Label>
-                <Select value={form.region} onValueChange={(v) => setForm({ ...form, region: v })}>
-                  <SelectTrigger className="bg-secondary/50 border-border/40"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {REGIONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs">Max Cleans / Day</Label>
+                <Input type="number" min={1} value={form.max_cleans_per_day ?? 3} onChange={e => setForm({ ...form, max_cleans_per_day: parseInt(e.target.value) || 1 })} className="bg-secondary/50 border-border/40" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs">Max Cleans / Day</Label>
-                <Input type="number" min={1} value={form.max_cleans_per_day ?? 3} onChange={(e) => setForm({ ...form, max_cleans_per_day: parseInt(e.target.value) || 1 })} className="bg-secondary/50 border-border/40" />
+                <Label className="text-xs">Rate per Clean (£)</Label>
+                <Input type="number" min={0} value={form.rate_per_clean ?? 0} onChange={e => setForm({ ...form, rate_per_clean: parseFloat(e.target.value) || 0 })} className="bg-secondary/50 border-border/40" />
               </div>
             </div>
+
+            {/* Location Groups multi-select */}
             <div className="space-y-1.5">
-              <Label className="text-xs">Rate per Clean (£)</Label>
-              <Input type="number" min={0} value={form.rate_per_clean ?? 0} onChange={(e) => setForm({ ...form, rate_per_clean: parseFloat(e.target.value) || 0 })} className="bg-secondary/50 border-border/40 w-32" />
+              <Label className="text-xs">Location Groups</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {LOCATION_GROUPS.map(g => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => toggleLocationGroup(g)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                      form.location_groups.includes(g)
+                        ? "bg-primary/20 text-primary border border-primary/30"
+                        : "bg-secondary/50 text-muted-foreground border border-border/40 hover:bg-secondary"
+                    }`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
             </div>
+
+            {/* Workload allocation */}
+            {form.location_groups.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs">Workload Allocation (%)</Label>
+                <div className="space-y-1.5">
+                  {form.location_groups.map(g => (
+                    <div key={g} className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-36 truncate">{g}</span>
+                      <Input
+                        type="number" min={0} max={100}
+                        value={form.workload_share[g] ?? 100}
+                        onChange={e => setWorkloadShare(g, parseInt(e.target.value) || 0)}
+                        className="bg-secondary/50 border-border/40 w-20 h-8 text-xs"
+                      />
+                      <span className="text-xs text-muted-foreground">%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <Label className="text-xs">Non-Working Days</Label>
               <div className="flex flex-wrap gap-1.5">
-                {DAYS.map((d) => (
+                {DAYS.map(d => (
                   <button
                     key={d}
                     type="button"
@@ -173,7 +267,7 @@ export function CleanersSettings() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} />
+              <Switch checked={form.active} onCheckedChange={v => setForm({ ...form, active: v })} />
               <Label className="text-xs">Active</Label>
             </div>
           </div>

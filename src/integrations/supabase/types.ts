@@ -44,6 +44,7 @@ export type Database = {
           created_at: string
           email: string | null
           id: string
+          location_groups: string[] | null
           max_cleans_per_day: number | null
           name: string
           non_working_days: string[] | null
@@ -51,12 +52,14 @@ export type Database = {
           rate_per_clean: number | null
           region: string
           updated_at: string
+          workload_share: Json | null
         }
         Insert: {
           active?: boolean
           created_at?: string
           email?: string | null
           id?: string
+          location_groups?: string[] | null
           max_cleans_per_day?: number | null
           name: string
           non_working_days?: string[] | null
@@ -64,12 +67,14 @@ export type Database = {
           rate_per_clean?: number | null
           region?: string
           updated_at?: string
+          workload_share?: Json | null
         }
         Update: {
           active?: boolean
           created_at?: string
           email?: string | null
           id?: string
+          location_groups?: string[] | null
           max_cleans_per_day?: number | null
           name?: string
           non_working_days?: string[] | null
@@ -77,6 +82,7 @@ export type Database = {
           rate_per_clean?: number | null
           region?: string
           updated_at?: string
+          workload_share?: Json | null
         }
         Relationships: []
       }
@@ -88,6 +94,7 @@ export type Database = {
           bathrooms: number | null
           bedrooms: number | null
           city: string | null
+          cleaning_duration_minutes: number | null
           country: string | null
           created_at: string
           google_place_id: string | null
@@ -119,6 +126,7 @@ export type Database = {
           bathrooms?: number | null
           bedrooms?: number | null
           city?: string | null
+          cleaning_duration_minutes?: number | null
           country?: string | null
           created_at?: string
           google_place_id?: string | null
@@ -150,6 +158,7 @@ export type Database = {
           bathrooms?: number | null
           bedrooms?: number | null
           city?: string | null
+          cleaning_duration_minutes?: number | null
           country?: string | null
           created_at?: string
           google_place_id?: string | null
