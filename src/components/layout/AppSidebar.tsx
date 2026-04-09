@@ -213,18 +213,18 @@ export function AppSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <NavLink
-                    to="/dashboard"
+                    to="/today"
                     end
                     className={`group flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                      location.pathname === "/dashboard"
+                      location.pathname === "/today"
                         ? "bg-primary/10 text-primary"
                         : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                     }`}
                     activeClassName=""
                   >
-                    <Home className={`h-5 w-5 shrink-0 ${location.pathname === "/dashboard" ? "text-primary" : ""}`} />
+                    <Home className={`h-5 w-5 shrink-0 ${location.pathname === "/today" ? "text-primary" : ""}`} />
                     {!collapsed && <span>Today</span>}
-                    {location.pathname === "/dashboard" && !collapsed && (
+                    {location.pathname === "/today" && !collapsed && (
                       <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary animate-pulse-glow" />
                     )}
                   </NavLink>
