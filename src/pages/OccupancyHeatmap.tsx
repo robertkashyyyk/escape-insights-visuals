@@ -184,7 +184,7 @@ function HeatmapCell({ cell, propertyName, month, year }: { cell: MonthCell; pro
         <div className="p-[2px]">
           <div
             className="w-full rounded-[3px] transition-all duration-150 hover:scale-110 hover:z-10 cursor-default"
-            style={{ backgroundColor: getCellColor(cell.occupancy), minHeight: "32px" }}
+            style={{ backgroundColor: getCellColor(cell?.occupancy ?? 0), minHeight: "32px" }}
           />
         </div>
       </TooltipTrigger>
@@ -194,11 +194,11 @@ function HeatmapCell({ cell, propertyName, month, year }: { cell: MonthCell; pro
         <div className="h-px bg-border/30 my-1" />
         <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px]">
           <span className="text-muted-foreground">Occupancy</span>
-          <span className="text-foreground font-medium text-right">{cell.occupancy}%</span>
+          <span className="text-foreground font-medium text-right">{cell?.occupancy ?? 0}%</span>
           <span className="text-muted-foreground">Nights</span>
-          <span className="text-foreground font-medium text-right">{cell.nightsBooked} / {cell.nightsAvailable}</span>
+          <span className="text-foreground font-medium text-right">{cell?.nightsBooked ?? 0} / {cell?.nightsAvailable ?? 0}</span>
           <span className="text-muted-foreground">Revenue</span>
-          <span className="text-foreground font-medium text-right">£{cell.revenue.toLocaleString()}</span>
+          <span className="text-foreground font-medium text-right">£{(cell?.revenue ?? 0).toLocaleString()}</span>
         </div>
       </TooltipContent>
     </Tooltip>
