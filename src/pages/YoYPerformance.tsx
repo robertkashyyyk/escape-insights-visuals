@@ -200,13 +200,13 @@ export default function YoYPerformance() {
                       <p className="text-[11px] text-muted-foreground mt-0.5">{p.city}</p>
                     )}
                     <div className="mt-4">
-                      <MetricRow label="Revenue" value={fmt(p.currentRevenue)} change={p.revenueChange} isNew={p.isNew} />
-                      <MetricRow label="ADR" value={fmt(p.currentAdr)} change={p.adrChange} isNew={p.isNew} />
+                      <MetricRow label="Revenue" value={fmt(p.currentRevenue)} current={p.currentRevenue} previous={p.previousRevenue} />
+                      <MetricRow label="ADR" value={fmt(p.currentAdr)} current={p.currentAdr} previous={p.previousAdr} />
                       <MetricRow
                         label="Occupancy"
                         value={`${p.currentOccupancy.toFixed(1)}%`}
-                        change={p.occupancyChange}
-                        isNew={p.isNew}
+                        current={p.currentOccupancy}
+                        previous={p.previousOccupancy}
                       />
                     </div>
                   </CardContent>
