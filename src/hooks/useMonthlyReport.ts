@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { differenceInDays, parseISO, format, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { differenceInDays, parseISO, format, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
 
 export interface ReportPropertyRow {
   listingId: string;
@@ -12,6 +12,11 @@ export interface ReportPropertyRow {
   prevRevenue: number;
 }
 
+export interface ForwardBooking {
+  label: string;
+  revenue: number;
+}
+
 export interface MonthlyReportData {
   owner: {
     id: string;
@@ -21,6 +26,7 @@ export interface MonthlyReportData {
     vatInclusive: boolean;
   };
   periodLabel: string;
+  prevPeriodLabel: string;
   propertyCount: number;
   totalRevenue: number;
   managementFee: number;
@@ -37,6 +43,12 @@ export interface MonthlyReportData {
   properties: ReportPropertyRow[];
   // Last 6 months trend
   monthlyTrend: { label: string; revenue: number }[];
+  // Forward bookings
+  forwardRevenue: number;
+  forwardNights: number;
+  nextCheckinDate: string | null;
+  forwardMonths: ForwardBooking[];
+  showForward: boolean;
 }
 
 function nightsInRange(checkIn: string, checkOut: string, rangeStart: Date, rangeEnd: Date): number {
@@ -53,7 +65,6 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
     queryKey: ["monthly_report", ownerId, periodStart.toISOString(), periodEnd.toISOString()],
     enabled: !!ownerId,
     queryFn: async (): Promise<MonthlyReportData | null> => {
-      // Fetch owner
       const { data: owner } = await supabase
         .from("property_owners")
         .select("*")
@@ -61,7 +72,6 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
         .single();
       if (!owner) return null;
 
-      // Fetch listings
       const { data: listings } = await supabase
         .from("listings")
         .select("id, name, status")
@@ -75,13 +85,23 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
       const endStr = format(periodEnd, "yyyy-MM-dd");
 
       // Previous year same period
-      const totalDays = differenceInDays(periodEnd, periodStart);
       const prevStart = new Date(periodStart);
       prevStart.setFullYear(prevStart.getFullYear() - 1);
       const prevEnd = new Date(periodEnd);
       prevEnd.setFullYear(prevEnd.getFullYear() - 1);
       const prevStartStr = format(prevStart, "yyyy-MM-dd");
       const prevEndStr = format(prevEnd, "yyyy-MM-dd");
+
+      // Period labels
+      const isSingleMonth =
+        periodStart.getDate() === 1 &&
+        periodEnd.getTime() === endOfMonth(periodStart).getTime();
+      const periodLabel = isSingleMonth
+        ? format(periodStart, "MMMM yyyy") + " Performance Report"
+        : `${format(periodStart, "d MMM yyyy")} – ${format(periodEnd, "d MMM yyyy")} Performance Report`;
+      const prevPeriodLabel = isSingleMonth
+        ? format(prevStart, "MMM yyyy")
+        : `${format(prevStart, "d MMM yyyy")} – ${format(prevEnd, "d MMM yyyy")}`;
 
       // Last 6 months for trend
       const trendMonths: { start: Date; end: Date; label: string }[] = [];
@@ -92,8 +112,17 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
       }
       const trendStartStr = format(trendMonths[0].start, "yyyy-MM-dd");
 
-      // Fetch current period, previous year, and trend reservations
-      const [currentRes, prevRes, trendRes] = await Promise.all([
+      // Forward bookings: next 3 months from today
+      const today = new Date();
+      const todayStr = format(today, "yyyy-MM-dd");
+      const forward3 = addMonths(today, 3);
+      const forward3Str = format(forward3, "yyyy-MM-dd");
+
+      // Should we show forward section? Only if period end is within 1 month of today
+      const monthsAgo = differenceInDays(today, periodEnd);
+      const showForward = monthsAgo <= 31;
+
+      const [currentRes, prevRes, trendRes, forwardRes] = await Promise.all([
         supabase
           .from("reservations")
           .select("listing_id, check_in, check_out, total_amount, status")
@@ -112,6 +141,14 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
           .in("listing_id", listingIds)
           .gte("check_in", trendStartStr)
           .lte("check_in", endStr),
+        showForward
+          ? supabase
+              .from("reservations")
+              .select("listing_id, check_in, check_out, total_amount, status")
+              .in("listing_id", listingIds)
+              .gte("check_in", todayStr)
+              .lte("check_in", forward3Str)
+          : Promise.resolve({ data: [] }),
       ]);
 
       const filter = (rows: any[]) =>
@@ -120,6 +157,7 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
       const currentRows = filter(currentRes.data);
       const prevRows = filter(prevRes.data);
       const trendRows = filter(trendRes.data);
+      const forwardRows = filter(forwardRes.data);
 
       // Current period aggregation per property
       const byListing: Record<string, { revenue: number; nights: number }> = {};
@@ -157,7 +195,6 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
       const prevOccupancy = activeCount > 0 ? (prevTotalNights / (activeCount * daysInPeriod)) * 100 : 0;
 
       // Property breakdown
-      const listingMap = Object.fromEntries(listings.map((l) => [l.id, l]));
       const properties: ReportPropertyRow[] = listings
         .map((l) => {
           const agg = byListing[l.id] ?? { revenue: 0, nights: 0 };
@@ -186,13 +223,30 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
         return { label: m.label, revenue: rev };
       });
 
-      // Period label
-      const isSingleMonth =
-        periodStart.getDate() === 1 &&
-        periodEnd.getTime() === endOfMonth(periodStart).getTime();
-      const periodLabel = isSingleMonth
-        ? format(periodStart, "MMMM yyyy") + " Performance Report"
-        : `${format(periodStart, "d MMM yyyy")} – ${format(periodEnd, "d MMM yyyy")} Performance Report`;
+      // Forward bookings
+      let forwardRevenue = 0;
+      let forwardNights = 0;
+      let nextCheckinDate: string | null = null;
+      const forwardMonthBuckets: ForwardBooking[] = [];
+
+      if (showForward) {
+        for (const r of forwardRows) {
+          forwardRevenue += r.total_amount ?? 0;
+          forwardNights += differenceInDays(parseISO(r.check_out), parseISO(r.check_in));
+          if (!nextCheckinDate || r.check_in < nextCheckinDate) nextCheckinDate = r.check_in;
+        }
+
+        for (let i = 0; i < 3; i++) {
+          const ms = startOfMonth(addMonths(today, i));
+          const me = endOfMonth(ms);
+          let rev = 0;
+          for (const r of forwardRows) {
+            const ci = parseISO(r.check_in);
+            if (ci >= ms && ci <= me) rev += r.total_amount ?? 0;
+          }
+          forwardMonthBuckets.push({ label: format(ms, "MMM yyyy"), revenue: rev });
+        }
+      }
 
       return {
         owner: {
@@ -203,6 +257,7 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
           vatInclusive: owner.vat_inclusive,
         },
         periodLabel,
+        prevPeriodLabel,
         propertyCount: listings.length,
         totalRevenue,
         managementFee,
@@ -216,6 +271,11 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
         currentOccupancy: avgOccupancy,
         properties,
         monthlyTrend,
+        forwardRevenue,
+        forwardNights,
+        nextCheckinDate,
+        forwardMonths: forwardMonthBuckets,
+        showForward,
       };
     },
   });
