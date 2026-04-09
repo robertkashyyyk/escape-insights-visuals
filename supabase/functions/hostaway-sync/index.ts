@@ -2,6 +2,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const HOSTAWAY_API = "https://api.hostaway.com/v1";
+const LIMIT = 100;
+const BATCH_SIZE = 50;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -18,7 +20,7 @@ Deno.serve(async (req) => {
   let totalListings = 0;
 
   try {
-    // 1. Get credentials from app_settings
+    // 1. Get credentials
     const { data: settings } = await supabase
       .from("app_settings")
       .select("key, value")
@@ -58,10 +60,9 @@ Deno.serve(async (req) => {
       row_count: 0,
     });
 
-    // 3. Sync listings (all pages)
+    // 3. Sync listings (all pages, batched upserts)
     console.log("Syncing listings...");
     let listingOffset = 0;
-    const LIMIT = 100;
     while (true) {
       const url = `${HOSTAWAY_API}/listings?limit=${LIMIT}&offset=${listingOffset}`;
       const res = await fetch(url, { headers: authHeaders });
@@ -71,26 +72,27 @@ Deno.serve(async (req) => {
       const listings = body.result || [];
       if (listings.length === 0) break;
 
-      for (const l of listings) {
-        const { error } = await supabase.from("listings").upsert(
-          {
-            hostaway_listing_id: l.id,
-            name: l.name || `Listing ${l.id}`,
-            address: l.address || null,
-            city: l.city || null,
-            country: l.countryCode || null,
-            property_type: l.propertyTypeId ? String(l.propertyTypeId) : null,
-            bedrooms: l.bedrooms || null,
-            bathrooms: l.bathrooms || null,
-            max_guests: l.maxGuests || l.personCapacity || null,
-            latitude: l.lat || null,
-            longitude: l.lng || null,
-            image_url: l.imageUrl || l.thumbnailUrl || null,
-          },
-          { onConflict: "hostaway_listing_id", ignoreDuplicates: false }
-        );
-        if (error) console.warn(`Listing upsert error for ${l.id}:`, error.message);
-      }
+      const rows = listings.map((l: any) => ({
+        hostaway_listing_id: l.id,
+        name: l.name || `Listing ${l.id}`,
+        address: l.address || null,
+        city: l.city || null,
+        country: l.countryCode || null,
+        property_type: l.propertyTypeId ? String(l.propertyTypeId) : null,
+        bedrooms: l.bedrooms || null,
+        bathrooms: l.bathrooms || null,
+        max_guests: l.maxGuests || l.personCapacity || null,
+        latitude: l.lat || null,
+        longitude: l.lng || null,
+        image_url: l.imageUrl || l.thumbnailUrl || null,
+      }));
+
+      // Batch upsert all listings at once
+      const { error } = await supabase.from("listings").upsert(rows, {
+        onConflict: "hostaway_listing_id",
+        ignoreDuplicates: false,
+      });
+      if (error) console.warn(`Listing batch upsert error:`, error.message);
 
       totalListings += listings.length;
       listingOffset += LIMIT;
@@ -109,7 +111,7 @@ Deno.serve(async (req) => {
       if (dl.hostaway_listing_id) listingMap.set(dl.hostaway_listing_id, dl.id);
     }
 
-    // 5. Sync reservations (all pages)
+    // 5. Sync reservations (all pages, batched upserts)
     console.log("Syncing reservations...");
     let resOffset = 0;
     while (true) {
@@ -121,11 +123,13 @@ Deno.serve(async (req) => {
       const reservations = body.result || [];
       if (reservations.length === 0) break;
 
+      // Build batch of rows
+      const rows: Record<string, unknown>[] = [];
       for (const r of reservations) {
         const hostawayListingId = r.listingMapId || r.listingId;
         const listingUuid = listingMap.get(hostawayListingId);
         if (!listingUuid) {
-          console.warn(`No listing found for hostaway_listing_id=${hostawayListingId}, skipping reservation ${r.id}`);
+          console.warn(`No listing for hostaway_listing_id=${hostawayListingId}, skipping reservation ${r.id}`);
           continue;
         }
 
@@ -136,7 +140,6 @@ Deno.serve(async (req) => {
           ? `${r.guestFirstName || ""} ${r.guestLastName || ""}`.trim()
           : "Unknown Guest";
 
-        // Derived fields
         let bookingLeadDays: number | null = null;
         let dayOfWeek: number | null = null;
         let weekNumber: number | null = null;
@@ -159,21 +162,17 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Map status
         let status = "confirmed";
         const rawStatus = (r.status || "").toLowerCase();
         if (rawStatus === "cancelled" || rawStatus === "canceled" || rawStatus === "declined") {
           status = "cancelled";
         } else if (rawStatus === "inquiry" || rawStatus === "enquiry") {
           status = "inquiry";
-        } else if (rawStatus === "new" || rawStatus === "pending" || rawStatus === "confirmed" || rawStatus === "modified") {
-          status = "confirmed";
         }
 
-        // Platform
         const platform = r.channelName || r.source || "hostaway";
 
-        const row: Record<string, unknown> = {
+        rows.push({
           hostaway_reservation_id: r.id,
           listing_id: listingUuid,
           guest_name: guestName,
@@ -191,36 +190,17 @@ Deno.serve(async (req) => {
           month,
           quarter,
           year,
-        };
+        });
+      }
 
-        // Try upsert by hostaway_reservation_id first
-        const { error } = await supabase.from("reservations").upsert(row, {
+      // Upsert in chunks of BATCH_SIZE
+      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+        const chunk = rows.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase.from("reservations").upsert(chunk, {
           onConflict: "hostaway_reservation_id",
           ignoreDuplicates: false,
         });
-
-        if (error) {
-          // Fallback: try matching on listing+checkin+guest (legacy CSV rows)
-          const { data: existing } = await supabase
-            .from("reservations")
-            .select("id")
-            .eq("listing_id", listingUuid)
-            .eq("check_in", checkIn)
-            .eq("guest_name", guestName)
-            .maybeSingle();
-
-          if (existing) {
-            await supabase
-              .from("reservations")
-              .update(row)
-              .eq("id", existing.id);
-          } else {
-            const { error: insertErr } = await supabase
-              .from("reservations")
-              .insert(row);
-            if (insertErr) console.warn(`Reservation insert error for ${r.id}:`, insertErr.message);
-          }
-        }
+        if (error) console.warn(`Reservation batch upsert error (offset=${resOffset}, chunk=${i}):`, error.message);
       }
 
       totalReservations += reservations.length;
