@@ -9,7 +9,8 @@ import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth, useRole } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useCallback } from "react";
+
 import {
   Sidebar,
   SidebarContent,
@@ -40,6 +41,7 @@ interface NavItem {
 interface NavSection {
   label: string;
   items: NavItem[];
+  collapsible?: boolean;
 }
 
 const allRoles: AppRole[] = ["super", "senior", "admin", "client"];
@@ -79,6 +81,7 @@ const sections: NavSection[] = [
   },
   {
     label: "Operations",
+    collapsible: true,
     items: [
       {
         title: "Housekeeping", url: "/housekeeping", icon: Brush, roles: allRoles,
@@ -94,6 +97,7 @@ const sections: NavSection[] = [
   },
   {
     label: "Finance",
+    collapsible: true,
     items: [
       { title: "Management Revenue", url: "/management", icon: Briefcase, roles: managementRoles },
       {
@@ -108,6 +112,7 @@ const sections: NavSection[] = [
   },
   {
     label: "Guests & Marketing",
+    collapsible: true,
     items: [
       { title: "Guest Database", url: "/guests", icon: UserSearch, roles: allRoles },
       {
@@ -123,6 +128,7 @@ const sections: NavSection[] = [
   },
   {
     label: "Portfolio",
+    collapsible: true,
     items: [
       { title: "Properties", url: "/properties", icon: Building2, roles: allRoles },
       { title: "Owner Portfolios", url: "/owners", icon: Users, roles: managementRoles },
@@ -130,7 +136,6 @@ const sections: NavSection[] = [
     ],
   },
 ];
-
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
@@ -138,6 +143,32 @@ export function AppSidebar() {
   const { user, profile, signOut } = useAuth();
   const { role } = useRole();
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+
+  const getInitialSectionState = (): Record<string, boolean> => {
+    try {
+      const stored = sessionStorage.getItem("sidebar-sections");
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return {};
+  };
+
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
+    const stored = getInitialSectionState();
+    const collapsibleLabels = sections.filter(s => s.collapsible).map(s => s.label);
+    const defaults: Record<string, boolean> = {};
+    collapsibleLabels.forEach(label => {
+      defaults[label] = stored[label] !== undefined ? stored[label] : true;
+    });
+    return defaults;
+  });
+
+  const toggleSection = useCallback((label: string) => {
+    setCollapsedSections(prev => {
+      const next = { ...prev, [label]: !prev[label] };
+      try { sessionStorage.setItem("sidebar-sections", JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
 
   const isRouteActive = (url: string) => {
     if (url.includes("?")) return location.pathname === url.split("?")[0];
@@ -204,93 +235,116 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Grouped sections */}
-        {filteredSections.map((section) => (
-          <SidebarGroup key={section.label}>
-            {!collapsed && (
-              <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium px-3 mb-1">
-                {section.label}
-              </SidebarGroupLabel>
-            )}
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {section.items.map((item) => {
-                  const active = isParentActive(item);
-                  const hasChildren = item.children && item.children.length > 0;
-                  const isExpanded = expandedItems[item.title] ?? active;
+        {filteredSections.map((section) => {
+          const isSectionCollapsible = section.collapsible === true;
+          const isSectionCollapsed = isSectionCollapsible && (collapsedSections[section.label] ?? true);
 
-                  return (
-                    <SidebarMenuItem key={item.title}>
-                      {hasChildren ? (
-                        <>
-                          <SidebarMenuButton
-                            onClick={() => toggleExpand(item.title)}
-                            className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 w-full cursor-pointer ${
-                              active
-                                ? "bg-primary/10 text-primary"
-                                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                            }`}
-                          >
-                            <item.icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${active ? "text-primary" : ""}`} />
-                            {!collapsed && (
-                              <>
-                                <span className="flex-1 text-left">{item.title}</span>
-                                <ChevronRight
-                                  className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${
-                                    isExpanded ? "rotate-90" : ""
-                                  }`}
-                                />
-                              </>
-                            )}
-                          </SidebarMenuButton>
-                          {!collapsed && isExpanded && (
-                            <div className="ml-7 mt-0.5 space-y-0.5 border-l border-border/30 pl-3">
-                              {item.children!.map((child) => {
-                                const childActive = isRouteActive(child.url);
-                                return (
-                                  <NavLink
-                                    key={child.url}
-                                    to={child.url}
-                                    className={`block px-2 py-1.5 rounded-md text-xs transition-colors ${
-                                      childActive
-                                        ? "text-primary font-medium"
-                                        : "text-muted-foreground hover:text-foreground"
-                                    }`}
-                                    activeClassName=""
-                                  >
-                                    {child.title}
-                                  </NavLink>
-                                );
-                              })}
-                            </div>
+          return (
+            <SidebarGroup key={section.label}>
+              {!collapsed && (
+                isSectionCollapsible ? (
+                  <button
+                    onClick={() => toggleSection(section.label)}
+                    className="flex items-center justify-between w-full px-3 mb-1 group cursor-pointer"
+                  >
+                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium">
+                      {section.label}
+                    </span>
+                    <ChevronRight
+                      className={`h-3 w-3 text-muted-foreground/40 transition-transform duration-200 group-hover:text-muted-foreground ${
+                        !isSectionCollapsed ? "rotate-90" : ""
+                      }`}
+                    />
+                  </button>
+                ) : (
+                  <SidebarGroupLabel className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-medium px-3 mb-1">
+                    {section.label}
+                  </SidebarGroupLabel>
+                )
+              )}
+              {!isSectionCollapsed && (
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {section.items.map((item) => {
+                      const active = isParentActive(item);
+                      const hasChildren = item.children && item.children.length > 0;
+                      const isExpanded = expandedItems[item.title] ?? active;
+
+                      return (
+                        <SidebarMenuItem key={item.title}>
+                          {hasChildren ? (
+                            <>
+                              <SidebarMenuButton
+                                onClick={() => toggleExpand(item.title)}
+                                className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 w-full cursor-pointer ${
+                                  active
+                                    ? "bg-primary/10 text-primary"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                                }`}
+                              >
+                                <item.icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${active ? "text-primary" : ""}`} />
+                                {!collapsed && (
+                                  <>
+                                    <span className="flex-1 text-left">{item.title}</span>
+                                    <ChevronRight
+                                      className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${
+                                        isExpanded ? "rotate-90" : ""
+                                      }`}
+                                    />
+                                  </>
+                                )}
+                              </SidebarMenuButton>
+                              {!collapsed && isExpanded && (
+                                <div className="ml-7 mt-0.5 space-y-0.5 border-l border-border/30 pl-3">
+                                  {item.children!.map((child) => {
+                                    const childActive = isRouteActive(child.url);
+                                    return (
+                                      <NavLink
+                                        key={child.url}
+                                        to={child.url}
+                                        className={`block px-2 py-1.5 rounded-md text-xs transition-colors ${
+                                          childActive
+                                            ? "text-primary font-medium"
+                                            : "text-muted-foreground hover:text-foreground"
+                                        }`}
+                                        activeClassName=""
+                                      >
+                                        {child.title}
+                                      </NavLink>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <SidebarMenuButton asChild>
+                              <NavLink
+                                to={item.url}
+                                end
+                                className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                                  active
+                                    ? "bg-primary/10 text-primary"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                                }`}
+                                activeClassName=""
+                              >
+                                <item.icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${active ? "text-primary" : ""}`} />
+                                {!collapsed && <span>{item.title}</span>}
+                                {active && !collapsed && (
+                                  <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary animate-pulse-glow" />
+                                )}
+                              </NavLink>
+                            </SidebarMenuButton>
                           )}
-                        </>
-                      ) : (
-                        <SidebarMenuButton asChild>
-                          <NavLink
-                            to={item.url}
-                            end
-                            className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                              active
-                                ? "bg-primary/10 text-primary"
-                                : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
-                            }`}
-                            activeClassName=""
-                          >
-                            <item.icon className={`h-[18px] w-[18px] shrink-0 transition-colors ${active ? "text-primary" : ""}`} />
-                            {!collapsed && <span>{item.title}</span>}
-                            {active && !collapsed && (
-                              <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary animate-pulse-glow" />
-                            )}
-                          </NavLink>
-                        </SidebarMenuButton>
-                      )}
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+                        </SidebarMenuItem>
+                      );
+                    })}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              )}
+            </SidebarGroup>
+          );
+        })}
 
         {/* Settings */}
         {(!role || role === "super") && (
