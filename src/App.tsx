@@ -23,6 +23,7 @@ import RevenuePacing from "./pages/RevenuePacing";
 import RevenueForecaster from "./pages/RevenueForecaster";
 import OrinIntelligence from "./pages/OrinIntelligence";
 import ComingSoon from "./pages/ComingSoon";
+import Today from "./pages/Today";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/today" element={<ProtectedRoute><Today /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/orin" element={<ProtectedRoute><OrinIntelligence /></ProtectedRoute>} />
             <Route path="/yoy" element={<ProtectedRoute><YoYPerformance /></ProtectedRoute>} />
