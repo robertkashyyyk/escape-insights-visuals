@@ -51,11 +51,11 @@ export default function Today() {
                 {data?.movements.map((m, i) => (
                   <div key={i} className="flex items-center gap-3 px-5 py-3 hover:bg-secondary/30 transition-colors">
                     <div className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 ${
-                      m.type === "checkout" ? "bg-red-500/10" : "bg-emerald-500/10"
+                      m.type === "checkout" ? "bg-destructive/10" : "bg-accent/10"
                     }`}>
                       {m.type === "checkout"
-                        ? <LogOut className="h-3.5 w-3.5 text-red-400" />
-                        : <LogIn className="h-3.5 w-3.5 text-emerald-400" />
+                        ? <LogOut className="h-3.5 w-3.5 text-destructive" />
+                        : <LogIn className="h-3.5 w-3.5 text-accent" />
                       }
                     </div>
                     <div className="flex-1 min-w-0">
@@ -64,13 +64,13 @@ export default function Today() {
                     </div>
                     <Badge variant="outline" className={`text-[10px] px-2 py-0.5 shrink-0 ${
                       m.type === "checkout"
-                        ? "border-red-500/30 text-red-400"
-                        : "border-emerald-500/30 text-emerald-400"
+                        ? "border-destructive/30 text-destructive"
+                        : "border-accent/30 text-accent"
                     }`}>
                       {m.type === "checkout" ? "Checkout" : "Check-in"}
                     </Badge>
                     {data?.sameDayTurnarounds.has(m.listingId) && (
-                      <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px] px-2 py-0.5 shrink-0">
+                      <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px] px-2 py-0.5 shrink-0">
                         Same-Day Turnaround
                       </Badge>
                     )}
@@ -80,11 +80,11 @@ export default function Today() {
             </section>
 
             {/* 3. Orin's Morning Note */}
-            <section className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-5 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-amber-400 to-amber-600" />
+            <section className="rounded-xl border border-primary/20 bg-primary/5 p-5 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-primary to-primary/60" />
               <div className="flex items-center gap-2 mb-3 ml-3">
-                <Sparkles className="h-4 w-4 text-amber-400" />
-                <h2 className="text-sm font-display font-semibold text-amber-300 uppercase tracking-wider">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-display font-semibold text-primary uppercase tracking-wider">
                   Orin's Morning Note
                 </h2>
               </div>
@@ -120,12 +120,12 @@ export default function Today() {
                       </span>
                       <div className="flex gap-1">
                         {day.checkouts > 0 && (
-                          <span className="flex items-center gap-0.5 text-[9px] text-red-400">
+                          <span className="flex items-center gap-0.5 text-[9px] text-destructive">
                             <LogOut className="h-2.5 w-2.5" />{day.checkouts}
                           </span>
                         )}
                         {day.checkins > 0 && (
-                          <span className="flex items-center gap-0.5 text-[9px] text-emerald-400">
+                          <span className="flex items-center gap-0.5 text-[9px] text-accent">
                             <LogIn className="h-2.5 w-2.5" />{day.checkins}
                           </span>
                         )}
@@ -153,8 +153,8 @@ export default function Today() {
                   "2 properties missing location group assignment",
                 ].map((action, i) => (
                   <div key={i} className="flex items-center gap-3 px-5 py-3">
-                    <div className="h-7 w-7 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-                      <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
+                    <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <AlertTriangle className="h-3.5 w-3.5 text-primary" />
                     </div>
                     <p className="text-sm text-foreground/80">{action}</p>
                   </div>

@@ -52,12 +52,10 @@ export default function PropertyDetail() {
   return (
     <AppLayout>
       <div className="p-4 md:p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
-        {/* Back link */}
         <Link to="/properties" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="h-4 w-4" /> Back to Properties
         </Link>
 
-        {/* Header */}
         <div className="glass-card rounded-xl border border-border/30 border-l-2 border-l-primary/60 p-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
@@ -82,7 +80,6 @@ export default function PropertyDetail() {
             )}
           </div>
 
-          {/* Quick stats */}
           <div className="flex flex-wrap gap-3 mt-5 pt-4 border-t border-border/20">
             {listing.bedrooms != null && <InfoChip icon={Bed} label={`${listing.bedrooms} bedrooms`} />}
             {listing.bathrooms != null && <InfoChip icon={Bath} label={`${listing.bathrooms} bathrooms`} />}
@@ -93,7 +90,6 @@ export default function PropertyDetail() {
           </div>
         </div>
 
-        {/* Details grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <DetailCard title="Location" icon={MapPin}>
             <DetailRow label="Address" value={listing.address} />
@@ -124,7 +120,6 @@ export default function PropertyDetail() {
           </DetailCard>
         </div>
 
-        {/* Operational sections */}
         <div className="space-y-4">
           <OperationalSection
             title="Access Details"
@@ -146,7 +141,6 @@ export default function PropertyDetail() {
           />
         </div>
 
-        {/* Listing ID footer */}
         <p className="text-[10px] text-muted-foreground/40 font-mono text-center pt-4">
           {listing.id}
         </p>
