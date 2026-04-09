@@ -1,16 +1,17 @@
 
 
-## Remove Orin Brief Sidebar Sub-Menus
+## Fix Quarterly Deep Dive Date
 
-### What changes
-The sidebar currently has sub-menu items under "Orin Brief" (e.g. Monthly Brief, Quarterly Deep Dive). These duplicate the on-page toggle tabs that already exist on `/orin`. We'll remove the sub-menu items and keep "Orin Brief" as a single, flat sidebar link — same as Dashboard, Properties, etc.
+The placeholder text says the Q1 report will be available on "1 April 2026", but today is 9 April 2026 — so it should already be "available." We need to update this to reference the next upcoming quarter instead.
 
-### Files to edit
+### Change
 
-**`src/components/layout/AppSidebar.tsx`** — Find the Orin Brief menu entry and remove any `children` / sub-items array. Keep it as a simple link to `/orin`. The on-page toggle on `OrinIntelligence.tsx` already handles Monthly vs Quarterly switching, so no other changes needed.
+**`src/pages/OrinIntelligence.tsx`** — In the `QuarterlyPlaceholder` component, update the copy to reference **Q2 2026** as the next upcoming report, with availability on **1 July 2026**. The current Q1 report should either show as "available" or the placeholder should simply point forward to the next quarter.
 
-### Scope
-- One file edit, minimal change
-- No routing changes — `/orin` stays as-is
-- The on-page Monthly/Quarterly toggle remains untouched
+Proposed updated copy:
+- Heading: **"Q2 2026 Quarterly Deep Dive"**
+- Body: "Your Q2 2026 Quarterly Deep Dive will be available on **1 July 2026**..."
+- Footer: "Next report: 1 October 2026"
+
+This keeps the locked/coming-soon state but with correct future dates.
 
