@@ -197,7 +197,7 @@ export function AppSidebar() {
       <div className="flex h-16 items-center px-4 border-b border-border/30">
         {!collapsed && (
           <div className="animate-fade-in">
-            <img src="/images/eg_logo_full.png" alt="Escape Grids" className="h-9 object-contain" />
+            <img src="/images/eg_logo_full_v2.png" alt="Escape Grids" className="h-9 object-contain" />
           </div>
         )}
         {collapsed && (
