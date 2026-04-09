@@ -63,18 +63,22 @@ export function ReservationsTable() {
   });
 
   // Derive filter options from data
-  const { propertyOptions, platformOptions } = useMemo(() => {
-    if (!reservations) return { propertyOptions: [], platformOptions: [] };
+  const { propertyOptions, platformOptions, yearOptions } = useMemo(() => {
+    if (!reservations) return { propertyOptions: [], platformOptions: [], yearOptions: [] };
     const props = new Map<string, string>();
     const plats = new Set<string>();
+    const years = new Set<number>();
     for (const r of reservations) {
       const listing = r.listings as any;
       if (listing?.id && listing?.name) props.set(listing.id, listing.name);
       if (r.platform) plats.add(r.platform);
+      const yr = parseISO(r.check_in).getFullYear();
+      if (!isNaN(yr)) years.add(yr);
     }
     return {
       propertyOptions: [...props.entries()].sort((a, b) => a[1].localeCompare(b[1])),
       platformOptions: [...plats].sort(),
+      yearOptions: [...years].sort((a, b) => a - b),
     };
   }, [reservations]);
 
