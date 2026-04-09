@@ -1,10 +1,15 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Bed, Bath, Users, MapPin, PoundSterling, Brush, Building2, Wrench, Key, ClipboardList } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { ArrowLeft, Bed, Bath, Users, MapPin, PoundSterling, Brush, Building2, Wrench, Key, ClipboardList, Clock } from "lucide-react";
 
 export default function PropertyDetail() {
   const { id } = useParams<{ id: string }>();
