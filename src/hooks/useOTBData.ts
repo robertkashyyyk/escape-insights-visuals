@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, differenceInDays, addMonths, addDays, startOfMonth, endOfMonth, parseISO } from "date-fns";
+import { format, differenceInDays, addMonths, addDays, startOfMonth, endOfMonth, parseISO, startOfISOWeek } from "date-fns";
 
 type PeriodWindow = 30 | 60 | 90 | 180;
 
-interface MonthlyBucket {
-  month: string;
+interface ChartBucket {
+  label: string;
   revenue: number;
 }
 
@@ -34,10 +34,72 @@ export interface OTBData {
   avgLeadTime: number;
   upcomingCheckins: number;
   propertiesWithBookings: number;
-  monthlyData: MonthlyBucket[];
+  chartData: ChartBucket[];
   upcomingReservations: UpcomingReservation[];
   propertySummaries: PropertyBookingSummary[];
   hasData: boolean;
+}
+
+function buildBuckets(window: PeriodWindow, now: Date): { buckets: ChartBucket[]; assign: (checkIn: Date, amount: number) => void } {
+  if (window === 30) {
+    // Daily buckets for 30 days
+    const buckets: ChartBucket[] = Array.from({ length: 30 }, (_, i) => {
+      const d = addDays(now, i);
+      return { label: format(d, "dd MMM"), revenue: 0 };
+    });
+    const startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    return {
+      buckets,
+      assign: (checkIn, amount) => {
+        const dayIndex = Math.floor((checkIn.getTime() - startDay) / (86400000));
+        if (dayIndex >= 0 && dayIndex < 30) buckets[dayIndex].revenue += amount;
+      },
+    };
+  }
+
+  if (window === 60 || window === 90) {
+    // Weekly buckets
+    const weekCount = window === 60 ? 9 : 13;
+    const weekMap = new Map<string, number>();
+    const buckets: ChartBucket[] = [];
+    for (let i = 0; i < weekCount; i++) {
+      const weekStart = startOfISOWeek(addDays(now, i * 7));
+      const key = format(weekStart, "yyyy-MM-dd");
+      if (!weekMap.has(key)) {
+        weekMap.set(key, buckets.length);
+        buckets.push({ label: `w/c ${format(weekStart, "d MMM")}`, revenue: 0 });
+      }
+    }
+    return {
+      buckets,
+      assign: (checkIn, amount) => {
+        const ws = startOfISOWeek(checkIn);
+        const key = format(ws, "yyyy-MM-dd");
+        const idx = weekMap.get(key);
+        if (idx !== undefined) buckets[idx].revenue += amount;
+      },
+    };
+  }
+
+  // 180 — monthly buckets
+  const bucketCount = 6;
+  const buckets: ChartBucket[] = Array.from({ length: bucketCount }, (_, i) => {
+    const m = addMonths(now, i);
+    return { label: format(m, "MMM yyyy"), revenue: 0 };
+  });
+  const starts = Array.from({ length: bucketCount }, (_, i) => startOfMonth(addMonths(now, i)));
+  const ends = Array.from({ length: bucketCount }, (_, i) => endOfMonth(addMonths(now, i)));
+  return {
+    buckets,
+    assign: (checkIn, amount) => {
+      for (let b = 0; b < bucketCount; b++) {
+        if (checkIn >= starts[b] && checkIn <= ends[b]) {
+          buckets[b].revenue += amount;
+          break;
+        }
+      }
+    },
+  };
 }
 
 export function useOTBData(window: PeriodWindow = 180) {
@@ -62,9 +124,9 @@ export function useOTBData(window: PeriodWindow = 180) {
           totalRevenue: 0,
           totalNights: 0,
           avgLeadTime: 0,
-          upcomingCheckins: rows.length,
+          upcomingCheckins: 0,
           propertiesWithBookings: 0,
-          monthlyData: [],
+          chartData: [],
           upcomingReservations: [],
           propertySummaries: [],
           hasData: false,
@@ -77,19 +139,9 @@ export function useOTBData(window: PeriodWindow = 180) {
       let totalLeadTimeDays = 0;
       const listingIds = new Set<string>();
 
-      // Monthly buckets (up to 6 months)
-      const bucketCount = Math.min(Math.ceil(window / 30), 6);
-      const buckets: MonthlyBucket[] = Array.from({ length: bucketCount }, (_, i) => {
-        const m = addMonths(now, i);
-        return { month: format(m, "MMM yyyy"), revenue: 0 };
-      });
-      const bucketStarts = Array.from({ length: bucketCount }, (_, i) => startOfMonth(addMonths(now, i)));
-      const bucketEnds = Array.from({ length: bucketCount }, (_, i) => endOfMonth(addMonths(now, i)));
+      const { buckets, assign } = buildBuckets(window, now);
 
-      // Property aggregation
       const propMap = new Map<string, { name: string; locationGroup: string | null; count: number; revenue: number; nextCheckIn: string }>();
-
-      // Upcoming 14 days
       const fourteenOut = format(addDays(now, 14), "yyyy-MM-dd");
       const upcoming: UpcomingReservation[] = [];
 
@@ -109,15 +161,8 @@ export function useOTBData(window: PeriodWindow = 180) {
         totalLeadTimeDays += leadTime;
         listingIds.add(listingId);
 
-        // Monthly bucket
-        for (let b = 0; b < bucketCount; b++) {
-          if (checkIn >= bucketStarts[b] && checkIn <= bucketEnds[b]) {
-            buckets[b].revenue += amount;
-            break;
-          }
-        }
+        assign(checkIn, amount);
 
-        // Property summary
         const existing = propMap.get(listingId);
         if (existing) {
           existing.count++;
@@ -127,7 +172,6 @@ export function useOTBData(window: PeriodWindow = 180) {
           propMap.set(listingId, { name: propName, locationGroup: locGroup, count: 1, revenue: amount, nextCheckIn: r.check_in });
         }
 
-        // Upcoming 14 days
         if (r.check_in <= fourteenOut) {
           upcoming.push({
             guestName: r.guest_name,
@@ -163,7 +207,7 @@ export function useOTBData(window: PeriodWindow = 180) {
         avgLeadTime,
         upcomingCheckins: count,
         propertiesWithBookings: listingIds.size,
-        monthlyData: buckets,
+        chartData: buckets,
         upcomingReservations: upcoming,
         propertySummaries,
         hasData: true,
