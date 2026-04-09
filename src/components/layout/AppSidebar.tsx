@@ -96,9 +96,9 @@ const sections: NavSection[] = [
     items: [
       { title: "Management Revenue", url: "/management", icon: Briefcase, roles: managementRoles },
       {
-        title: "Owner Reports", url: "/owner-reports", icon: FileText, roles: managementRoles,
+      title: "Owner Reports", url: "/owner-reports", icon: FileText, roles: managementRoles,
         children: [
-          { title: "Monthly Report (15th)", url: "/owner-reports" },
+          { title: "Monthly Report", url: "/owner-reports" },
           { title: "Invoice Generator", url: "/owner-reports/invoice" },
         ],
       },
