@@ -255,7 +255,7 @@ Deno.serve(async (req) => {
         (cleanerRegionCount[best.id][task.location_group] ?? 0) + 1;
     }
 
-    // 9. Route-optimise each cleaner's tasks using home location
+    // 9. Route-optimise each cleaner's tasks: cluster by location group, then sequence
     for (const c of cleaners) {
       const tasks = cleanerBuckets[c.id];
       if (tasks.length === 0) continue;
@@ -264,51 +264,91 @@ Deno.serve(async (req) => {
       const homeLon = c.home_longitude;
 
       if (tasks.length === 1) {
-        // Single task: travel from home
         const travel = travelMinutes(homeLat, homeLon, tasks[0].latitude, tasks[0].longitude);
         tasks[0].travel_time_from_previous_minutes = travel;
         tasks[0].estimated_start_time = addMinutesToTime(DEFAULT_CHECKOUT, travel);
         continue;
       }
 
-      // Find the nearest task to home for the first job
-      const remaining = [...tasks];
-      const ordered: TaskInfo[] = [];
-
-      // First job: closest to home
-      let bestIdx = 0;
-      let bestDist = Infinity;
-      for (let i = 0; i < remaining.length; i++) {
-        const d = haversineKm(
-          homeLat ?? 54.35, homeLon ?? -7.64,
-          remaining[i].latitude ?? 54.35, remaining[i].longitude ?? -7.64
-        );
-        if (d < bestDist) { bestDist = d; bestIdx = i; }
+      // Step A: Group tasks by location_group
+      const clusters: Record<string, TaskInfo[]> = {};
+      for (const t of tasks) {
+        const key = t.location_group || "Other";
+        if (!clusters[key]) clusters[key] = [];
+        clusters[key].push(t);
       }
-      ordered.push(remaining.splice(bestIdx, 1)[0]);
 
-      // Middle jobs: nearest-next (but hold back the last pick for home-proximity check)
-      while (remaining.length > 1) {
-        const last = ordered[ordered.length - 1];
-        let nearestIdx = 0;
-        let nearestDist = Infinity;
-        for (let i = 0; i < remaining.length; i++) {
-          const d = haversineKm(
-            last.latitude ?? 54.35, last.longitude ?? -7.64,
-            remaining[i].latitude ?? 54.35, remaining[i].longitude ?? -7.64
-          );
-          if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
+      // Step B: Order clusters by proximity to home (centroid of each cluster)
+      const clusterKeys = Object.keys(clusters);
+      const clusterCentroids = clusterKeys.map(key => {
+        const group = clusters[key];
+        const avgLat = group.reduce((s, t) => s + (t.latitude ?? 54.35), 0) / group.length;
+        const avgLon = group.reduce((s, t) => s + (t.longitude ?? -7.64), 0) / group.length;
+        return { key, avgLat, avgLon };
+      });
+
+      // Order clusters: nearest-next from home
+      const orderedClusters: typeof clusterCentroids = [];
+      const remainingClusters = [...clusterCentroids];
+      let currentLat = homeLat ?? 54.35;
+      let currentLon = homeLon ?? -7.64;
+
+      while (remainingClusters.length > 0) {
+        let bestIdx = 0;
+        let bestDist = Infinity;
+        for (let i = 0; i < remainingClusters.length; i++) {
+          const d = haversineKm(currentLat, currentLon, remainingClusters[i].avgLat, remainingClusters[i].avgLon);
+          if (d < bestDist) { bestDist = d; bestIdx = i; }
         }
-        ordered.push(remaining.splice(nearestIdx, 1)[0]);
+        const picked = remainingClusters.splice(bestIdx, 1)[0];
+        orderedClusters.push(picked);
+        currentLat = picked.avgLat;
+        currentLon = picked.avgLon;
       }
 
-      // Last job: the remaining one (if only 1 left, just add it)
-      // If there were exactly 2 remaining at some point, prefer the one closer to home as last
-      if (remaining.length === 1) {
-        ordered.push(remaining[0]);
+      // Step C: Within each cluster, do nearest-next from the entry point
+      const ordered: TaskInfo[] = [];
+      let entryLat = homeLat ?? 54.35;
+      let entryLon = homeLon ?? -7.64;
+
+      for (const cluster of orderedClusters) {
+        const group = [...clusters[cluster.key]];
+        // Nearest-next within the cluster
+        while (group.length > 0) {
+          let bestIdx = 0;
+          let bestDist = Infinity;
+          for (let i = 0; i < group.length; i++) {
+            const d = haversineKm(entryLat, entryLon, group[i].latitude ?? 54.35, group[i].longitude ?? -7.64);
+            if (d < bestDist) { bestDist = d; bestIdx = i; }
+          }
+          const picked = group.splice(bestIdx, 1)[0];
+          ordered.push(picked);
+          entryLat = picked.latitude ?? 54.35;
+          entryLon = picked.longitude ?? 54.35;
+        }
       }
 
-      // Calculate travel times and estimated start times
+      // Step D: Check if reversing the last cluster puts cleaner closer to home
+      if (orderedClusters.length >= 2) {
+        const lastClusterKey = orderedClusters[orderedClusters.length - 1].key;
+        const lastTask = ordered[ordered.length - 1];
+        const homeDistCurrent = haversineKm(lastTask.latitude ?? 54.35, lastTask.longitude ?? -7.64, homeLat ?? 54.35, homeLon ?? -7.64);
+        // Find first task of last cluster
+        const lastClusterStart = ordered.findIndex(t => t.location_group === lastClusterKey);
+        if (lastClusterStart >= 0) {
+          const firstOfLastCluster = ordered[lastClusterStart];
+          const homeDistReversed = haversineKm(firstOfLastCluster.latitude ?? 54.35, firstOfLastCluster.longitude ?? -7.64, homeLat ?? 54.35, homeLon ?? -7.64);
+          if (homeDistReversed < homeDistCurrent) {
+            // Reverse the last cluster portion
+            const prefix = ordered.slice(0, lastClusterStart);
+            const suffix = ordered.slice(lastClusterStart).reverse();
+            ordered.length = 0;
+            ordered.push(...prefix, ...suffix);
+          }
+        }
+      }
+
+      // Step E: Calculate travel times and estimated start times
       const firstTravel = travelMinutes(homeLat, homeLon, ordered[0].latitude, ordered[0].longitude);
       ordered[0].travel_time_from_previous_minutes = firstTravel;
       ordered[0].estimated_start_time = addMinutesToTime(DEFAULT_CHECKOUT, firstTravel);
@@ -325,7 +365,6 @@ Deno.serve(async (req) => {
         currentTime = addMinutesToTime(currentTime, travel + ordered[i].cleaning_duration_minutes);
       }
 
-      // Replace tasks in bucket with ordered version
       cleanerBuckets[c.id] = ordered;
     }
 
