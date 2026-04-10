@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Plus, Search, Pencil } from "lucide-react";
 import { PropertyForm } from "./PropertyForm";
 
 export function PropertiesTable() {
   const [search, setSearch] = useState("");
+  const [cleanFilter, setCleanFilter] = useState("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
 
