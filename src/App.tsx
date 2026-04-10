@@ -30,6 +30,9 @@ import MonthlyReport from "./pages/MonthlyReport";
 import CleaningSchedule from "./pages/CleaningSchedule";
 import CleaningNumbers from "./pages/CleaningNumbers";
 import CleanerPortal from "./pages/CleanerPortal";
+import OwnerPortfolio from "./pages/owner/OwnerPortfolio";
+import OwnerReservations from "./pages/owner/OwnerReservations";
+import OwnerStatements from "./pages/owner/OwnerStatements";
 
 const queryClient = new QueryClient();
 
@@ -44,7 +47,10 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/cleaner" element={<CleanerPortal />} />
-            <Route path="/today" element={<ProtectedRoute><Today /></ProtectedRoute>} />
+            <Route path="/owner" element={<ProtectedRoute requiredRoles={["client"]}><OwnerPortfolio /></ProtectedRoute>} />
+            <Route path="/owner/reservations" element={<ProtectedRoute requiredRoles={["client"]}><OwnerReservations /></ProtectedRoute>} />
+            <Route path="/owner/statements" element={<ProtectedRoute requiredRoles={["client"]}><OwnerStatements /></ProtectedRoute>} />
+            <Route path="/today" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><Today /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/orin" element={<ProtectedRoute><OrinIntelligence /></ProtectedRoute>} />
             <Route path="/yoy" element={<ProtectedRoute><YoYPerformance /></ProtectedRoute>} />
