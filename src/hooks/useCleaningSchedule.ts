@@ -31,7 +31,8 @@ export interface CleanTask {
 export interface CleanerDay {
   id: string;
   name: string;
-  maxPerDay: number;
+  dailyWorkingHours: number;
+  totalScheduledMinutes: number;
   tasks: CleanTask[];
 }
 
@@ -48,7 +49,7 @@ interface Cleaner {
   location_groups: string[];
   workload_share: Record<string, number>;
   non_working_days: string[];
-  max_cleans_per_day: number;
+  daily_working_hours: number;
   rate_per_clean: number;
   active: boolean;
 }
@@ -75,7 +76,7 @@ interface Reservation {
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DEFAULT_CHECKOUT = "10:00";
 const DEFAULT_CHECKIN = "15:00";
-const AVG_SPEED_MPH = 30;
+const AVG_SPEED_KMH = 40;
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
@@ -88,8 +89,7 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 function travelMinutes(lat1: number | null, lon1: number | null, lat2: number | null, lon2: number | null): number {
   if (!lat1 || !lon1 || !lat2 || !lon2) return 15;
   const km = haversineKm(lat1, lon1, lat2, lon2);
-  const miles = km * 0.621371;
-  return Math.ceil((miles / AVG_SPEED_MPH) * 60);
+  return Math.round((km / AVG_SPEED_KMH) * 60);
 }
 
 function addMinutesToTime(time: string, mins: number): string {
