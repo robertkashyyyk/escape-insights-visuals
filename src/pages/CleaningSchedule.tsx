@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { format, addDays } from "date-fns";
+import { format, addDays, startOfWeek } from "date-fns";
 import {
   ChevronLeft, ChevronRight, RefreshCw, Calendar, CheckCircle2,
-  Clock, MapPin, AlertTriangle, ChevronDown, PoundSterling, User, Loader2,
+  Clock, MapPin, AlertTriangle, ChevronDown, User, Loader2,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 const PRIORITY_CONFIG: Record<Priority, { label: string; color: string; icon: string }> = {
   TIGHT_WINDOW: { label: "TIGHT WINDOW", color: "bg-amber-500/20 text-amber-400 border-amber-500/30", icon: "🟡" },
@@ -22,24 +22,80 @@ export default function CleaningSchedule() {
   const {
     selectedDate, setSelectedDate, viewMode, setViewMode,
     filterCleaner, setFilterCleaner, filterLocation, setFilterLocation,
-    cleanerDays, unassigned, weekSummary, monthlyInvoice,
+    cleanerDays, unassigned, weekSummary,
     cleaners, locationGroups, totalTasks,
     regenerate, completeTask, goBack, goForward, isToday, isRegenerating,
+    buildDaySchedule,
   } = useCleaningSchedule();
 
-  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
+
+  // Week-at-a-glance stats
+  const weekStats = useMemo(() => {
+    if (viewMode !== "week" || weekSummary.length === 0) return null;
+    const totalCleans = weekSummary.reduce((s, d) => s + d.totalCleans, 0);
+    const totalMinutes = weekSummary.reduce((s, d) => s + d.totalMinutes, 0);
+    const busiest = weekSummary.reduce((best, d) => d.totalCleans > best.totalCleans ? d : best, weekSummary[0]);
+    // Count unassigned across the week
+    const ws = startOfWeek(selectedDate, { weekStartsOn: 1 });
+    let unassignedCount = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(ws, i);
+      const { unassigned: u } = buildDaySchedule(d);
+      unassignedCount += u.length;
+    }
+    return {
+      totalCleans,
+      totalHours: Math.floor(totalMinutes / 60),
+      totalMins: totalMinutes % 60,
+      busiestDay: busiest.dayLabel,
+      busiestCleans: busiest.totalCleans,
+      unassignedCount,
+    };
+  }, [viewMode, weekSummary, selectedDate, buildDaySchedule]);
+
+  // Daily breakdown data for expanded view
+  const weekDailyBreakdown = useMemo(() => {
+    if (viewMode !== "week") return [];
+    const ws = startOfWeek(selectedDate, { weekStartsOn: 1 });
+    return weekSummary.map((day, i) => {
+      const d = addDays(ws, i);
+      const { tasks, cleanerDays: cds } = buildDaySchedule(d);
+      return {
+        ...day,
+        date_obj: d,
+        cleanerNames: cds.map(cd => ({ name: cd.name, initial: cd.name.charAt(0) })),
+        tasks: tasks.map(t => ({
+          propertyName: t.propertyName,
+          cleanerName: t.assignedCleanerName ?? "Unassigned",
+          time: t.estimatedStart ?? "—",
+        })),
+      };
+    });
+  }, [viewMode, weekSummary, selectedDate, buildDaySchedule]);
 
   return (
     <AppLayout>
       <div className="p-4 md:p-6 lg:p-8 space-y-6">
         {/* Header */}
-        <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight font-display">
-            Cleaning Schedule
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {totalTasks} clean{totalTasks !== 1 ? "s" : ""} · {format(selectedDate, "EEEE d MMMM yyyy")}
-          </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight font-display">
+              Schedule
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              {totalTasks} clean{totalTasks !== 1 ? "s" : ""} · {format(selectedDate, "EEEE d MMMM yyyy")}
+            </p>
+          </div>
+          <Button
+            size="sm" variant="outline"
+            onClick={regenerate}
+            disabled={isRegenerating}
+            className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+          >
+            {isRegenerating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+            {isRegenerating ? "Generating..." : "Regenerate"}
+          </Button>
         </div>
 
         {/* Controls */}
@@ -103,42 +159,143 @@ export default function CleaningSchedule() {
               {locationGroups.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
             </SelectContent>
           </Select>
-
-          <Button
-            size="sm" variant="outline"
-            onClick={regenerate}
-            disabled={isRegenerating}
-            className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
-          >
-            {isRegenerating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
-            {isRegenerating ? "Generating..." : "Regenerate"}
-          </Button>
         </div>
 
         {/* Week View */}
         {viewMode === "week" && (
-          <div className="grid grid-cols-7 gap-2">
-            {weekSummary.map(day => {
-              const isSelected = day.date === format(selectedDate, "yyyy-MM-dd");
-              const isTodayDay = day.date === format(new Date(), "yyyy-MM-dd");
-              return (
-                <button
-                  key={day.date}
-                  onClick={() => { setSelectedDate(new Date(day.date + "T12:00:00")); setViewMode("day"); }}
-                  className={`glass-card rounded-xl border p-4 text-center transition-all hover:border-primary/40 ${
-                    isSelected ? "border-primary/60 bg-primary/5" : "border-border/30"
-                  }`}
-                >
-                  <p className={`text-xs font-medium mb-1 ${isTodayDay ? "text-primary" : "text-muted-foreground"}`}>
-                    {day.dayLabel}
-                  </p>
-                  <p className="text-2xl font-display font-bold text-foreground">{day.totalCleans}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    {Math.round(day.totalMinutes / 60)}h {day.totalMinutes % 60}m
-                  </p>
-                </button>
-              );
-            })}
+          <div className="space-y-6">
+            {/* Week grid */}
+            <div className="grid grid-cols-7 gap-2">
+              {weekSummary.map(day => {
+                const isSelected = day.date === format(selectedDate, "yyyy-MM-dd");
+                const isTodayDay = day.date === format(new Date(), "yyyy-MM-dd");
+                return (
+                  <button
+                    key={day.date}
+                    onClick={() => { setSelectedDate(new Date(day.date + "T12:00:00")); setViewMode("day"); }}
+                    className={`glass-card rounded-xl border p-4 text-center transition-all hover:border-primary/40 ${
+                      isSelected ? "border-primary/60 bg-primary/5" : "border-border/30"
+                    }`}
+                  >
+                    <p className={`text-xs font-medium mb-1 ${isTodayDay ? "text-primary" : "text-muted-foreground"}`}>
+                      {day.dayLabel}
+                    </p>
+                    <p className="text-2xl font-display font-bold text-foreground">{day.totalCleans}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {Math.round(day.totalMinutes / 60)}h {day.totalMinutes % 60}m
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* This Week at a Glance */}
+            {weekStats && (
+              <div>
+                <h3 className="text-sm font-display font-semibold text-foreground uppercase tracking-wider mb-3">
+                  This Week at a Glance
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <Card className="border-border/30 bg-card/50">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-display font-bold text-foreground">{weekStats.totalCleans}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1">Total cleans</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-border/30 bg-card/50">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-display font-bold text-foreground">
+                        {weekStats.totalHours}h {weekStats.totalMins}m
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-1">Total cleaner hours</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-border/30 bg-card/50">
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-display font-bold text-foreground">{weekStats.busiestDay}</p>
+                      <p className="text-[11px] text-muted-foreground mt-1">Busiest day ({weekStats.busiestCleans} cleans)</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-border/30 bg-card/50">
+                    <CardContent className="p-4 text-center">
+                      <p className={`text-2xl font-display font-bold ${weekStats.unassignedCount > 0 ? "text-destructive" : "text-foreground"}`}>
+                        {weekStats.unassignedCount}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-1">Unassigned this week</p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            )}
+
+            {/* Daily Breakdown */}
+            <div>
+              <h3 className="text-sm font-display font-semibold text-foreground uppercase tracking-wider mb-3">
+                Daily Breakdown
+              </h3>
+              <div className="space-y-2">
+                {weekDailyBreakdown.map(day => (
+                  <Collapsible
+                    key={day.date}
+                    open={expandedDays[day.date] ?? false}
+                    onOpenChange={open => setExpandedDays(prev => ({ ...prev, [day.date]: open }))}
+                  >
+                    <CollapsibleTrigger asChild>
+                      <button className="w-full glass-card rounded-xl border border-border/30 p-4 flex items-center justify-between hover:border-primary/30 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="text-left">
+                            <p className="text-sm font-display font-semibold text-foreground">
+                              {format(day.date_obj, "EEEE")}
+                              <span className="text-muted-foreground font-normal ml-1.5">{format(day.date_obj, "d MMM")}</span>
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {day.totalCleans} clean{day.totalCleans !== 1 ? "s" : ""}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {/* Cleaner avatars */}
+                          <div className="flex -space-x-1.5">
+                            {day.cleanerNames.slice(0, 4).map((cn, i) => (
+                              <div
+                                key={i}
+                                className="h-6 w-6 rounded-full bg-primary/15 border border-background flex items-center justify-center"
+                                title={cn.name}
+                              >
+                                <span className="text-[9px] font-bold text-primary">{cn.initial}</span>
+                              </div>
+                            ))}
+                            {day.cleanerNames.length > 4 && (
+                              <div className="h-6 w-6 rounded-full bg-secondary border border-background flex items-center justify-center">
+                                <span className="text-[9px] text-muted-foreground">+{day.cleanerNames.length - 4}</span>
+                              </div>
+                            )}
+                          </div>
+                          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${expandedDays[day.date] ? "rotate-180" : ""}`} />
+                        </div>
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-1">
+                      <div className="ml-4 border-l-2 border-border/20 pl-4 space-y-1 py-2">
+                        {day.tasks.length === 0 ? (
+                          <p className="text-xs text-muted-foreground py-2">No cleans scheduled</p>
+                        ) : (
+                          day.tasks.map((t, i) => (
+                            <div key={i} className="flex items-center justify-between py-1.5 text-xs">
+                              <span className="font-medium text-foreground">{t.propertyName}</span>
+                              <div className="flex items-center gap-3 text-muted-foreground">
+                                <span>{t.cleanerName}</span>
+                                <span className="tabular-nums">{t.time}</span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -175,48 +332,6 @@ export default function CleaningSchedule() {
             </div>
           </div>
         )}
-
-        {/* Monthly Invoice Summary */}
-        <Collapsible open={invoiceOpen} onOpenChange={setInvoiceOpen}>
-          <CollapsibleTrigger asChild>
-            <button className="flex items-center gap-2 w-full text-left group">
-              <PoundSterling className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-display font-semibold text-foreground uppercase tracking-wider">
-                Invoice Summary — {format(selectedDate, "MMMM yyyy")}
-              </h3>
-              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${invoiceOpen ? "rotate-180" : ""}`} />
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-3">
-            <Card className="border-border/30 bg-card/50">
-              <CardContent className="p-4 space-y-2">
-                {monthlyInvoice.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No completed cleans this month yet.</p>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-4 gap-2 text-[10px] text-muted-foreground uppercase tracking-wider pb-2 border-b border-border/20 px-2">
-                      <span>Cleaner</span><span className="text-right">Cleans</span><span className="text-right">Rate</span><span className="text-right">Total</span>
-                    </div>
-                    {monthlyInvoice.map(row => (
-                      <div key={row.id} className="grid grid-cols-4 gap-2 text-xs py-2 px-2 rounded-lg hover:bg-secondary/30 transition-colors">
-                        <span className="font-medium text-foreground">{row.name}</span>
-                        <span className="text-right text-muted-foreground">{row.cleans}</span>
-                        <span className="text-right text-muted-foreground">£{row.rate}</span>
-                        <span className="text-right font-semibold text-foreground">£{row.total.toFixed(2)}</span>
-                      </div>
-                    ))}
-                    <div className="grid grid-cols-4 gap-2 text-xs py-2 px-2 border-t border-border/20 mt-1">
-                      <span className="font-semibold text-foreground">Total</span>
-                      <span className="text-right font-semibold text-foreground">{monthlyInvoice.reduce((s, r) => s + r.cleans, 0)}</span>
-                      <span />
-                      <span className="text-right font-bold text-primary">£{monthlyInvoice.reduce((s, r) => s + r.total, 0).toFixed(2)}</span>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </CollapsibleContent>
-        </Collapsible>
       </div>
     </AppLayout>
   );
@@ -262,7 +377,6 @@ function CleanerSection({ cleanerDay, cleaners, onComplete }: { cleanerDay: Clea
           const sorted = [...cleanerDay.tasks].sort((a, b) => (a.estimatedStart || "").localeCompare(b.estimatedStart || ""));
           return (
             <>
-              {/* Home → First property */}
               {cleanerDay.homeToFirstMinutes != null && sorted.length > 0 && (
                 <div className="flex items-center gap-1.5 py-1.5 text-[11px] text-muted-foreground/70">
                   <span>🏠 Home → {sorted[0].propertyName} · ~{cleanerDay.homeToFirstMinutes} min</span>
@@ -280,7 +394,6 @@ function CleanerSection({ cleanerDay, cleaners, onComplete }: { cleanerDay: Clea
                   <TaskCard task={task} cleaners={cleaners} onComplete={onComplete} />
                 </div>
               ))}
-              {/* Last property → Home */}
               {cleanerDay.lastToHomeMinutes != null && sorted.length > 0 && (
                 <div className="flex items-center gap-1.5 py-1.5 text-[11px] text-muted-foreground/70">
                   <span>{sorted[sorted.length - 1].propertyName} → 🏠 Home · ~{cleanerDay.lastToHomeMinutes} min</span>
