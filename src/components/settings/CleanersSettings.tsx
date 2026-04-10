@@ -281,6 +281,30 @@ export function CleanersSettings() {
                 <Input value={form.email || ""} onChange={e => setForm({ ...form, email: e.target.value })} className="bg-secondary/50 border-border/40" />
               </div>
             </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Home Postcode</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={form.home_postcode || ""}
+                  onChange={e => setForm({ ...form, home_postcode: e.target.value })}
+                  placeholder="e.g. BT93 1UJ"
+                  className="bg-secondary/50 border-border/40 flex-1"
+                />
+                <Button
+                  type="button" size="sm" variant="outline"
+                  onClick={() => geocodePostcode(form.home_postcode || "")}
+                  disabled={geocoding || !form.home_postcode?.trim()}
+                  className="h-9 text-xs"
+                >
+                  {geocoding ? <Loader2 className="h-3 w-3 animate-spin" /> : "Locate"}
+                </Button>
+              </div>
+              {geocodeResult && (
+                <p className={`text-[11px] ${geocodeResult.startsWith("📍") ? "text-emerald-400" : "text-red-400"}`}>
+                  {geocodeResult}
+                </p>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Daily Working Hours</Label>
