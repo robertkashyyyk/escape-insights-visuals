@@ -31,6 +31,7 @@ interface Cleaner {
   home_postcode: string | null;
   home_latitude: number | null;
   home_longitude: number | null;
+  user_id: string | null;
 }
 
 type CleanerForm = Omit<Cleaner, "id" | "region">;
