@@ -28,6 +28,7 @@ import Today from "./pages/Today";
 import SyncHealth from "./pages/SyncHealth";
 import MonthlyReport from "./pages/MonthlyReport";
 import CleaningSchedule from "./pages/CleaningSchedule";
+import CleaningNumbers from "./pages/CleaningNumbers";
 import CleanerPortal from "./pages/CleanerPortal";
 
 const queryClient = new QueryClient();
@@ -60,7 +61,9 @@ const App = () => (
             <Route path="/management" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ManagementRevenue /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute requiredRoles={["super"]}><SettingsPage /></ProtectedRoute>} />
             <Route path="/sync-health" element={<ProtectedRoute requiredRoles={["super", "senior"]}><SyncHealth /></ProtectedRoute>} />
+            <Route path="/operations/schedule" element={<ProtectedRoute><CleaningSchedule /></ProtectedRoute>} />
             <Route path="/operations/cleaning" element={<ProtectedRoute><CleaningSchedule /></ProtectedRoute>} />
+            <Route path="/operations/numbers" element={<ProtectedRoute requiredRoles={["super", "senior"]}><CleaningNumbers /></ProtectedRoute>} />
             <Route path="/property-knowledge" element={<ProtectedRoute><ComingSoon title="Property Knowledge" /></ProtectedRoute>} />
             <Route path="/owner-reports" element={<ProtectedRoute requiredRoles={["super", "senior"]}><MonthlyReport /></ProtectedRoute>} />
             <Route path="/owner-reports/invoice" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ComingSoon title="Owner Reports — Invoice Generator" /></ProtectedRoute>} />
