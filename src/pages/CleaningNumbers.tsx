@@ -530,10 +530,16 @@ export default function CleaningNumbers() {
                         fontSize: "12px",
                       }}
                       labelStyle={{ color: "hsl(220 20% 92%)" }}
+                      formatter={(value: number, _name: string, props: any) => {
+                        const ratio = props.payload.completionRatio;
+                        const completed = Math.round(ratio * (props.payload.cleans));
+                        const pending = props.payload.cleans - completed;
+                        return [`${completed} completed · ${pending} pending`, "Cleans"];
+                      }}
                     />
                     <Bar dataKey="cleans" radius={[4, 4, 0, 0]}>
-                      {chartData.map((_, i) => (
-                        <Cell key={i} fill="hsl(38 92% 50%)" fillOpacity={0.8} />
+                      {chartData.map((entry, i) => (
+                        <Cell key={i} fill={getBarColor(entry.completionRatio)} fillOpacity={0.85} />
                       ))}
                     </Bar>
                   </BarChart>
