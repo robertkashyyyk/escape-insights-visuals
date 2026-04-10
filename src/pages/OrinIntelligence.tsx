@@ -62,7 +62,7 @@ function GenerateButton() {
     <Button
       variant="outline"
       size="sm"
-      onClick={() => generate.mutate()}
+      onClick={() => generate.mutate({})}
       disabled={generate.isPending}
       className="text-xs gap-1.5"
     >
