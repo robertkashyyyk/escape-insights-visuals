@@ -96,7 +96,7 @@ export default function CleanerPortal() {
       `)
       .eq("assigned_cleaner_id", cleanerId)
       .eq("scheduled_date", today)
-      .order("route_order", { ascending: true });
+      .order("estimated_start_time", { ascending: true, nullsFirst: false });
 
     if (taskData) {
       setTasks(mapTaskData(taskData));
@@ -149,7 +149,7 @@ export default function CleanerPortal() {
       `)
       .eq("assigned_cleaner_id", cleanerData.id)
       .eq("scheduled_date", today)
-      .order("route_order", { ascending: true });
+      .order("estimated_start_time", { ascending: true, nullsFirst: false });
 
     if (taskData) {
       setTasks(mapTaskData(taskData));
@@ -172,7 +172,7 @@ export default function CleanerPortal() {
       .eq("assigned_cleaner_id", cleaner.id)
       .eq("scheduled_date", today)
       .gt("created_at", pageLoadTime.current)
-      .order("route_order", { ascending: true });
+      .order("estimated_start_time", { ascending: true, nullsFirst: false });
 
     if (data && data.length > 0) {
       pageLoadTime.current = new Date().toISOString();
@@ -183,7 +183,7 @@ export default function CleanerPortal() {
         const onlyNew = newTasks.filter((n: CleanTask) => !existingIds.has(n.id));
         if (onlyNew.length === 0) return prev;
         const merged = [...prev, ...onlyNew].sort(
-          (a, b) => a.route_order - b.route_order
+          (a, b) => (a.estimated_start_time ?? "99:99").localeCompare(b.estimated_start_time ?? "99:99")
         );
         onlyNew.forEach((n: CleanTask) => {
           toast(`⚡ New job added — ${n.property_name} — tap to view`);
