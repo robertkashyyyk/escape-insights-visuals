@@ -268,7 +268,6 @@ export default function CleaningNumbers() {
   }, [cleanerCounts, cleaners]);
 
   // Month comparison
-  const prevTotalCleans = prevTasks.length;
   const monthChange = prevTotalCleans > 0 ? Math.round(((totalCleans - prevTotalCleans) / prevTotalCleans) * 100) : 0;
 
   // Chart data
