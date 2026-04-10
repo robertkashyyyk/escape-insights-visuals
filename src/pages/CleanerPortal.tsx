@@ -431,11 +431,19 @@ export default function CleanerPortal() {
 
                   return (
                     <div key={task.id}>
-                      {/* Travel connector */}
-                      {idx > 0 && task.travel_time_from_previous_minutes != null && task.travel_time_from_previous_minutes > 0 && (
+                      {/* Home → first travel connector */}
+                      {idx === 0 && cleaner && (
                         <div className="flex items-center justify-center py-2">
                           <span className="text-xs text-muted-foreground">
-                            🚗 ~{task.travel_time_from_previous_minutes} min travel
+                            🏠 ~{travelMinutes(cleaner.home_latitude, cleaner.home_longitude, task.latitude, task.longitude)} min from home
+                          </span>
+                        </div>
+                      )}
+                      {/* Travel connector between tasks */}
+                      {idx > 0 && (
+                        <div className="flex items-center justify-center py-2">
+                          <span className="text-xs text-muted-foreground">
+                            🚗 ~{task.travel_time_from_previous_minutes ?? travelMinutes(tasks[idx - 1].latitude, tasks[idx - 1].longitude, task.latitude, task.longitude)} min travel
                           </span>
                         </div>
                       )}
