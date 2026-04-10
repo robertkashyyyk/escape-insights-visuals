@@ -244,6 +244,7 @@ export function CleanersSettings() {
                   {c.phone && <p>📞 {c.phone}</p>}
                   {c.email && <p>✉️ {c.email}</p>}
                   <p>{c.daily_working_hours ?? 8}h/day · £{c.rate_per_clean}/clean</p>
+                  {c.home_postcode && <p>🏠 {c.home_postcode}</p>}
                   {c.location_groups?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1">
                       {c.location_groups.map(g => (
