@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LogOut, Check } from "lucide-react";
+import { Loader2, LogOut, Check, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
@@ -38,21 +38,93 @@ export default function CleanerPortal() {
   const [completingId, setCompletingId] = useState<string | null>(null);
   const pageLoadTime = useRef(new Date().toISOString());
   const isCleaner = (role as string) === "cleaner";
+  const isAdmin = (role as string) === "super" || (role as string) === "senior";
+  const isPreviewMode = isAdmin;
+
+  // Admin cleaner selector state
+  const [allCleaners, setAllCleaners] = useState<CleanerProfile[]>([]);
+  const [selectedCleanerId, setSelectedCleanerId] = useState<string | null>(null);
+
+  // Fetch all cleaners for admin preview
+  useEffect(() => {
+    if (!isAdmin || !user) return;
+    const fetchCleaners = async () => {
+      const { data } = await supabase
+        .from("cleaners")
+        .select("id, name, daily_working_hours")
+        .eq("active", true)
+        .order("name");
+      if (data && data.length > 0) {
+        setAllCleaners(data);
+        setSelectedCleanerId(data[0].id);
+      }
+    };
+    fetchCleaners();
+  }, [isAdmin, user]);
 
   useEffect(() => {
     if (!user) return;
-    fetchData();
+    if (isAdmin) {
+      if (selectedCleanerId) fetchDataForCleaner(selectedCleanerId);
+    } else {
+      fetchData();
+    }
+  }, [user, selectedCleanerId, isAdmin]);
 
-    // Poll every 5 minutes for new tasks
+  // Poll for cleaners (non-admin only)
+  useEffect(() => {
+    if (!user || isAdmin) return;
     const interval = setInterval(() => pollNewTasks(), 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, isAdmin, cleaner]);
+
+  const fetchDataForCleaner = async (cleanerId: string) => {
+    setLoading(true);
+    const selected = allCleaners.find(c => c.id === cleanerId);
+    if (!selected) { setLoading(false); return; }
+    setCleaner(selected);
+
+    const today = format(new Date(), "yyyy-MM-dd");
+    const { data: taskData } = await supabase
+      .from("clean_tasks")
+      .select(`
+        id, status, route_order, estimated_start_time,
+        travel_time_from_previous_minutes, is_same_day_turnaround,
+        checkout_time, checkin_time, cleaning_duration_minutes,
+        listing_id,
+        listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms)
+      `)
+      .eq("assigned_cleaner_id", cleanerId)
+      .eq("scheduled_date", today)
+      .order("route_order", { ascending: true });
+
+    if (taskData) {
+      setTasks(mapTaskData(taskData));
+    }
+    setLoading(false);
+  };
+
+  const mapTaskData = (taskData: any[]): CleanTask[] =>
+    taskData.map((t: any) => ({
+      id: t.id,
+      status: t.status,
+      route_order: t.route_order,
+      estimated_start_time: t.estimated_start_time,
+      travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
+      is_same_day_turnaround: t.is_same_day_turnaround,
+      checkout_time: t.checkout_time,
+      checkin_time: t.checkin_time,
+      cleaning_duration_minutes: t.cleaning_duration_minutes,
+      listing_id: t.listing_id,
+      property_name: t.listings?.name ?? "Unknown",
+      location_group: t.listings?.location_group ?? null,
+      bedrooms: t.listings?.bedrooms ?? null,
+    }));
 
   const fetchData = async () => {
     if (!user) return;
     setLoading(true);
 
-    // Get cleaner profile
     const { data: cleanerData } = await supabase
       .from("cleaners")
       .select("id, name, daily_working_hours")
@@ -65,7 +137,6 @@ export default function CleanerPortal() {
     }
     setCleaner(cleanerData);
 
-    // Get today's tasks
     const today = format(new Date(), "yyyy-MM-dd");
     const { data: taskData } = await supabase
       .from("clean_tasks")
@@ -81,23 +152,7 @@ export default function CleanerPortal() {
       .order("route_order", { ascending: true });
 
     if (taskData) {
-      setTasks(
-        taskData.map((t: any) => ({
-          id: t.id,
-          status: t.status,
-          route_order: t.route_order,
-          estimated_start_time: t.estimated_start_time,
-          travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
-          is_same_day_turnaround: t.is_same_day_turnaround,
-          checkout_time: t.checkout_time,
-          checkin_time: t.checkin_time,
-          cleaning_duration_minutes: t.cleaning_duration_minutes,
-          listing_id: t.listing_id,
-          property_name: t.listings?.name ?? "Unknown",
-          location_group: t.listings?.location_group ?? null,
-          bedrooms: t.listings?.bedrooms ?? null,
-        }))
-      );
+      setTasks(mapTaskData(taskData));
     }
     setLoading(false);
   };
@@ -121,21 +176,7 @@ export default function CleanerPortal() {
 
     if (data && data.length > 0) {
       pageLoadTime.current = new Date().toISOString();
-      const newTasks = data.map((t: any) => ({
-        id: t.id,
-        status: t.status,
-        route_order: t.route_order,
-        estimated_start_time: t.estimated_start_time,
-        travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
-        is_same_day_turnaround: t.is_same_day_turnaround,
-        checkout_time: t.checkout_time,
-        checkin_time: t.checkin_time,
-        cleaning_duration_minutes: t.cleaning_duration_minutes,
-        listing_id: t.listing_id,
-        property_name: t.listings?.name ?? "Unknown",
-        location_group: t.listings?.location_group ?? null,
-        bedrooms: t.listings?.bedrooms ?? null,
-      }));
+      const newTasks = mapTaskData(data);
 
       setTasks((prev) => {
         const existingIds = new Set(prev.map((p) => p.id));
@@ -153,9 +194,12 @@ export default function CleanerPortal() {
   };
 
   const handleMarkComplete = async (task: CleanTask) => {
+    if (isPreviewMode) {
+      toast.info("Preview mode — actions are disabled");
+      return;
+    }
     setCompletingId(task.id);
 
-    // Optimistic update
     setTasks((prev) =>
       prev.map((t) =>
         t.id === task.id ? { ...t, status: "complete" } : t
@@ -174,7 +218,6 @@ export default function CleanerPortal() {
     ]);
 
     if (taskRes.error || listingRes.error) {
-      // Revert
       setTasks((prev) =>
         prev.map((t) =>
           t.id === task.id ? { ...t, status: "scheduled" } : t
@@ -189,11 +232,10 @@ export default function CleanerPortal() {
 
   const formatTime = (time: string | null) => {
     if (!time) return "—";
-    // time is HH:MM:SS, show HH:MM
     return time.substring(0, 5);
   };
 
-  if (authLoading || loading) {
+  if (authLoading || (loading && !isAdmin)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -205,12 +247,12 @@ export default function CleanerPortal() {
     return <Navigate to="/auth" replace />;
   }
 
-  // Redirect non-cleaners
-  if (!authLoading && role && !isCleaner) {
+  // Redirect non-cleaners and non-admins
+  if (!authLoading && role && !isCleaner && !isAdmin) {
     return <Navigate to="/today" replace />;
   }
 
-  if (!cleaner) {
+  if (!isAdmin && !cleaner) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-6">
         <p className="text-muted-foreground text-center">
@@ -220,7 +262,8 @@ export default function CleanerPortal() {
     );
   }
 
-  const firstName = cleaner.name.split(" ")[0];
+  const displayCleaner = cleaner;
+  const firstName = displayCleaner?.name.split(" ")[0] ?? "Cleaner";
   const initial = firstName.charAt(0).toUpperCase();
   const todayFormatted = format(new Date(), "EEEE, d MMMM yyyy");
 
@@ -231,7 +274,7 @@ export default function CleanerPortal() {
       (t.travel_time_from_previous_minutes ?? 0),
     0
   );
-  const maxMinutes = cleaner.daily_working_hours * 60;
+  const maxMinutes = (displayCleaner?.daily_working_hours ?? 8) * 60;
   const capacityPct = maxMinutes > 0 ? Math.round((totalMinutes / maxMinutes) * 100) : 0;
   const totalHours = Math.floor(totalMinutes / 60);
   const totalMins = totalMinutes % 60;
@@ -243,6 +286,24 @@ export default function CleanerPortal() {
   return (
     <div className="min-h-screen bg-background flex justify-center">
       <div className="w-full max-w-[430px] flex flex-col min-h-screen">
+        {/* Preview banner for admins */}
+        {isPreviewMode && (
+          <div className="bg-primary/15 border-b border-primary/30 px-4 py-2.5 flex items-center gap-2">
+            <Eye className="h-4 w-4 text-primary shrink-0" />
+            <span className="text-xs font-medium text-primary">Preview Mode</span>
+            <div className="flex-1" />
+            <select
+              value={selectedCleanerId ?? ""}
+              onChange={(e) => setSelectedCleanerId(e.target.value)}
+              className="text-xs bg-background/50 border border-border/30 rounded-md px-2 py-1 text-foreground"
+            >
+              {allCleaners.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 pt-3 pb-2">
           <img
@@ -250,13 +311,22 @@ export default function CleanerPortal() {
             alt="Escape Grids"
             className="h-7 w-7 object-contain opacity-60"
           />
-          <button
-            onClick={signOut}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors min-h-[48px] flex items-center"
-          >
-            <LogOut className="h-3.5 w-3.5 mr-1" />
-            Sign out
-          </button>
+          {!isPreviewMode ? (
+            <button
+              onClick={signOut}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors min-h-[48px] flex items-center"
+            >
+              <LogOut className="h-3.5 w-3.5 mr-1" />
+              Sign out
+            </button>
+          ) : (
+            <a
+              href="/today"
+              className="text-xs text-primary hover:text-primary/80 transition-colors min-h-[48px] flex items-center font-medium"
+            >
+              ← Back to app
+            </a>
+          )}
         </div>
 
         {/* Sticky header */}
@@ -309,14 +379,18 @@ export default function CleanerPortal() {
 
         {/* Content */}
         <div className="flex-1 px-4 pt-4 pb-8" style={{ paddingBottom: "env(safe-area-inset-bottom, 2rem)" }}>
-          {tasks.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : tasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-20 px-6">
               <span className="text-5xl mb-4">🌅</span>
               <p className="text-foreground font-display font-semibold text-lg">
                 No cleans scheduled for today.
               </p>
               <p className="text-muted-foreground text-sm mt-1">
-                Enjoy your day off, {firstName}.
+                {isPreviewMode ? `${firstName} has no tasks today.` : `Enjoy your day off, ${firstName}.`}
               </p>
             </div>
           ) : allComplete ? (
@@ -326,7 +400,7 @@ export default function CleanerPortal() {
                 All done for today!
               </p>
               <p className="text-muted-foreground text-sm mt-1">
-                {completedCount} propert{completedCount !== 1 ? "ies" : "y"} cleaned. Great work, {firstName}.
+                {completedCount} propert{completedCount !== 1 ? "ies" : "y"} cleaned. {isPreviewMode ? "" : `Great work, ${firstName}.`}
               </p>
             </div>
           ) : (
@@ -334,7 +408,6 @@ export default function CleanerPortal() {
               <AnimatePresence initial={false}>
                 {tasks.map((task, idx) => {
                   const isComplete = task.status === "complete";
-                  const isNewlyAdded = false; // Could track for pulsing border
 
                   return (
                     <div key={task.id}>
@@ -358,7 +431,6 @@ export default function CleanerPortal() {
                             : ""
                         }`}
                       >
-                        {/* Status + Property name */}
                         <div className="flex items-start gap-3">
                           <div className="mt-1 shrink-0">
                             {isComplete ? (
@@ -379,21 +451,18 @@ export default function CleanerPortal() {
                               )}
                             </h3>
 
-                            {/* Location badge */}
                             {task.location_group && (
                               <span className="inline-block mt-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-primary/15 text-primary">
                                 {task.location_group}
                               </span>
                             )}
 
-                            {/* Same-day turnaround badge */}
                             {task.is_same_day_turnaround && (
                               <span className="inline-block mt-1.5 ml-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-destructive/15 text-destructive">
                                 SAME-DAY TURNAROUND
                               </span>
                             )}
 
-                            {/* Info row */}
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2.5 text-[14px] text-muted-foreground">
                               {task.estimated_start_time && (
                                 <span>🕐 {formatTime(task.estimated_start_time)}</span>
@@ -407,20 +476,23 @@ export default function CleanerPortal() {
                               )}
                             </div>
 
-                            {/* Mark Complete button */}
                             {!isComplete && (
                               <motion.button
                                 onClick={() => handleMarkComplete(task)}
-                                disabled={completingId === task.id}
-                                className="w-full mt-4 min-h-[48px] rounded-lg bg-success text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-300 active:scale-[0.98] disabled:opacity-50"
-                                whileTap={{ scale: 0.98 }}
+                                disabled={completingId === task.id || isPreviewMode}
+                                className={`w-full mt-4 min-h-[48px] rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-300 active:scale-[0.98] disabled:opacity-50 ${
+                                  isPreviewMode
+                                    ? "bg-muted text-muted-foreground cursor-not-allowed"
+                                    : "bg-success text-primary-foreground"
+                                }`}
+                                whileTap={isPreviewMode ? undefined : { scale: 0.98 }}
                               >
                                 {completingId === task.id ? (
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
                                   <>
                                     <Check className="h-4 w-4" />
-                                    Mark Complete
+                                    {isPreviewMode ? "Mark Complete (disabled in preview)" : "Mark Complete"}
                                   </>
                                 )}
                               </motion.button>
@@ -433,7 +505,6 @@ export default function CleanerPortal() {
                 })}
               </AnimatePresence>
 
-              {/* Footer: last property → home */}
               {tasks.length > 0 && (
                 <div className="text-center text-xs text-muted-foreground pt-4 pb-2">
                   🏠 {tasks[tasks.length - 1].property_name} → Home
