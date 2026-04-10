@@ -106,14 +106,13 @@ export function CleanersSettings() {
     setGeocoding(true);
     setGeocodeResult(null);
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(postcode.trim())}&country=GB&format=json&addressdetails=1&limit=1`, {
-        headers: { "User-Agent": "EscapeGrids/1.0" },
-      });
+      // Use postcodes.io — free, accurate for UK/NI postcodes
+      const res = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode.trim().replace(/\s+/g, ""))}`);
       const data = await res.json();
-      if (data.length > 0) {
-        const { lat, lon, address } = data[0];
-        const parts = [address?.town || address?.city || address?.village, address?.county || address?.state].filter(Boolean);
-        setForm(f => ({ ...f, home_latitude: parseFloat(lat), home_longitude: parseFloat(lon) }));
+      if (data.status === 200 && data.result) {
+        const { latitude, longitude, admin_district, admin_county } = data.result;
+        const parts = [admin_district, admin_county].filter(Boolean);
+        setForm(f => ({ ...f, home_latitude: latitude, home_longitude: longitude }));
         setGeocodeResult(`📍 ${parts.join(", ") || "Location found"}`);
       } else {
         setGeocodeResult("❌ Postcode not found");
