@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 
 export function StorySection() {
   return (
-    <section id="story" className="py-28 relative">
+    <section id="testimonial" className="py-24 md:py-28 relative">
       <div className="absolute inset-0">
         <div className="absolute bottom-0 left-1/4 w-[600px] h-[400px] rounded-full bg-primary/5 blur-[120px]" />
       </div>
@@ -13,20 +13,34 @@ export function StorySection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.7 }}
-          className="glass-card p-10 sm:p-16 text-center border-primary/10"
+          className="text-center mb-10"
         >
-          <span className="inline-block text-xs font-medium uppercase tracking-[0.2em] text-accent mb-6">
-            Our Story
-          </span>
-          <h2 className="font-display text-3xl sm:text-4xl font-bold tracking-tight mb-8">
-            Built by{" "}
-            <span className="text-gradient-primary">Escape Ordinary</span>
+          <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
+            Built with and for{" "}
+            <span className="text-gradient-primary">Escape Ordinary</span>{" "}
+            — 46 properties, 9,427 reservations, live since 2025.
           </h2>
-          <p className="text-muted-foreground text-base sm:text-lg leading-relaxed max-w-2xl mx-auto">
-            Escape Grids wasn't built by software engineers guessing what property managers need. It was built by{" "}
-            <span className="text-foreground font-medium">Escape Ordinary</span>—a premium short-term rental management company—to solve our own biggest headache. We built the tool we wished existed.
-          </p>
-          <div className="mt-10 h-px w-24 mx-auto bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.6, delay: 0.15 }}
+          className="glass-card p-8 sm:p-10 border-l-4 border-l-primary"
+        >
+          <blockquote className="text-base sm:text-lg text-foreground leading-relaxed italic mb-6">
+            "Escape Grids replaced a 20-sheet manual workbook we rebuilt every month. It now updates automatically, every night."
+          </blockquote>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <span className="text-sm font-display font-bold text-primary">R</span>
+            </div>
+            <div>
+              <p className="text-sm font-display font-semibold text-foreground">Ryan</p>
+              <p className="text-xs text-muted-foreground">Escape Ordinary · Fermanagh, Northern Ireland</p>
+            </div>
+          </div>
         </motion.div>
       </div>
     </section>
