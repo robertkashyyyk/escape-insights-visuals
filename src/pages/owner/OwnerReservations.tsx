@@ -172,15 +172,9 @@ export default function OwnerReservations() {
                         </Badge>
                       </div>
 
-                      <div className="flex items-center gap-4 shrink-0">
-                        <div className="text-right">
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Revenue</p>
-                          <p className="text-sm font-display font-bold text-foreground">{fmt(r.total_amount || 0)}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Your Payout</p>
-                          <p className="text-sm font-display font-bold text-primary">{fmt(r.owner_payout || 0)}</p>
-                        </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Revenue</p>
+                        <p className="text-sm font-display font-bold text-foreground">{fmt(r.total_amount || 0)}</p>
                       </div>
                     </div>
                   </CardContent>
