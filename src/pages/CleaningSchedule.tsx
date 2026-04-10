@@ -24,7 +24,7 @@ export default function CleaningSchedule() {
     filterCleaner, setFilterCleaner, filterLocation, setFilterLocation,
     cleanerDays, unassigned, weekSummary, monthlyInvoice,
     cleaners, locationGroups, totalTasks,
-    regenerate, goBack, goForward,
+    regenerate, goBack, goForward, isToday,
   } = useCleaningSchedule();
 
   const [invoiceOpen, setInvoiceOpen] = useState(false);
