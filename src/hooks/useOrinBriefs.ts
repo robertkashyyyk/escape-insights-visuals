@@ -85,7 +85,7 @@ export function useOrinBriefs(type?: "monthly" | "quarterly") {
   return useQuery({
     queryKey: ["orin-briefs", type],
     queryFn: async () => {
-      let q = supabase.from("orin_briefs").select("*").order("period_start", { ascending: false });
+      let q = (supabase as any).from("orin_briefs").select("*").order("period_start", { ascending: false });
       if (type) q = q.eq("period_type", type);
       const { data, error } = await q;
       if (error) throw error;
