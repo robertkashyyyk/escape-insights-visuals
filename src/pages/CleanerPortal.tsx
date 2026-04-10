@@ -149,7 +149,7 @@ export default function CleanerPortal() {
       `)
       .eq("assigned_cleaner_id", cleanerData.id)
       .eq("scheduled_date", today)
-      .order("route_order", { ascending: true });
+      .order("estimated_start_time", { ascending: true, nullsFirst: false });
 
     if (taskData) {
       setTasks(mapTaskData(taskData));
