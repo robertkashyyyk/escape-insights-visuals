@@ -137,6 +137,8 @@ export default function CleanerPortal() {
       property_name: t.listings?.name ?? "Unknown",
       location_group: t.listings?.location_group ?? null,
       bedrooms: t.listings?.bedrooms ?? null,
+      latitude: t.listings?.latitude ?? null,
+      longitude: t.listings?.longitude ?? null,
     }));
 
   const fetchData = async () => {
