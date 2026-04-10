@@ -37,11 +37,7 @@ export default function CleanerPortal() {
   const [loading, setLoading] = useState(true);
   const [completingId, setCompletingId] = useState<string | null>(null);
   const pageLoadTime = useRef(new Date().toISOString());
-
-  // Redirect non-cleaners
-  if (!authLoading && role && role !== "cleaner") {
-    return <Navigate to="/today" replace />;
-  }
+  const isCleaner = (role as string) === "cleaner";
 
   useEffect(() => {
     if (!user) return;
