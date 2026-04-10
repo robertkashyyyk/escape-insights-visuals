@@ -69,11 +69,11 @@ export default function CleanerPortal() {
     const fetchCleaners = async () => {
       const { data } = await supabase
         .from("cleaners")
-        .select("id, name, daily_working_hours")
+        .select("id, name, daily_working_hours, home_latitude, home_longitude")
         .eq("active", true)
         .order("name");
       if (data && data.length > 0) {
-        setAllCleaners(data);
+        setAllCleaners(data as any as CleanerProfile[]);
         setSelectedCleanerId(data[0].id);
       }
     };
