@@ -264,12 +264,14 @@ function CleanerSection({ cleanerDay, cleaners, onComplete }: { cleanerDay: Clea
             <span>🏠 Home → {cleanerDay.tasks[0].propertyName} · ~{cleanerDay.homeToFirstMinutes} min</span>
           </div>
         )}
-        {cleanerDay.tasks.map((task) => (
+        {[...cleanerDay.tasks]
+          .sort((a, b) => (a.estimatedStart || "").localeCompare(b.estimatedStart || ""))
+          .map((task, idx) => (
           <div key={task.id}>
-            {task.travelMinutes != null && task.travelMinutes > 0 && (
+            {idx > 0 && (
               <div className="flex items-center gap-1.5 py-1 text-[10px] text-muted-foreground/60">
                 <div className="h-px flex-1 bg-border/20" />
-                <span>🚗 ~{task.travelMinutes} min travel</span>
+                <span>🚗 ~{task.travelMinutes ?? 0} min travel</span>
                 <div className="h-px flex-1 bg-border/20" />
               </div>
             )}
