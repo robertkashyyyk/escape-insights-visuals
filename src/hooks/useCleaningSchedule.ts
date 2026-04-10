@@ -292,11 +292,12 @@ export function useCleaningSchedule() {
     // Route optimization per cleaner (nearest-neighbor)
     const cleanerDays: CleanerDay[] = cleaners.map(c => {
       const cTasks = tasks.filter(t => t.assignedCleanerId === c.id);
+      const totalMins = cleanerScheduledMinutes[c.id] ?? 0;
       if (cTasks.length <= 1) {
         if (cTasks.length === 1) {
           cTasks[0].estimatedStart = DEFAULT_CHECKOUT;
         }
-        return { id: c.id, name: c.name, maxPerDay: c.max_cleans_per_day, tasks: cTasks };
+        return { id: c.id, name: c.name, dailyWorkingHours: c.daily_working_hours, totalScheduledMinutes: totalMins, tasks: cTasks };
       }
 
       const ordered: CleanTask[] = [];
@@ -327,7 +328,7 @@ export function useCleaningSchedule() {
         }
       }
 
-      return { id: c.id, name: c.name, maxPerDay: c.max_cleans_per_day, tasks: ordered };
+      return { id: c.id, name: c.name, dailyWorkingHours: c.daily_working_hours, totalScheduledMinutes: totalMins, tasks: ordered };
     }).filter(cd => cd.tasks.length > 0);
 
     const unassigned = tasks.filter(t => t.status === "unassigned");
