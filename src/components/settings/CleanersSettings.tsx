@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,9 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, SprayCan } from "lucide-react";
+import { Plus, Pencil, Trash2, SprayCan, AlertTriangle } from "lucide-react";
 
 const LOCATION_GROUPS = ["Castle Hume", "Belfast", "Enniskillen", "North Coast", "Portstewart Coast", "Larne", "Kesh", "Other"];
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -34,6 +35,22 @@ const empty: CleanerForm = {
   location_groups: [], workload_share: {},
   non_working_days: [], max_cleans_per_day: 3, rate_per_clean: 0, active: true,
 };
+
+/** Get sum of workload_share for a group across all cleaners, excluding one cleaner by id */
+function getOthersTotal(cleaners: Cleaner[], group: string, excludeId: string | null): number {
+  return cleaners.reduce((sum, c) => {
+    if (c.id === excludeId) return sum;
+    if (!c.location_groups?.includes(group)) return sum;
+    return sum + (c.workload_share?.[group] ?? 0);
+  }, 0);
+}
+
+/** Get breakdown of allocations for a group across all cleaners */
+function getGroupBreakdown(cleaners: Cleaner[], group: string, excludeId: string | null): { name: string; pct: number }[] {
+  return cleaners
+    .filter(c => c.id !== excludeId && c.location_groups?.includes(group) && (c.workload_share?.[group] ?? 0) > 0)
+    .map(c => ({ name: c.name, pct: c.workload_share?.[group] ?? 0 }));
+}
 
 export function CleanersSettings() {
   const { toast } = useToast();
@@ -68,6 +85,20 @@ export function CleanersSettings() {
     });
     setOpen(true);
   };
+
+  // Compute save-time warnings for under-allocated groups
+  const saveWarnings = useMemo(() => {
+    const warnings: string[] = [];
+    for (const g of form.location_groups) {
+      const othersTotal = getOthersTotal(cleaners, g, editing?.id ?? null);
+      const thisValue = form.workload_share[g] ?? 0;
+      const total = othersTotal + thisValue;
+      if (total < 100) {
+        warnings.push(`${g} is only allocated to ${total}%. Add another cleaner or adjust allocations to reach 100%.`);
+      }
+    }
+    return warnings;
+  }, [form.location_groups, form.workload_share, cleaners, editing]);
 
   const handleSave = async () => {
     if (!form.name.trim()) return;
@@ -114,14 +145,26 @@ export function CleanersSettings() {
       if (has) {
         delete newShare[group];
       } else {
-        newShare[group] = 100;
+        const othersTotal = getOthersTotal(cleaners, group, editing?.id ?? null);
+        const remaining = Math.max(0, 100 - othersTotal);
+        newShare[group] = remaining;
       }
       return { ...f, location_groups: newGroups, workload_share: newShare };
     });
   };
 
   const setWorkloadShare = (group: string, value: number) => {
-    setForm(f => ({ ...f, workload_share: { ...f.workload_share, [group]: value } }));
+    const othersTotal = getOthersTotal(cleaners, group, editing?.id ?? null);
+    const maxAvailable = Math.max(0, 100 - othersTotal);
+    const clamped = Math.min(Math.max(0, value), maxAvailable);
+    if (value > maxAvailable) {
+      toast({
+        title: `Maximum available for ${group} is ${maxAvailable}%`,
+        description: `Other cleaners account for ${othersTotal}%.`,
+        variant: "destructive",
+      });
+    }
+    setForm(f => ({ ...f, workload_share: { ...f.workload_share, [group]: clamped } }));
   };
 
   return (
@@ -226,23 +269,44 @@ export function CleanersSettings() {
               </div>
             </div>
 
-            {/* Workload allocation */}
+            {/* Workload allocation with breakdown + remaining */}
             {form.location_groups.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-xs">Workload Allocation (%)</Label>
-                <div className="space-y-1.5">
-                  {form.location_groups.map(g => (
-                    <div key={g} className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground w-36 truncate">{g}</span>
-                      <Input
-                        type="number" min={0} max={100}
-                        value={form.workload_share[g] ?? 100}
-                        onChange={e => setWorkloadShare(g, parseInt(e.target.value) || 0)}
-                        className="bg-secondary/50 border-border/40 w-20 h-8 text-xs"
-                      />
-                      <span className="text-xs text-muted-foreground">%</span>
-                    </div>
-                  ))}
+                <div className="space-y-3">
+                  {form.location_groups.map(g => {
+                    const othersTotal = getOthersTotal(cleaners, g, editing?.id ?? null);
+                    const remaining = Math.max(0, 100 - othersTotal - (form.workload_share[g] ?? 0));
+                    const maxAvailable = Math.max(0, 100 - othersTotal);
+                    const breakdown = getGroupBreakdown(cleaners, g, editing?.id ?? null);
+
+                    return (
+                      <div key={g} className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground w-36 truncate">{g}</span>
+                          <Input
+                            type="number" min={0} max={maxAvailable}
+                            value={form.workload_share[g] ?? 0}
+                            onChange={e => setWorkloadShare(g, parseInt(e.target.value) || 0)}
+                            className="bg-secondary/50 border-border/40 w-20 h-8 text-xs"
+                          />
+                          <span className="text-xs text-muted-foreground">%</span>
+                        </div>
+                        {/* Breakdown of existing allocations */}
+                        {breakdown.length > 0 && (
+                          <p className="text-[10px] text-muted-foreground pl-[9.5rem]">
+                            {breakdown.map(b => `${b.name}: ${b.pct}%`).join(" · ")} · Remaining: {remaining}%
+                          </p>
+                        )}
+                        {/* Helper text for remaining */}
+                        {breakdown.length === 0 && (
+                          <p className="text-[10px] text-muted-foreground pl-[9.5rem]">
+                            {remaining}% remaining for {g}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -270,6 +334,18 @@ export function CleanersSettings() {
               <Switch checked={form.active} onCheckedChange={v => setForm({ ...form, active: v })} />
               <Label className="text-xs">Active</Label>
             </div>
+
+            {/* Save warnings for under-allocated groups */}
+            {saveWarnings.length > 0 && (
+              <div className="space-y-2">
+                {saveWarnings.map((w, i) => (
+                  <Alert key={i} className="border-amber-500/30 bg-amber-500/10">
+                    <AlertTriangle className="h-4 w-4 text-amber-400" />
+                    <AlertDescription className="text-xs text-amber-300">{w}</AlertDescription>
+                  </Alert>
+                ))}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
