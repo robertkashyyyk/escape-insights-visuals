@@ -173,6 +173,34 @@ export function CleanersSettings() {
     fetchCleaners();
   };
 
+  const handleEnableLogin = async (cleaner: Cleaner) => {
+    if (!cleaner.email) {
+      toast({ title: "No email address", description: "Add an email to this cleaner first.", variant: "destructive" });
+      return;
+    }
+    setEnablingLogin(cleaner.id);
+    try {
+      const tempPassword = crypto.randomUUID().slice(0, 12) + "A1!";
+      const { data, error } = await supabase.functions.invoke("invite-user", {
+        body: {
+          email: cleaner.email,
+          role: "cleaner",
+          password: tempPassword,
+          linkTable: "cleaners",
+          linkId: cleaner.id,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: "Login enabled", description: `Account created for ${cleaner.name}. Temp password: ${tempPassword}` });
+      fetchCleaners();
+    } catch (err: any) {
+      toast({ title: "Failed to enable login", description: err?.message || "Unknown error", variant: "destructive" });
+    } finally {
+      setEnablingLogin(null);
+    }
+  };
+
   const toggleDay = (day: string) => {
     setForm(f => ({
       ...f,
