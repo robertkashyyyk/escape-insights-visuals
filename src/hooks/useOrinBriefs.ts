@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useEffect, useRef } from "react";
 
 export interface OrinBrief {
   id: string;
@@ -18,7 +19,7 @@ function getExpectedPeriods(): { period_type: "monthly" | "quarterly"; period_la
   const today = new Date();
   const periods: any[] = [];
 
-  // Quarterly: Q4 2025, Q1 2026, and any subsequent completed quarters
+  // Quarterly first (so they get generated before timeout)
   const quarters = [
     { label: "Q4 2025", start: "2025-10-01", end: "2025-12-31" },
     { label: "Q1 2026", start: "2026-01-01", end: "2026-03-31" },
@@ -32,8 +33,8 @@ function getExpectedPeriods(): { period_type: "monthly" | "quarterly"; period_la
     }
   });
 
-  // Monthly: Oct 2025 through current month (only completed months)
-  const startMonth = new Date(2025, 9, 1); // Oct 2025
+  // Monthly: Oct 2025 through last completed month
+  const startMonth = new Date(2025, 9, 1);
   const current = new Date(today.getFullYear(), today.getMonth(), 1);
   let m = new Date(startMonth);
   while (m < current) {
@@ -51,7 +52,6 @@ function getExpectedPeriods(): { period_type: "monthly" | "quarterly"; period_la
   return periods;
 }
 
-// Get next upcoming period (locked)
 export function getNextPeriod(type: "monthly" | "quarterly") {
   const today = new Date();
   if (type === "quarterly") {
@@ -73,7 +73,6 @@ export function getNextPeriod(type: "monthly" | "quarterly") {
     }
     return { label: `Q1 ${today.getFullYear() + 1}`, availableDate: `1 April ${today.getFullYear() + 1}` };
   }
-  // Monthly: current month
   const nextAvailable = new Date(today.getFullYear(), today.getMonth() + 1, 1);
   return {
     label: today.toLocaleString("en-GB", { month: "long", year: "numeric" }),
@@ -94,32 +93,49 @@ export function useOrinBriefs(type?: "monthly" | "quarterly") {
   });
 }
 
-export function useGenerateBriefs() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (options: { force?: boolean; specificPeriods?: any[] } = {}) => {
-      const periods = options?.specificPeriods || getExpectedPeriods();
-      if (periods.length === 0) {
-        toast.info("No completed periods to generate briefs for.");
-        return { results: [] };
-      }
-
-      const { data, error } = await supabase.functions.invoke("generate-orin-brief", {
-        body: { periods: periods.map(p => ({ ...p, force: options?.force })) },
-      });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["orin-briefs"] });
-      const generated = data?.results?.filter((r: any) => r.status === "generated").length || 0;
-      if (generated > 0) toast.success(`Generated ${generated} brief(s)`);
-    },
-    onError: (err) => {
-      toast.error("Failed to generate briefs: " + (err as Error).message);
-    },
+// Generate a single period — used for backfill one at a time to avoid timeout
+async function generateSinglePeriod(period: any) {
+  const { data, error } = await supabase.functions.invoke("generate-orin-brief", {
+    body: period,
   });
+  if (error) throw error;
+  return data;
+}
+
+// Auto-backfill: generates missing briefs one at a time on first load
+export function useAutoBackfill() {
+  const { data: briefs, isLoading } = useOrinBriefs();
+  const queryClient = useQueryClient();
+  const running = useRef(false);
+
+  useEffect(() => {
+    if (isLoading || !briefs || running.current) return;
+
+    const existingLabels = new Set(briefs.map(b => `${b.period_type}:${b.period_label}`));
+    const expected = getExpectedPeriods();
+    const missing = expected.filter(p => !existingLabels.has(`${p.period_type}:${p.period_label}`));
+
+    if (missing.length === 0) return;
+
+    running.current = true;
+    
+    (async () => {
+      let generated = 0;
+      for (const period of missing) {
+        try {
+          await generateSinglePeriod(period);
+          generated++;
+          queryClient.invalidateQueries({ queryKey: ["orin-briefs"] });
+        } catch (err) {
+          console.error(`Failed to generate ${period.period_label}:`, err);
+        }
+      }
+      if (generated > 0) {
+        toast.success(`Generated ${generated} historical brief(s)`);
+      }
+      running.current = false;
+    })();
+  }, [briefs, isLoading, queryClient]);
 }
 
 export function useRegenerateBrief() {
