@@ -42,10 +42,10 @@ export type Database = {
         Row: {
           active: boolean
           created_at: string
+          daily_working_hours: number
           email: string | null
           id: string
           location_groups: string[] | null
-          max_cleans_per_day: number | null
           name: string
           non_working_days: string[] | null
           phone: string | null
@@ -57,10 +57,10 @@ export type Database = {
         Insert: {
           active?: boolean
           created_at?: string
+          daily_working_hours?: number
           email?: string | null
           id?: string
           location_groups?: string[] | null
-          max_cleans_per_day?: number | null
           name: string
           non_working_days?: string[] | null
           phone?: string | null
@@ -72,10 +72,10 @@ export type Database = {
         Update: {
           active?: boolean
           created_at?: string
+          daily_working_hours?: number
           email?: string | null
           id?: string
           location_groups?: string[] | null
-          max_cleans_per_day?: number | null
           name?: string
           non_working_days?: string[] | null
           phone?: string | null
