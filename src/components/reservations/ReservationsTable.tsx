@@ -29,6 +29,7 @@ function statusBadgeClass(s: string) {
 
 export function ReservationsTable() {
   const [search, setSearch] = useState("");
+  const [timeFilter, setTimeFilter] = useState<"all" | "future" | "past">("all");
   const [yearFilter, setYearFilter] = useState("all");
   const [propertyFilter, setPropertyFilter] = useState("all");
   const [locationFilter, setLocationFilter] = useState("all");
@@ -38,6 +39,8 @@ export function ReservationsTable() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
+
+  const todayStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
 
   const { data: reservations, isLoading } = useQuery({
     queryKey: ["reservations_enhanced"],
@@ -105,6 +108,10 @@ export function ReservationsTable() {
   const filtered = useMemo(() => {
     let rows = processedRows;
 
+    // Time filter
+    if (timeFilter === "future") rows = rows.filter((r) => r.check_in >= todayStr);
+    if (timeFilter === "past") rows = rows.filter((r) => r.check_in < todayStr);
+
     // Search
     if (search) {
       const q = search.toLowerCase();
@@ -123,7 +130,8 @@ export function ReservationsTable() {
     if (statusFilter !== "all") rows = rows.filter((r) => r.status.toLowerCase() === statusFilter.toLowerCase());
     if (platformFilter !== "all") rows = rows.filter((r) => r.platform === platformFilter);
 
-    // Sort
+    // Sort — default direction depends on time filter
+    const effectiveDir = sortDir;
     rows = [...rows].sort((a, b) => {
       let cmp = 0;
       switch (sortKey) {
@@ -137,11 +145,11 @@ export function ReservationsTable() {
         case "platform": cmp = (a.platform ?? "").localeCompare(b.platform ?? ""); break;
         case "status": cmp = a.status.localeCompare(b.status); break;
       }
-      return sortDir === "asc" ? cmp : -cmp;
+      return effectiveDir === "asc" ? cmp : -cmp;
     });
 
     return rows;
-  }, [processedRows, search, yearFilter, propertyFilter, locationFilter, statusFilter, platformFilter, sortKey, sortDir]);
+  }, [processedRows, search, timeFilter, todayStr, yearFilter, propertyFilter, locationFilter, statusFilter, platformFilter, sortKey, sortDir]);
 
   // Stats
   const totalBookings = filtered.length;
@@ -167,14 +175,23 @@ export function ReservationsTable() {
     setPage(0);
   };
 
-  const hasFilters = yearFilter !== "all" || propertyFilter !== "all" || locationFilter !== "all" || statusFilter !== "all" || platformFilter !== "all";
+  const hasFilters = timeFilter !== "all" || yearFilter !== "all" || propertyFilter !== "all" || locationFilter !== "all" || statusFilter !== "all" || platformFilter !== "all";
 
   const clearFilters = () => {
+    setTimeFilter("all");
     setYearFilter("all");
     setPropertyFilter("all");
     setLocationFilter("all");
     setStatusFilter("all");
     setPlatformFilter("all");
+    setSortDir("desc");
+    setPage(0);
+  };
+
+  const handleTimeFilter = (mode: "all" | "future" | "past") => {
+    setTimeFilter(mode);
+    setSortKey("check_in");
+    setSortDir(mode === "future" ? "asc" : "desc");
     setPage(0);
   };
 
@@ -197,10 +214,28 @@ export function ReservationsTable() {
         <StatPill label="Avg Lead Time" value={`${Math.round(avgLeadTime)} days`} />
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search reservations..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} className="pl-9" />
+      {/* Search + Time Filter */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative max-w-sm flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search reservations..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} className="pl-9" />
+        </div>
+
+        <div className="flex items-center bg-secondary/50 rounded-lg border border-border/30 p-1">
+          {(["all", "future", "past"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => handleTimeFilter(mode)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                timeFilter === mode
+                  ? "bg-primary/20 text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {mode === "all" ? "All" : mode === "future" ? "Future Only" : "Past Only"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Filters */}
