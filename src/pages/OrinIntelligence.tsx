@@ -1,18 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Calendar, Lock, ChevronLeft, RefreshCw, Loader2, AlertTriangle, TrendingUp, TrendingDown, Building2, Eye, BarChart3 } from "lucide-react";
-import { useOrinBriefs, useGenerateBriefs, useRegenerateBrief, getNextPeriod, type OrinBrief } from "@/hooks/useOrinBriefs";
+import { Sparkles, Calendar, Lock, ChevronLeft, RefreshCw, Loader2, AlertTriangle, TrendingUp, Building2, Eye, BarChart3 } from "lucide-react";
+import { useOrinBriefs, useAutoBackfill, useRegenerateBrief, getNextPeriod, type OrinBrief } from "@/hooks/useOrinBriefs";
 
 export default function OrinIntelligence() {
   const [view, setView] = useState<"monthly" | "quarterly">("monthly");
   const [selectedBrief, setSelectedBrief] = useState<OrinBrief | null>(null);
 
+  // Auto-backfill missing historical briefs on first load
+  useAutoBackfill();
+
   return (
     <AppLayout>
       <div className="p-6 md:p-10 lg:p-12 max-w-3xl mx-auto">
-        {/* Page Header */}
         <div className="mb-10">
           <div className="flex items-center gap-3 mb-3">
             <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
@@ -24,25 +26,21 @@ export default function OrinIntelligence() {
           </div>
           <p className="text-sm text-muted-foreground">Your portfolio intelligence, delivered monthly.</p>
 
-          {/* Tabs */}
-          <div className="mt-6 flex items-center justify-between">
-            <div className="inline-flex rounded-xl bg-secondary/40 p-1 border border-border/20">
-              {(["monthly", "quarterly"] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => { setView(v); setSelectedBrief(null); }}
-                  className={`px-5 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                    view === v
-                      ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                  style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-                >
-                  {v === "monthly" ? "Monthly Brief" : "Quarterly Deep Dive"}
-                </button>
-              ))}
-            </div>
-            <GenerateButton />
+          <div className="mt-6 inline-flex rounded-xl bg-secondary/40 p-1 border border-border/20">
+            {(["monthly", "quarterly"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => { setView(v); setSelectedBrief(null); }}
+                className={`px-5 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  view === v
+                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+              >
+                {v === "monthly" ? "Monthly Brief" : "Quarterly Deep Dive"}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -53,22 +51,6 @@ export default function OrinIntelligence() {
         )}
       </div>
     </AppLayout>
-  );
-}
-
-function GenerateButton() {
-  const generate = useGenerateBriefs();
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={() => generate.mutate({})}
-      disabled={generate.isPending}
-      className="text-xs gap-1.5"
-    >
-      {generate.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-      Generate Historical Briefs
-    </Button>
   );
 }
 
@@ -85,6 +67,7 @@ function BriefArchive({ type, onSelect }: { type: "monthly" | "quarterly"; onSel
   }
 
   const generated = briefs?.filter(b => b.status === "generated") || [];
+  const generating = briefs?.filter(b => b.status === "generating") || [];
 
   return (
     <div className="space-y-3 animate-fade-in">
@@ -101,11 +84,22 @@ function BriefArchive({ type, onSelect }: { type: "monthly" | "quarterly"; onSel
         </p>
       </div>
 
+      {/* Currently generating */}
+      {generating.length > 0 && (
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center gap-3">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          <p className="text-xs text-muted-foreground">
+            Generating {generating.map(g => g.period_label).join(", ")}…
+          </p>
+        </div>
+      )}
+
       {/* Generated briefs */}
-      {generated.length === 0 ? (
+      {generated.length === 0 && generating.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-sm text-muted-foreground mb-3">No briefs generated yet.</p>
-          <p className="text-xs text-muted-foreground/70">Click "Generate Historical Briefs" to create briefs for all completed periods with data.</p>
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">Generating historical briefs…</p>
+          <p className="text-xs text-muted-foreground/70 mt-1">This happens automatically on first load.</p>
         </div>
       ) : (
         generated.map((brief) => (
@@ -184,7 +178,6 @@ function BriefDetail({ brief, onBack }: { brief: OrinBrief; onBack: () => void }
         </Button>
       </div>
 
-      {/* Header */}
       <div className="border-l-2 border-primary/40 pl-6">
         <h2 className="text-xl md:text-2xl font-bold text-foreground" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
           {brief.period_label} — {isQuarterly ? "Quarterly Deep Dive" : "Monthly Performance Brief"}
@@ -200,7 +193,6 @@ function BriefDetail({ brief, onBack }: { brief: OrinBrief; onBack: () => void }
         </div>
       </div>
 
-      {/* Headline */}
       {content?.headline && (
         <section>
           <SectionHeading icon={Sparkles} title="Headline" />
@@ -210,7 +202,6 @@ function BriefDetail({ brief, onBack }: { brief: OrinBrief; onBack: () => void }
         </section>
       )}
 
-      {/* Snapshot */}
       {content?.snapshot && (
         <section>
           <SectionHeading icon={Building2} title="Portfolio Snapshot" />
@@ -227,7 +218,6 @@ function BriefDetail({ brief, onBack }: { brief: OrinBrief; onBack: () => void }
         </section>
       )}
 
-      {/* Monthly Trend (quarterly only) */}
       {isQuarterly && content?.monthly_trend && (
         <section>
           <SectionHeading icon={TrendingUp} title="Monthly Revenue Trend" />
@@ -242,7 +232,6 @@ function BriefDetail({ brief, onBack }: { brief: OrinBrief; onBack: () => void }
         </section>
       )}
 
-      {/* Top Properties */}
       {content?.top_properties && (
         <section>
           <SectionHeading icon={TrendingUp} title="Top Properties" />
@@ -260,7 +249,6 @@ function BriefDetail({ brief, onBack }: { brief: OrinBrief; onBack: () => void }
         </section>
       )}
 
-      {/* Watch List */}
       {content?.watch_list && content.watch_list.length > 0 && (
         <section>
           <SectionHeading icon={AlertTriangle} title="Watch List" />
@@ -280,7 +268,6 @@ function BriefDetail({ brief, onBack }: { brief: OrinBrief; onBack: () => void }
         </section>
       )}
 
-      {/* Owner Rankings (quarterly) */}
       {isQuarterly && content?.owner_rankings && (
         <section>
           <SectionHeading icon={Eye} title="Owner Rankings" />
@@ -295,7 +282,6 @@ function BriefDetail({ brief, onBack }: { brief: OrinBrief; onBack: () => void }
         </section>
       )}
 
-      {/* Location Performance (quarterly) */}
       {isQuarterly && content?.location_performance && (
         <section>
           <SectionHeading icon={Building2} title="Location Performance" />
@@ -313,7 +299,6 @@ function BriefDetail({ brief, onBack }: { brief: OrinBrief; onBack: () => void }
         </section>
       )}
 
-      {/* Platform Breakdown */}
       {content?.platform_breakdown && (
         <section>
           <SectionHeading icon={BarChart3} title="Booking Source Breakdown" />
@@ -330,7 +315,6 @@ function BriefDetail({ brief, onBack }: { brief: OrinBrief; onBack: () => void }
         </section>
       )}
 
-      {/* Seasonal Commentary (quarterly) */}
       {isQuarterly && content?.seasonal_commentary && (
         <section>
           <SectionHeading icon={Calendar} title="Seasonal Analysis" />
@@ -340,7 +324,6 @@ function BriefDetail({ brief, onBack }: { brief: OrinBrief; onBack: () => void }
         </section>
       )}
 
-      {/* Forward Outlook (quarterly) */}
       {isQuarterly && content?.forward_outlook && (
         <section>
           <SectionHeading icon={TrendingUp} title="Forward Outlook" />
@@ -350,7 +333,6 @@ function BriefDetail({ brief, onBack }: { brief: OrinBrief; onBack: () => void }
         </section>
       )}
 
-      {/* Commentary */}
       {content?.commentary && (
         <section>
           <SectionHeading icon={Sparkles} title="Orin's Analysis" />
@@ -360,12 +342,10 @@ function BriefDetail({ brief, onBack }: { brief: OrinBrief; onBack: () => void }
         </section>
       )}
 
-      {/* Lead Time */}
       {content?.avg_lead_time && (
         <p className="text-xs text-muted-foreground">Average booking lead time: {content.avg_lead_time}</p>
       )}
 
-      {/* Raw text fallback */}
       {content?.raw_text && !content?.headline && (
         <div className="prose prose-sm prose-invert max-w-none">
           <p className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">{content.raw_text}</p>
@@ -374,8 +354,6 @@ function BriefDetail({ brief, onBack }: { brief: OrinBrief; onBack: () => void }
     </article>
   );
 }
-
-/* ── Sub-components ── */
 
 function SectionHeading({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
   return (
