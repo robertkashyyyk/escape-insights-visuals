@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Plus, Search, Pencil } from "lucide-react";
 import { PropertyForm } from "./PropertyForm";
 
 export function PropertiesTable() {
   const [search, setSearch] = useState("");
+  const [cleanFilter, setCleanFilter] = useState("all");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
 
@@ -27,6 +29,8 @@ export function PropertiesTable() {
   });
 
   const filtered = listings?.filter((l) => {
+    if (cleanFilter === "clean" && l.is_clean === false) return false;
+    if (cleanFilter === "dirty" && l.is_clean !== false) return false;
     const q = search.toLowerCase();
     return (
       l.name.toLowerCase().includes(q) ||
@@ -51,6 +55,17 @@ export function PropertiesTable() {
             className="pl-9"
           />
         </div>
+        <ToggleGroup
+          type="single"
+          value={cleanFilter}
+          onValueChange={(v) => v && setCleanFilter(v)}
+          size="sm"
+          className="border border-border rounded-lg p-0.5"
+        >
+          <ToggleGroupItem value="all" className="text-xs px-3">All</ToggleGroupItem>
+          <ToggleGroupItem value="clean" className="text-xs px-3">Clean</ToggleGroupItem>
+          <ToggleGroupItem value="dirty" className="text-xs px-3">Dirty</ToggleGroupItem>
+        </ToggleGroup>
         <Button onClick={() => setShowAdd(true)} size="sm">
           <Plus className="h-4 w-4 mr-1.5" /> Add Property
         </Button>
