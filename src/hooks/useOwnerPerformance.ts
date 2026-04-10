@@ -20,6 +20,7 @@ export interface OwnerPerformanceRow {
   totalNights: number;
   monthlyRevenue: number[]; // 12 entries Jan-Dec
   hasData: boolean;
+  userId: string | null;
 }
 
 export function useOwnerPerformance(year: number) {
@@ -99,6 +100,7 @@ export function useOwnerPerformance(year: number) {
           totalNights: agg.nights,
           monthlyRevenue: agg.monthly,
           hasData: agg.revenue > 0,
+          userId: o.user_id ?? null,
         };
       });
     },

@@ -133,6 +133,7 @@ export default function Owners() {
                 owner={owner}
                 year={year}
                 onEdit={setEditingId}
+                onRefresh={refetch}
               />
             ))}
           </div>
