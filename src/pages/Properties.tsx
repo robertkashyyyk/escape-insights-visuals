@@ -76,6 +76,17 @@ export default function Properties() {
               {owners.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
             </SelectContent>
           </Select>
+          <ToggleGroup
+            type="single"
+            value={cleanFilter}
+            onValueChange={(v) => v && setCleanFilter(v)}
+            size="sm"
+            className="border border-border rounded-lg p-0.5"
+          >
+            <ToggleGroupItem value="all" className="text-xs px-3">All</ToggleGroupItem>
+            <ToggleGroupItem value="clean" className="text-xs px-3">Clean</ToggleGroupItem>
+            <ToggleGroupItem value="dirty" className="text-xs px-3">Dirty</ToggleGroupItem>
+          </ToggleGroup>
           <div className="flex items-center gap-3 ml-auto">
             <span className="text-sm text-muted-foreground font-medium">
               {isLoading ? "…" : `${filtered?.length ?? 0} Properties`}
