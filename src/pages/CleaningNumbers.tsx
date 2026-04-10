@@ -273,32 +273,43 @@ export default function CleaningNumbers() {
   // Chart data
   const chartData = useMemo(() => {
     if (period === "week") {
-      const days: { label: string; cleans: number }[] = [];
+      const days: { label: string; cleans: number; completionRatio: number }[] = [];
       for (let i = 0; i < 7; i++) {
         const d = addDays(rangeStart, i);
         const ds = format(d, "yyyy-MM-dd");
-        const count = tasks.filter((t: any) => t.scheduled_date === ds).length;
-        days.push({ label: format(d, "EEE"), cleans: count });
+        const dayTasks = tasks.filter((t) => t.scheduled_date === ds);
+        const completed = dayTasks.filter(t => t.status === "completed" || t.status === "complete").length;
+        const ratio = dayTasks.length > 0 ? completed / dayTasks.length : 0;
+        days.push({ label: format(d, "EEE"), cleans: dayTasks.length, completionRatio: ratio });
       }
       return days;
     } else {
-      // Weekly buckets within month
-      const weeks: { label: string; cleans: number }[] = [];
+      const weeks: { label: string; cleans: number; completionRatio: number }[] = [];
       let ws = startOfWeek(rangeStart, { weekStartsOn: 1 });
       let weekNum = 1;
       while (isBefore(ws, rangeEnd)) {
         const we = endOfWeek(ws, { weekStartsOn: 1 });
-        const count = tasks.filter((t: any) => {
-          const d = t.scheduled_date;
-          return d >= format(ws, "yyyy-MM-dd") && d <= format(we, "yyyy-MM-dd");
-        }).length;
-        weeks.push({ label: `Week ${weekNum}`, cleans: count });
+        const wsStr = format(ws, "yyyy-MM-dd");
+        const weStr = format(we, "yyyy-MM-dd");
+        const weekTasks = tasks.filter((t) => t.scheduled_date >= wsStr && t.scheduled_date <= weStr);
+        const completed = weekTasks.filter(t => t.status === "completed" || t.status === "complete").length;
+        const ratio = weekTasks.length > 0 ? completed / weekTasks.length : 0;
+        weeks.push({ label: `Week ${weekNum}`, cleans: weekTasks.length, completionRatio: ratio });
         ws = addWeeks(ws, 1);
         weekNum++;
       }
       return weeks;
     }
   }, [period, tasks, rangeStart, rangeEnd]);
+
+  // Interpolate amber → green based on completion ratio
+  const getBarColor = (ratio: number): string => {
+    // amber: hsl(38, 92%, 50%) → green: hsl(142, 71%, 45%)
+    const h = 38 + (142 - 38) * ratio;
+    const s = 92 + (71 - 92) * ratio;
+    const l = 50 + (45 - 50) * ratio;
+    return `hsl(${Math.round(h)} ${Math.round(s)}% ${Math.round(l)}%)`;
+  };
 
   // Badge helper
   const statusBadge = isPast
@@ -519,10 +530,16 @@ export default function CleaningNumbers() {
                         fontSize: "12px",
                       }}
                       labelStyle={{ color: "hsl(220 20% 92%)" }}
+                      formatter={(value: number, _name: string, props: any) => {
+                        const ratio = props.payload.completionRatio;
+                        const completed = Math.round(ratio * (props.payload.cleans));
+                        const pending = props.payload.cleans - completed;
+                        return [`${completed} completed · ${pending} pending`, "Cleans"];
+                      }}
                     />
                     <Bar dataKey="cleans" radius={[4, 4, 0, 0]}>
-                      {chartData.map((_, i) => (
-                        <Cell key={i} fill="hsl(38 92% 50%)" fillOpacity={0.8} />
+                      {chartData.map((entry, i) => (
+                        <Cell key={i} fill={getBarColor(entry.completionRatio)} fillOpacity={0.85} />
                       ))}
                     </Bar>
                   </BarChart>
