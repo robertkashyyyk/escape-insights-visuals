@@ -44,8 +44,6 @@ const tiers: Tier[] = [
       "Year-on-year analytics (full)",
       "Occupancy heatmap",
       "Owner portfolio grouping",
-      "Cleaning schedule (GPS routes)",
-      "Cleaner portal (mobile)",
       "Orin AI assistant",
       "Unlimited owner portal logins",
     ],
@@ -62,6 +60,8 @@ const tiers: Tier[] = [
     popular: true,
     features: [
       "Everything in Operator",
+      "Cleaning schedule (GPS routes)",
+      "Cleaner portal (mobile)",
       "Management revenue tracking",
       "Cleaning Numbers (financials)",
       "Orin Brief (monthly + quarterly)",
