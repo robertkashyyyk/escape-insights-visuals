@@ -23,7 +23,7 @@ interface Cleaner {
   location_groups: string[];
   workload_share: Record<string, number>;
   non_working_days: string[];
-  max_cleans_per_day: number | null;
+  daily_working_hours: number | null;
   rate_per_clean: number | null;
   active: boolean;
 }
@@ -33,7 +33,7 @@ type CleanerForm = Omit<Cleaner, "id" | "region">;
 const empty: CleanerForm = {
   name: "", phone: "", email: "",
   location_groups: [], workload_share: {},
-  non_working_days: [], max_cleans_per_day: 3, rate_per_clean: 0, active: true,
+  non_working_days: [], daily_working_hours: 8, rate_per_clean: 0, active: true,
 };
 
 /** Get sum of workload_share for a group across all cleaners, excluding one cleaner by id */
