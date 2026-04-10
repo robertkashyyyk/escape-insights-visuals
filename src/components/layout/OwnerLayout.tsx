@@ -4,6 +4,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { LogOut, Home, CalendarDays, FileText, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { OrinChatFAB } from "@/components/orin/OrinChatFAB";
 
 const navItems = [
   { to: "/owner", label: "My Portfolio", icon: Home },
@@ -112,6 +113,7 @@ export function OwnerLayout({ children }: { children: React.ReactNode }) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
         {children}
       </main>
+      <OrinChatFAB />
     </div>
   );
 }
