@@ -108,6 +108,10 @@ export function ReservationsTable() {
   const filtered = useMemo(() => {
     let rows = processedRows;
 
+    // Time filter
+    if (timeFilter === "future") rows = rows.filter((r) => r.check_in >= todayStr);
+    if (timeFilter === "past") rows = rows.filter((r) => r.check_in < todayStr);
+
     // Search
     if (search) {
       const q = search.toLowerCase();
@@ -126,7 +130,8 @@ export function ReservationsTable() {
     if (statusFilter !== "all") rows = rows.filter((r) => r.status.toLowerCase() === statusFilter.toLowerCase());
     if (platformFilter !== "all") rows = rows.filter((r) => r.platform === platformFilter);
 
-    // Sort
+    // Sort — default direction depends on time filter
+    const effectiveDir = sortDir;
     rows = [...rows].sort((a, b) => {
       let cmp = 0;
       switch (sortKey) {
@@ -140,11 +145,11 @@ export function ReservationsTable() {
         case "platform": cmp = (a.platform ?? "").localeCompare(b.platform ?? ""); break;
         case "status": cmp = a.status.localeCompare(b.status); break;
       }
-      return sortDir === "asc" ? cmp : -cmp;
+      return effectiveDir === "asc" ? cmp : -cmp;
     });
 
     return rows;
-  }, [processedRows, search, yearFilter, propertyFilter, locationFilter, statusFilter, platformFilter, sortKey, sortDir]);
+  }, [processedRows, search, timeFilter, todayStr, yearFilter, propertyFilter, locationFilter, statusFilter, platformFilter, sortKey, sortDir]);
 
   // Stats
   const totalBookings = filtered.length;
