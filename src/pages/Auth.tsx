@@ -32,13 +32,15 @@ export default function Auth() {
   }
 
   if (user && !showTransition) {
-    return <Navigate to={isCleaner ? "/cleaner" : "/today"} replace />;
+    const dest = isClient ? "/owner" : isCleaner ? "/cleaner" : "/today";
+    return <Navigate to={dest} replace />;
   }
 
   const handleLoginSuccess = () => {
     setShowTransition(true);
     setTimeout(() => {
-      navigate(isCleaner ? "/cleaner" : "/today");
+      const dest = isClient ? "/owner" : isCleaner ? "/cleaner" : "/today";
+      navigate(dest);
     }, 3000);
   };
 
