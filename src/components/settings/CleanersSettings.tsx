@@ -478,9 +478,27 @@ export function CleanersSettings() {
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={!form.name.trim()}>{editing ? "Update" : "Add"}</Button>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            {editing && !editing.user_id && editing.email && (
+              <Button
+                variant="outline"
+                className="border-primary/30 text-primary hover:bg-primary/10"
+                onClick={() => handleEnableLogin(editing)}
+                disabled={enablingLogin === editing.id}
+              >
+                {enablingLogin === editing.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <KeyRound className="h-4 w-4 mr-1" />}
+                Enable Login
+              </Button>
+            )}
+            {editing?.user_id && (
+              <Badge variant="outline" className="border-success/30 text-success text-xs h-9 px-3 flex items-center">
+                <UserCheck className="h-3.5 w-3.5 mr-1" /> Login enabled
+              </Badge>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button onClick={handleSave} disabled={!form.name.trim()}>{editing ? "Update" : "Add"}</Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
