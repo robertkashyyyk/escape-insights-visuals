@@ -22,6 +22,7 @@ export default function Auth() {
   const { user, loading: authLoading, role } = useAuth();
   const navigate = useNavigate();
   const isCleaner = (role as string) === "cleaner";
+  const isClient = (role as string) === "client";
 
   if (authLoading) {
     return (
