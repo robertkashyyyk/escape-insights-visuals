@@ -52,12 +52,20 @@ export default function CleaningSchedule() {
               onClick={() => setSelectedDate(new Date())}
               className="px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary rounded-md transition-colors"
             >
-              Today
+              {isToday ? "Today" : format(selectedDate, "d MMM")}
             </button>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goForward}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
+          {!isToday && (
+            <button
+              onClick={() => setSelectedDate(new Date())}
+              className="text-xs text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
+            >
+              Back to Today
+            </button>
+          )}
 
           <div className="flex items-center gap-1 bg-secondary/50 rounded-lg border border-border/30 p-1">
             <button
