@@ -34,7 +34,7 @@ interface Cleaner {
   user_id: string | null;
 }
 
-type CleanerForm = Omit<Cleaner, "id" | "region">;
+type CleanerForm = Omit<Cleaner, "id" | "region" | "user_id">;
 
 const empty: CleanerForm = {
   name: "", phone: "", email: "",
