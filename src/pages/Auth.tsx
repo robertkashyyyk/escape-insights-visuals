@@ -19,8 +19,9 @@ export default function Auth() {
   const [sent, setSent] = useState(false);
   const [showTransition, setShowTransition] = useState(false);
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, role } = useAuth();
   const navigate = useNavigate();
+  const isCleaner = (role as string) === "cleaner";
 
   if (authLoading) {
     return (
@@ -31,13 +32,13 @@ export default function Auth() {
   }
 
   if (user && !showTransition) {
-    return <Navigate to="/today" replace />;
+    return <Navigate to={isCleaner ? "/cleaner" : "/today"} replace />;
   }
 
   const handleLoginSuccess = () => {
     setShowTransition(true);
     setTimeout(() => {
-      navigate("/today");
+      navigate(isCleaner ? "/cleaner" : "/today");
     }, 3000);
   };
 

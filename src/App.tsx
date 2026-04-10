@@ -28,6 +28,7 @@ import Today from "./pages/Today";
 import SyncHealth from "./pages/SyncHealth";
 import MonthlyReport from "./pages/MonthlyReport";
 import CleaningSchedule from "./pages/CleaningSchedule";
+import CleanerPortal from "./pages/CleanerPortal";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/cleaner" element={<CleanerPortal />} />
             <Route path="/today" element={<ProtectedRoute><Today /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/orin" element={<ProtectedRoute><OrinIntelligence /></ProtectedRoute>} />
