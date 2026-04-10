@@ -258,32 +258,37 @@ function CleanerSection({ cleanerDay, cleaners, onComplete }: { cleanerDay: Clea
       </div>
 
       <div className="ml-4 border-l-2 border-border/20 pl-4 space-y-1">
-        {/* Home → First property */}
-        {cleanerDay.homeToFirstMinutes != null && cleanerDay.tasks.length > 0 && (
-          <div className="flex items-center gap-1.5 py-1.5 text-[11px] text-muted-foreground/70">
-            <span>🏠 Home → {cleanerDay.tasks[0].propertyName} · ~{cleanerDay.homeToFirstMinutes} min</span>
-          </div>
-        )}
-        {[...cleanerDay.tasks]
-          .sort((a, b) => (a.estimatedStart || "").localeCompare(b.estimatedStart || ""))
-          .map((task, idx) => (
-          <div key={task.id}>
-            {idx > 0 && (
-              <div className="flex items-center gap-1.5 py-1 text-[10px] text-muted-foreground/60">
-                <div className="h-px flex-1 bg-border/20" />
-                <span>🚗 ~{task.travelMinutes ?? 0} min travel</span>
-                <div className="h-px flex-1 bg-border/20" />
-              </div>
-            )}
-            <TaskCard task={task} cleaners={cleaners} onComplete={onComplete} />
-          </div>
-        ))}
-        {/* Last property → Home */}
-        {cleanerDay.lastToHomeMinutes != null && cleanerDay.tasks.length > 0 && (
-          <div className="flex items-center gap-1.5 py-1.5 text-[11px] text-muted-foreground/70">
-            <span>{cleanerDay.tasks[cleanerDay.tasks.length - 1].propertyName} → 🏠 Home · ~{cleanerDay.lastToHomeMinutes} min</span>
-          </div>
-        )}
+        {(() => {
+          const sorted = [...cleanerDay.tasks].sort((a, b) => (a.estimatedStart || "").localeCompare(b.estimatedStart || ""));
+          return (
+            <>
+              {/* Home → First property */}
+              {cleanerDay.homeToFirstMinutes != null && sorted.length > 0 && (
+                <div className="flex items-center gap-1.5 py-1.5 text-[11px] text-muted-foreground/70">
+                  <span>🏠 Home → {sorted[0].propertyName} · ~{cleanerDay.homeToFirstMinutes} min</span>
+                </div>
+              )}
+              {sorted.map((task, idx) => (
+                <div key={task.id}>
+                  {idx > 0 && (
+                    <div className="flex items-center gap-1.5 py-1 text-[10px] text-muted-foreground/60">
+                      <div className="h-px flex-1 bg-border/20" />
+                      <span>🚗 ~{task.travelMinutes ?? 0} min travel</span>
+                      <div className="h-px flex-1 bg-border/20" />
+                    </div>
+                  )}
+                  <TaskCard task={task} cleaners={cleaners} onComplete={onComplete} />
+                </div>
+              ))}
+              {/* Last property → Home */}
+              {cleanerDay.lastToHomeMinutes != null && sorted.length > 0 && (
+                <div className="flex items-center gap-1.5 py-1.5 text-[11px] text-muted-foreground/70">
+                  <span>{sorted[sorted.length - 1].propertyName} → 🏠 Home · ~{cleanerDay.lastToHomeMinutes} min</span>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );
