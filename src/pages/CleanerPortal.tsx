@@ -205,6 +205,11 @@ export default function CleanerPortal() {
     return <Navigate to="/auth" replace />;
   }
 
+  // Redirect non-cleaners
+  if (!authLoading && role && !isCleaner) {
+    return <Navigate to="/today" replace />;
+  }
+
   if (!cleaner) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-6">
