@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOwnerPreview } from "@/contexts/OwnerPreviewContext";
 import { OwnerLayout } from "@/components/layout/OwnerLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,21 +22,39 @@ const platformColors: Record<string, string> = {
 
 export default function OwnerReservations() {
   const { user } = useAuth();
+  const { isPreviewMode, selectedOwnerId, selectedOwnerName } = useOwnerPreview();
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("upcoming");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["owner_reservations", user?.id],
-    enabled: !!user,
+    queryKey: ["owner_reservations", isPreviewMode ? selectedOwnerId : user?.id],
+    enabled: !!(isPreviewMode ? selectedOwnerId : user),
     queryFn: async () => {
-      const [listingsRes, reservationsRes, ownerRes] = await Promise.all([
-        supabase.from("listings").select("id, name"),
-        supabase.from("reservations").select("*").order("check_in", { ascending: false }),
-        supabase.from("property_owners").select("name"),
-      ]);
+      let listingsQuery = supabase.from("listings").select("id, name, owner_id");
+      let ownerQuery = supabase.from("property_owners").select("name");
+
+      if (isPreviewMode && selectedOwnerId) {
+        listingsQuery = listingsQuery.eq("owner_id", selectedOwnerId);
+        ownerQuery = ownerQuery.eq("id", selectedOwnerId);
+      }
+
+      const [listingsRes, ownerRes] = await Promise.all([listingsQuery, ownerQuery]);
+      const listings = listingsRes.data || [];
+      const listingIds = listings.map((l) => l.id);
+
+      let reservations: any[] = [];
+      if (listingIds.length > 0) {
+        const { data } = await supabase
+          .from("reservations")
+          .select("*")
+          .in("listing_id", listingIds)
+          .order("check_in", { ascending: false });
+        reservations = data || [];
+      }
+
       return {
-        listings: listingsRes.data || [],
-        reservations: reservationsRes.data || [],
+        listings,
+        reservations,
         ownerName: ownerRes.data?.[0]?.name || "",
       };
     },
@@ -45,16 +64,16 @@ export default function OwnerReservations() {
 
   const filtered = useMemo(() => {
     if (!data) return [];
-    let list = data.reservations.filter((r) => r.status !== "cancelled");
+    let list = data.reservations.filter((r: any) => r.status !== "cancelled");
 
     if (propertyFilter !== "all") {
-      list = list.filter((r) => r.listing_id === propertyFilter);
+      list = list.filter((r: any) => r.listing_id === propertyFilter);
     }
 
     if (dateFilter === "upcoming") {
-      list = list.filter((r) => r.check_in >= today);
+      list = list.filter((r: any) => r.check_in >= today);
     } else if (dateFilter === "past") {
-      list = list.filter((r) => r.check_out < today);
+      list = list.filter((r: any) => r.check_out < today);
     }
 
     return list;
@@ -77,7 +96,6 @@ export default function OwnerReservations() {
   return (
     <OwnerLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div>
           <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground tracking-tight">
             My Reservations
@@ -87,7 +105,6 @@ export default function OwnerReservations() {
           </p>
         </div>
 
-        {/* Filters */}
         <div className="flex flex-wrap gap-3">
           <Select value={propertyFilter} onValueChange={setPropertyFilter}>
             <SelectTrigger className="w-[200px] h-9 text-xs">
@@ -112,7 +129,6 @@ export default function OwnerReservations() {
           </Select>
         </div>
 
-        {/* Reservation cards */}
         {filtered.length === 0 ? (
           <Card className="border-border/30 bg-card/50 p-8 text-center">
             <CalendarDays className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
@@ -120,7 +136,7 @@ export default function OwnerReservations() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {filtered.map((r) => {
+            {filtered.map((r: any) => {
               const nights = differenceInDays(new Date(r.check_out), new Date(r.check_in));
               const guestFirstName = r.guest_name?.split(" ")[0] || "Guest";
               const platformKey = (r.platform || "").toLowerCase();
@@ -130,7 +146,6 @@ export default function OwnerReservations() {
                 <Card key={r.id} className="border-border/30 bg-card/50 backdrop-blur-sm">
                   <CardContent className="p-4 md:p-5">
                     <div className="flex flex-col md:flex-row md:items-center gap-4">
-                      {/* Guest & Property */}
                       <div className="flex-1 min-w-0 space-y-1">
                         <div className="flex items-center gap-2">
                           <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -147,7 +162,6 @@ export default function OwnerReservations() {
                         </div>
                       </div>
 
-                      {/* Dates */}
                       <div className="flex items-center gap-2 text-xs">
                         <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
                         <span className="text-foreground font-medium">
@@ -158,7 +172,6 @@ export default function OwnerReservations() {
                         </Badge>
                       </div>
 
-                      {/* Financials */}
                       <div className="flex items-center gap-4 shrink-0">
                         <div className="text-right">
                           <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Revenue</p>
