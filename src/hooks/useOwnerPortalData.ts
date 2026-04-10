@@ -2,7 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOwnerPreview } from "@/contexts/OwnerPreviewContext";
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear, subYears } from "date-fns";
+import {
+  startOfWeek, endOfWeek, startOfMonth, endOfMonth,
+  startOfQuarter, endOfQuarter, startOfYear, endOfYear,
+  subYears, addWeeks, addMonths, addQuarters, addYears,
+  format, isFuture, min as dateMin
+} from "date-fns";
 
 export type OwnerPeriodType = "Week" | "Month" | "Quarter" | "Year";
 
@@ -28,37 +33,80 @@ export interface OwnerKpis {
   prevYearAdr: number;
 }
 
-function getPeriodRange(periodType: OwnerPeriodType, now: Date) {
+/** Returns the start/end of a period given a reference date */
+export function getPeriodRange(periodType: OwnerPeriodType, ref: Date) {
   switch (periodType) {
     case "Week":
-      return { from: startOfWeek(now, { weekStartsOn: 1 }), to: endOfWeek(now, { weekStartsOn: 1 }) };
+      return { from: startOfWeek(ref, { weekStartsOn: 1 }), to: endOfWeek(ref, { weekStartsOn: 1 }) };
     case "Month":
-      return { from: startOfMonth(now), to: endOfMonth(now) };
+      return { from: startOfMonth(ref), to: endOfMonth(ref) };
     case "Quarter":
-      return { from: startOfQuarter(now), to: endOfQuarter(now) };
+      return { from: startOfQuarter(ref), to: endOfQuarter(ref) };
     case "Year":
     default:
-      return { from: startOfYear(now), to: endOfYear(now) };
+      return { from: startOfYear(ref), to: endOfYear(ref) };
   }
 }
 
-export function useOwnerPortalData(periodType: OwnerPeriodType = "Year") {
+/** Shift a reference date by +/- 1 period */
+export function shiftPeriod(ref: Date, periodType: OwnerPeriodType, direction: 1 | -1): Date {
+  switch (periodType) {
+    case "Week": return addWeeks(ref, direction);
+    case "Month": return addMonths(ref, direction);
+    case "Quarter": return addQuarters(ref, direction);
+    case "Year": return addYears(ref, direction);
+  }
+}
+
+/** Human-readable label for the selected period */
+export function getPeriodLabel(periodType: OwnerPeriodType, ref: Date, now: Date): string {
+  const { from, to } = getPeriodRange(periodType, ref);
+  const isCurrentPeriod = from <= now && to >= now;
+  switch (periodType) {
+    case "Week": {
+      const label = `W/C ${format(from, "d MMM yyyy")}`;
+      return isCurrentPeriod ? `${label} (This week)` : label;
+    }
+    case "Month": {
+      const label = format(from, "MMMM yyyy");
+      return isCurrentPeriod ? `${label} (This month)` : label;
+    }
+    case "Quarter": {
+      const q = Math.ceil((from.getMonth() + 1) / 3);
+      const label = `Q${q} ${format(from, "yyyy")}`;
+      return isCurrentPeriod ? `${label} (This quarter)` : label;
+    }
+    case "Year": {
+      const label = format(from, "yyyy");
+      return isCurrentPeriod ? `${label} YTD` : label;
+    }
+  }
+}
+
+export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodRef: Date = new Date()) {
   const { user } = useAuth();
   const { isPreviewMode, selectedOwnerId } = useOwnerPreview();
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
 
-  const { from: periodStart, to: periodEnd } = getPeriodRange(periodType, now);
+  const { from: periodStart, to: periodEnd } = getPeriodRange(periodType, periodRef);
+  // Cap at today if the period extends into the future
+  const effectiveEnd = dateMin([periodEnd, now]);
+  const periodDays = Math.max(1, Math.floor((effectiveEnd.getTime() - periodStart.getTime()) / 86400000));
+
+  // Same period last year, also capped at the same relative day
   const prevPeriodStart = subYears(periodStart, 1);
   const prevPeriodEnd = subYears(periodEnd, 1);
+  const prevEffectiveEnd = dateMin([prevPeriodEnd, subYears(effectiveEnd, 1)]);
+  const prevPeriodDays = Math.max(1, Math.floor((prevEffectiveEnd.getTime() - prevPeriodStart.getTime()) / 86400000));
 
   const periodStartStr = periodStart.toISOString().slice(0, 10);
-  const periodEndStr = periodEnd.toISOString().slice(0, 10);
+  const effectiveEndStr = effectiveEnd.toISOString().slice(0, 10);
   const prevStartStr = prevPeriodStart.toISOString().slice(0, 10);
-  const prevEndStr = prevPeriodEnd.toISOString().slice(0, 10);
+  const prevEffectiveEndStr = prevEffectiveEnd.toISOString().slice(0, 10);
 
   return useQuery({
-    queryKey: ["owner_portal", isPreviewMode ? selectedOwnerId : user?.id, periodType],
+    queryKey: ["owner_portal", isPreviewMode ? selectedOwnerId : user?.id, periodType, periodStartStr],
     enabled: !!(isPreviewMode ? selectedOwnerId : user),
     queryFn: async () => {
       let listingsQuery = supabase.from("listings").select("id, name, location_group, bedrooms, owner_id");
@@ -83,7 +131,7 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year") {
         reservations = data || [];
       }
 
-      // Filter reservations that overlap with current period and previous period
+      // Overlap check capped at effective end dates
       const overlaps = (ci: string, co: string, rangeStart: string, rangeEnd: string) =>
         ci <= rangeEnd && co > rangeStart;
 
@@ -92,8 +140,8 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year") {
       const properties: OwnerProperty[] = listings.map((l) => {
         const propRes = reservations.filter((r) => r.listing_id === l.id && r.status !== "cancelled");
 
-        const thisPeriodRes = propRes.filter((r) => overlaps(r.check_in, r.check_out, periodStartStr, periodEndStr));
-        const prevPeriodRes = propRes.filter((r) => overlaps(r.check_in, r.check_out, prevStartStr, prevEndStr));
+        const thisPeriodRes = propRes.filter((r) => overlaps(r.check_in, r.check_out, periodStartStr, effectiveEndStr));
+        const prevPeriodRes = propRes.filter((r) => overlaps(r.check_in, r.check_out, prevStartStr, prevEffectiveEndStr));
 
         const revenueThisYear = thisPeriodRes.reduce((s, r) => s + (r.total_amount || 0), 0);
         const revenuePrevYear = prevPeriodRes.reduce((s, r) => s + (r.total_amount || 0), 0);
@@ -102,14 +150,13 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year") {
           propRes.filter((r) => r.year === currentYear && r.month === m + 1).reduce((s, r) => s + (r.total_amount || 0), 0)
         );
 
-        // Occupancy for period
-        const periodDays = Math.max(1, Math.floor((Math.min(periodEnd.getTime(), now.getTime()) - periodStart.getTime()) / 86400000));
+        // Occupancy for period (capped at effective end)
         let nightsBooked = 0;
         thisPeriodRes.forEach((r) => {
           const ci = new Date(r.check_in);
           const co = new Date(r.check_out);
           const start = ci < periodStart ? periodStart : ci;
-          const end = co > (periodEnd < now ? periodEnd : now) ? (periodEnd < now ? periodEnd : now) : co;
+          const end = co > effectiveEnd ? effectiveEnd : co;
           nightsBooked += Math.max(0, Math.floor((end.getTime() - start.getTime()) / 86400000));
         });
         const occupancyPct = Math.min(100, (nightsBooked / periodDays) * 100);
@@ -127,8 +174,8 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year") {
       });
 
       // Aggregate KPIs
-      const allThisPeriod = reservations.filter((r) => r.status !== "cancelled" && overlaps(r.check_in, r.check_out, periodStartStr, periodEndStr));
-      const allPrevPeriod = reservations.filter((r) => r.status !== "cancelled" && overlaps(r.check_in, r.check_out, prevStartStr, prevEndStr));
+      const allThisPeriod = reservations.filter((r) => r.status !== "cancelled" && overlaps(r.check_in, r.check_out, periodStartStr, effectiveEndStr));
+      const allPrevPeriod = reservations.filter((r) => r.status !== "cancelled" && overlaps(r.check_in, r.check_out, prevStartStr, prevEffectiveEndStr));
 
       const totalRevenue = allThisPeriod.reduce((s, r) => s + (r.total_amount || 0), 0);
       const prevYearRevenue = allPrevPeriod.reduce((s, r) => s + (r.total_amount || 0), 0);
@@ -150,13 +197,12 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year") {
       const prevYearAdr = prevTotalNights > 0 ? prevYearRevenue / prevTotalNights : 0;
 
       // Prev year occupancy
-      const prevPeriodDays = Math.max(1, Math.floor((prevPeriodEnd.getTime() - prevPeriodStart.getTime()) / 86400000));
       let prevNightsBooked = 0;
       allPrevPeriod.forEach((r) => {
         const ci = new Date(r.check_in);
         const co = new Date(r.check_out);
         const start = ci < prevPeriodStart ? prevPeriodStart : ci;
-        const end = co > prevPeriodEnd ? prevPeriodEnd : co;
+        const end = co > prevEffectiveEnd ? prevEffectiveEnd : co;
         prevNightsBooked += Math.max(0, Math.floor((end.getTime() - start.getTime()) / 86400000));
       });
       const prevYearOccupancy = listings.length > 0 ? Math.min(100, (prevNightsBooked / (prevPeriodDays * listings.length)) * 100) : 0;

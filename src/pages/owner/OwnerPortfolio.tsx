@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { OwnerLayout } from "@/components/layout/OwnerLayout";
-import { useOwnerPortalData, type OwnerPeriodType } from "@/hooks/useOwnerPortalData";
+import { useOwnerPortalData, type OwnerPeriodType, getPeriodLabel, getPeriodRange, shiftPeriod } from "@/hooks/useOwnerPortalData";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PoundSterling, Percent, BedDouble, TrendingUp, TrendingDown, CalendarDays } from "lucide-react";
+import { PoundSterling, Percent, BedDouble, TrendingUp, TrendingDown, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { isFuture, startOfWeek, startOfMonth, startOfQuarter, startOfYear } from "date-fns";
 
 const fmt = (n: number) => `£${n.toLocaleString("en-GB", { maximumFractionDigits: 0 })}`;
 
@@ -17,14 +18,14 @@ function getGreeting(): string {
   return "Good evening";
 }
 
-function TrendBadge({ current, previous, label }: { current: number; previous: number; label: string }) {
+function TrendBadge({ current, previous }: { current: number; previous: number }) {
   if (previous === 0) return null;
   const pct = ((current - previous) / previous) * 100;
   const isUp = pct >= 0;
   return (
     <span className={`flex items-center gap-0.5 text-[10px] font-medium ${isUp ? "text-emerald-400" : "text-red-400"}`}>
       {isUp ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
-      {isUp ? "+" : ""}{pct.toFixed(0)}% vs last year
+      {isUp ? "+" : ""}{pct.toFixed(0)}% vs same period last year
     </span>
   );
 }
@@ -45,15 +46,30 @@ function MiniSparkline({ data }: { data: number[] }) {
 }
 
 export default function OwnerPortfolio() {
+  const now = new Date();
   const [periodType, setPeriodType] = useState<OwnerPeriodType>("Year");
-  const { data, isLoading } = useOwnerPortalData(periodType);
+  const [periodRef, setPeriodRef] = useState<Date>(now);
+  const { data, isLoading } = useOwnerPortalData(periodType, periodRef);
+
+  const canGoForward = (() => {
+    const next = shiftPeriod(periodRef, periodType, 1);
+    const { from } = getPeriodRange(periodType, next);
+    return !isFuture(from);
+  })();
+
+  const handlePeriodChange = (p: OwnerPeriodType) => {
+    setPeriodType(p);
+    setPeriodRef(now); // reset to current period
+  };
+
+  const label = getPeriodLabel(periodType, periodRef, now);
 
   if (isLoading) {
     return (
       <OwnerLayout>
         <div className="space-y-6">
           <Skeleton className="h-10 w-64" />
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -64,9 +80,9 @@ export default function OwnerPortfolio() {
     );
   }
 
-  const { owner, properties, kpis, currentYear } = data || { properties: [], kpis: null, currentYear: new Date().getFullYear() };
+  const { owner, properties, kpis } = data || { properties: [], kpis: null, currentYear: now.getFullYear() };
   const firstName = owner?.name?.split(" ")[0] || "there";
-  const todayStr = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const todayStr = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   const kpiCards = kpis ? [
     { label: "Total Revenue", value: fmt(kpis.totalRevenue), icon: PoundSterling, prev: kpis.prevYearRevenue },
@@ -78,22 +94,23 @@ export default function OwnerPortfolio() {
     <OwnerLayout>
       <div className="space-y-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground tracking-tight">
-              {getGreeting()}, {firstName}.
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Here is how your portfolio is performing. · {todayStr}
-            </p>
-          </div>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground tracking-tight">
+            {getGreeting()}, {firstName}.
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Here is how your portfolio is performing. · {todayStr}
+          </p>
+        </div>
 
-          {/* Period Filter */}
+        {/* Period Controls */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          {/* Period Type Toggle */}
           <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary/50 border border-border/30">
             {periods.map((p) => (
               <button
                 key={p}
-                onClick={() => setPeriodType(p)}
+                onClick={() => handlePeriodChange(p)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                   periodType === p
                     ? "bg-primary text-primary-foreground shadow-sm"
@@ -103,6 +120,46 @@ export default function OwnerPortfolio() {
                 {p}
               </button>
             ))}
+          </div>
+
+          {/* Period Navigation */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPeriodRef(shiftPeriod(periodRef, periodType, -1))}
+              className="h-8 w-8 rounded-md border border-border/30 bg-secondary/30 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-medium text-foreground min-w-[180px] text-center">
+              {label}
+            </span>
+            <button
+              onClick={() => canGoForward && setPeriodRef(shiftPeriod(periodRef, periodType, 1))}
+              disabled={!canGoForward}
+              className={`h-8 w-8 rounded-md border border-border/30 bg-secondary/30 flex items-center justify-center transition-colors ${
+                canGoForward
+                  ? "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                  : "text-muted-foreground/30 cursor-not-allowed"
+              }`}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            {/* Reset to current */}
+            {(() => {
+              const currentStart = getPeriodRange(periodType, now).from;
+              const selectedStart = getPeriodRange(periodType, periodRef).from;
+              if (currentStart.getTime() !== selectedStart.getTime()) {
+                return (
+                  <button
+                    onClick={() => setPeriodRef(now)}
+                    className="text-[11px] text-primary hover:text-primary/80 font-medium ml-1 transition-colors"
+                  >
+                    Today
+                  </button>
+                );
+              }
+              return null;
+            })()}
           </div>
         </div>
 
@@ -116,7 +173,7 @@ export default function OwnerPortfolio() {
                   <span className="text-[10px] font-medium uppercase tracking-wider">{kpi.label}</span>
                 </div>
                 <p className="text-xl md:text-2xl font-display font-bold text-foreground">{kpi.value}</p>
-                <TrendBadge current={parseFloat(kpi.value.replace(/[£%,]/g, "")) || 0} previous={kpi.prev} label={String(currentYear - 1)} />
+                <TrendBadge current={parseFloat(kpi.value.replace(/[£%,]/g, "")) || 0} previous={kpi.prev} />
               </CardContent>
             </Card>
           ))}
