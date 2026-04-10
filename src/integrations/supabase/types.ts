@@ -365,6 +365,33 @@ export type Database = {
         }
         Relationships: []
       }
+      orin_conversations: {
+        Row: {
+          content: string
+          created_at: string
+          current_page: string | null
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          current_page?: string | null
+          id?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          current_page?: string | null
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

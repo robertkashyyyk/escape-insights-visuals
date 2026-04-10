@@ -2,3 +2,6 @@ project_id = "pftqjrmdksrrpczhomln"
 
 [functions.generate-orin-brief]
 verify_jwt = false
+
+[functions.orin-chat]
+verify_jwt = false
