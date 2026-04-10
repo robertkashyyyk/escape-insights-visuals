@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Search, Bed, Users, MapPin, Plus, ArrowRight, Brush } from "lucide-react";
 import { PropertyForm } from "@/components/properties/PropertyForm";
 import { Link } from "react-router-dom";
@@ -15,6 +16,7 @@ export default function Properties() {
   const [search, setSearch] = useState("");
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
+  const [cleanFilter, setCleanFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
 
   const { data: listings, isLoading, refetch } = useQuery({
@@ -42,7 +44,9 @@ export default function Properties() {
       (l.property_owners as any)?.name?.toLowerCase().includes(q);
     const matchesLocation = locationFilter === "all" || l.location_group === locationFilter;
     const matchesOwner = ownerFilter === "all" || (l.property_owners as any)?.name === ownerFilter;
-    return matchesSearch && matchesLocation && matchesOwner;
+    const isClean = (l as any).is_clean ?? true;
+    const matchesClean = cleanFilter === "all" || (cleanFilter === "clean" && isClean) || (cleanFilter === "dirty" && !isClean);
+    return matchesSearch && matchesLocation && matchesOwner && matchesClean;
   });
 
   return (
