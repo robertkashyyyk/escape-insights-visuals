@@ -67,19 +67,19 @@ const App = () => (
             <Route path="/management" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ManagementRevenue /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute requiredRoles={["super"]}><SettingsPage /></ProtectedRoute>} />
             <Route path="/sync-health" element={<ProtectedRoute requiredRoles={["super", "senior"]}><SyncHealth /></ProtectedRoute>} />
-            <Route path="/operations/schedule" element={<ProtectedRoute><CleaningSchedule /></ProtectedRoute>} />
-            <Route path="/operations/cleaning" element={<ProtectedRoute><CleaningSchedule /></ProtectedRoute>} />
+            <Route path="/operations/schedule" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><CleaningSchedule /></ProtectedRoute>} />
+            <Route path="/operations/cleaning" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><CleaningSchedule /></ProtectedRoute>} />
             <Route path="/operations/numbers" element={<ProtectedRoute requiredRoles={["super", "senior"]}><CleaningNumbers /></ProtectedRoute>} />
-            <Route path="/property-knowledge" element={<ProtectedRoute><ComingSoon title="Property Knowledge" /></ProtectedRoute>} />
+            <Route path="/property-knowledge" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Property Knowledge" /></ProtectedRoute>} />
             <Route path="/owner-reports" element={<ProtectedRoute requiredRoles={["super", "senior"]}><MonthlyReport /></ProtectedRoute>} />
             <Route path="/owner-reports/invoice" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ComingSoon title="Owner Reports — Invoice Generator" /></ProtectedRoute>} />
             <Route path="/xero-sync" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ComingSoon title="Xero Sync" /></ProtectedRoute>} />
-            <Route path="/guests" element={<ProtectedRoute><ComingSoon title="Guest Database" /></ProtectedRoute>} />
-            <Route path="/campaigns" element={<ProtectedRoute><ComingSoon title="Active Campaigns" /></ProtectedRoute>} />
-            <Route path="/campaigns/segments" element={<ProtectedRoute><ComingSoon title="Campaign Segments" /></ProtectedRoute>} />
-            <Route path="/campaigns/history" element={<ProtectedRoute><ComingSoon title="Campaign History" /></ProtectedRoute>} />
-            <Route path="/mailchimp-sync" element={<ProtectedRoute><ComingSoon title="Mailchimp Sync" /></ProtectedRoute>} />
-            <Route path="/leads" element={<ProtectedRoute><ComingSoon title="Leads & Enquiries" /></ProtectedRoute>} />
+            <Route path="/guests" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Guest Database" /></ProtectedRoute>} />
+            <Route path="/campaigns" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Active Campaigns" /></ProtectedRoute>} />
+            <Route path="/campaigns/segments" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Campaign Segments" /></ProtectedRoute>} />
+            <Route path="/campaigns/history" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Campaign History" /></ProtectedRoute>} />
+            <Route path="/mailchimp-sync" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Mailchimp Sync" /></ProtectedRoute>} />
+            <Route path="/leads" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Leads & Enquiries" /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
