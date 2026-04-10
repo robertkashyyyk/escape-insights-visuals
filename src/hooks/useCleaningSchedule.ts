@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, addDays, startOfWeek, endOfWeek, isSameDay } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 /* ── types ── */
 export type Priority = "SAME_DAY" | "TIGHT_WINDOW" | "STANDARD";
@@ -26,6 +27,8 @@ export interface CleanTask {
   longitude: number | null;
   estimatedStart?: string;
   travelMinutes?: number;
+  reservationId?: string;
+  dbTaskId?: string; // actual clean_tasks.id from DB
 }
 
 export interface CleanerDay {
@@ -101,12 +104,14 @@ function addMinutesToTime(time: string, mins: number): string {
 /* ── hook ── */
 export function useCleaningSchedule() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [viewMode, setViewMode] = useState<"day" | "week">("day");
   const [filterCleaner, setFilterCleaner] = useState<string>("all");
   const [filterLocation, setFilterLocation] = useState<string>("all");
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
-  // Date range for queries — include week range + 7 days lookahead for next check-ins
+  // Date range for queries
   const rangeStart = viewMode === "week" ? startOfWeek(selectedDate, { weekStartsOn: 1 }) : selectedDate;
   const rangeEnd = viewMode === "week" ? endOfWeek(selectedDate, { weekStartsOn: 1 }) : selectedDate;
   const rangeStartStr = format(rangeStart, "yyyy-MM-dd");
@@ -138,7 +143,19 @@ export function useCleaningSchedule() {
     },
   });
 
-  // Query 1: Checkouts in the visible date range (confirmed/new/modified only)
+  // Query DB clean_tasks for the date range
+  const { data: dbCleanTasks = [] } = useQuery({
+    queryKey: ["clean-tasks", rangeStartStr, rangeEndStr],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("clean_tasks" as any)
+        .select("*")
+        .gte("scheduled_date", rangeStartStr)
+        .lte("scheduled_date", rangeEndStr);
+      return (data || []) as any[];
+    },
+  });
+
   const { data: checkoutReservations = [] } = useQuery({
     queryKey: ["reservations-checkouts", rangeStartStr, rangeEndStr],
     queryFn: async () => {
@@ -153,7 +170,6 @@ export function useCleaningSchedule() {
     },
   });
 
-  // Query 2: Check-ins in the visible range + lookahead (for next-guest detection)
   const { data: checkinReservations = [] } = useQuery({
     queryKey: ["reservations-checkins", rangeStartStr, lookAheadStr],
     queryFn: async () => {
@@ -174,15 +190,67 @@ export function useCleaningSchedule() {
     return m;
   }, [listings]);
 
-  // Build schedule for a specific date
+  const cleanerMap = useMemo(() => {
+    const m = new Map<string, Cleaner>();
+    cleaners.forEach(c => m.set(c.id, c));
+    return m;
+  }, [cleaners]);
+
+  // Build schedule for a specific date — use DB tasks if available, otherwise compute
   const buildDaySchedule = useCallback((date: Date): { tasks: CleanTask[]; cleanerDays: CleanerDay[]; unassigned: CleanTask[] } => {
     const ds = format(date, "yyyy-MM-dd");
     const dayName = DAY_NAMES[date.getDay()];
 
-    // Find checkouts on this date
+    // Check if we have DB tasks for this date
+    const dbTasksForDate = dbCleanTasks.filter((t: any) => t.scheduled_date === ds);
+
+    if (dbTasksForDate.length > 0) {
+      // Use DB tasks
+      const tasks: CleanTask[] = dbTasksForDate.map((t: any) => {
+        const listing = listingMap.get(t.listing_id);
+        const cleaner = t.assigned_cleaner_id ? cleanerMap.get(t.assigned_cleaner_id) : null;
+        const checkout = checkoutReservations.find(r => r.id === t.reservation_id);
+        const nextCheckIn = checkinReservations
+          .filter(nr => nr.listing_id === t.listing_id && nr.check_in >= ds && nr.id !== t.reservation_id)
+          .sort((a, b) => a.check_in.localeCompare(b.check_in))[0];
+
+        return {
+          id: t.id,
+          dbTaskId: t.id,
+          listingId: t.listing_id,
+          reservationId: t.reservation_id,
+          propertyName: listing?.name ?? "Unknown Property",
+          locationGroup: listing?.location_group ?? "Other",
+          checkoutDate: ds,
+          checkoutTime: DEFAULT_CHECKOUT,
+          nextCheckinDate: nextCheckIn?.check_in ?? null,
+          nextCheckinTime: nextCheckIn?.check_in === ds ? DEFAULT_CHECKIN : null,
+          cleaningDuration: t.cleaning_duration_minutes ?? 90,
+          assignedCleanerId: t.assigned_cleaner_id,
+          assignedCleanerName: cleaner?.name ?? null,
+          status: (t.status === "completed" ? "complete" : t.status) as TaskStatus,
+          priority: t.priority === "same_day_turnaround" ? "SAME_DAY" as Priority : "STANDARD" as Priority,
+          latitude: listing?.latitude ?? null,
+          longitude: listing?.longitude ?? null,
+          estimatedStart: t.estimated_start_time ? t.estimated_start_time.slice(0, 5) : undefined,
+          travelMinutes: t.travel_time_from_previous_minutes > 0 ? t.travel_time_from_previous_minutes : undefined,
+        };
+      });
+
+      const cleanerDays: CleanerDay[] = cleaners.map(c => {
+        const cTasks = tasks.filter(t => t.assignedCleanerId === c.id);
+        const totalMins = cTasks.reduce((s, t) => s + t.cleaningDuration + (t.travelMinutes ?? 0), 0);
+        return { id: c.id, name: c.name, dailyWorkingHours: c.daily_working_hours, totalScheduledMinutes: totalMins, tasks: cTasks };
+      }).filter(cd => cd.tasks.length > 0);
+
+      const unassigned = tasks.filter(t => t.status === "unassigned");
+
+      return { tasks, cleanerDays, unassigned };
+    }
+
+    // Fallback: compute from reservations (for dates without DB tasks)
     const checkouts = checkoutReservations.filter(r => r.check_out === ds);
 
-    // For each checkout, find the next check-in at the same listing
     const tasks: CleanTask[] = checkouts.map(r => {
       const listing = listingMap.get(r.listing_id);
       const nextCheckIn = checkinReservations
@@ -201,6 +269,7 @@ export function useCleaningSchedule() {
       return {
         id: `${r.id}-clean`,
         listingId: r.listing_id,
+        reservationId: r.id,
         propertyName: listing?.name ?? "Unknown Property",
         locationGroup: listing?.location_group ?? "Other",
         checkoutDate: ds,
@@ -217,12 +286,10 @@ export function useCleaningSchedule() {
       };
     });
 
-    // Sort: priority tasks first
     const priorityOrder: Record<Priority, number> = { TIGHT_WINDOW: 0, SAME_DAY: 1, STANDARD: 2 };
     tasks.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
-    // Auto-allocate
-    // Track scheduled minutes per cleaner for capacity checks
+    // Auto-allocate (client-side preview only)
     const cleanerScheduledMinutes: Record<string, number> = {};
     const cleanerTaskCount: Record<string, number> = {};
     const cleanerTotalForRegion: Record<string, Record<string, number>> = {};
@@ -240,11 +307,8 @@ export function useCleaningSchedule() {
       const eligible = cleaners.filter(c => {
         if (!c.location_groups.includes(task.locationGroup)) return false;
         if (c.non_working_days.includes(dayName)) return false;
-        // Check hours-based capacity: estimate travel from last task + cleaning duration
         const lastTask = cleanerTaskList[c.id]?.[cleanerTaskList[c.id].length - 1];
-        const travel = lastTask
-          ? travelMinutes(lastTask.latitude, lastTask.longitude, task.latitude, task.longitude)
-          : 0;
+        const travel = lastTask ? travelMinutes(lastTask.latitude, lastTask.longitude, task.latitude, task.longitude) : 0;
         const projectedMinutes = cleanerScheduledMinutes[c.id] + travel + task.cleaningDuration;
         const maxMinutes = (c.daily_working_hours ?? 8) * 60;
         if (projectedMinutes > maxMinutes) return false;
@@ -256,28 +320,18 @@ export function useCleaningSchedule() {
         continue;
       }
 
-      // Find cleaner furthest below their workload share target
       let bestCleaner = eligible[0];
       let bestDeficit = -Infinity;
-
       for (const c of eligible) {
         const targetShare = c.workload_share[task.locationGroup] ?? 100;
         const totalInRegion = eligible.reduce((sum, ec) => sum + (cleanerTotalForRegion[ec.id]?.[task.locationGroup] ?? 0), 0);
-        const actualShare = totalInRegion > 0
-          ? ((cleanerTotalForRegion[c.id]?.[task.locationGroup] ?? 0) / totalInRegion) * 100
-          : 0;
+        const actualShare = totalInRegion > 0 ? ((cleanerTotalForRegion[c.id]?.[task.locationGroup] ?? 0) / totalInRegion) * 100 : 0;
         const deficit = targetShare - actualShare;
-        if (deficit > bestDeficit) {
-          bestDeficit = deficit;
-          bestCleaner = c;
-        }
+        if (deficit > bestDeficit) { bestDeficit = deficit; bestCleaner = c; }
       }
 
-      // Calculate travel from last assigned task for the best cleaner
       const lastTask = cleanerTaskList[bestCleaner.id]?.[cleanerTaskList[bestCleaner.id].length - 1];
-      const travelMins = lastTask
-        ? travelMinutes(lastTask.latitude, lastTask.longitude, task.latitude, task.longitude)
-        : 0;
+      const travelMins = lastTask ? travelMinutes(lastTask.latitude, lastTask.longitude, task.latitude, task.longitude) : 0;
 
       task.assignedCleanerId = bestCleaner.id;
       task.assignedCleanerName = bestCleaner.name;
@@ -289,30 +343,24 @@ export function useCleaningSchedule() {
       cleanerTotalForRegion[bestCleaner.id][task.locationGroup] = (cleanerTotalForRegion[bestCleaner.id][task.locationGroup] ?? 0) + 1;
     }
 
-    // Route optimization per cleaner (nearest-neighbor)
+    // Route optimization per cleaner
     const cleanerDays: CleanerDay[] = cleaners.map(c => {
       const cTasks = tasks.filter(t => t.assignedCleanerId === c.id);
       const totalMins = cleanerScheduledMinutes[c.id] ?? 0;
       if (cTasks.length <= 1) {
-        if (cTasks.length === 1) {
-          cTasks[0].estimatedStart = DEFAULT_CHECKOUT;
-        }
+        if (cTasks.length === 1) cTasks[0].estimatedStart = DEFAULT_CHECKOUT;
         return { id: c.id, name: c.name, dailyWorkingHours: c.daily_working_hours, totalScheduledMinutes: totalMins, tasks: cTasks };
       }
 
       const ordered: CleanTask[] = [];
       const remaining = [...cTasks];
-
       ordered.push(remaining.shift()!);
       while (remaining.length > 0) {
         const last = ordered[ordered.length - 1];
         let nearestIdx = 0;
         let nearestDist = Infinity;
         for (let i = 0; i < remaining.length; i++) {
-          const d = haversineKm(
-            last.latitude ?? 54.35, last.longitude ?? -7.64,
-            remaining[i].latitude ?? 54.35, remaining[i].longitude ?? -7.64
-          );
+          const d = haversineKm(last.latitude ?? 54.35, last.longitude ?? -7.64, remaining[i].latitude ?? 54.35, remaining[i].longitude ?? -7.64);
           if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
         }
         ordered.push(remaining.splice(nearestIdx, 1)[0]);
@@ -332,14 +380,11 @@ export function useCleaningSchedule() {
     }).filter(cd => cd.tasks.length > 0);
 
     const unassigned = tasks.filter(t => t.status === "unassigned");
-
     return { tasks, cleanerDays, unassigned };
-  }, [checkoutReservations, checkinReservations, cleaners, listingMap]);
+  }, [checkoutReservations, checkinReservations, cleaners, listingMap, cleanerMap, dbCleanTasks]);
 
-  // Build for selected date
   const daySchedule = useMemo(() => buildDaySchedule(selectedDate), [selectedDate, buildDaySchedule]);
 
-  // Week summary
   const weekSummary = useMemo((): WeekDaySummary[] => {
     if (viewMode !== "week") return [];
     const days: WeekDaySummary[] = [];
@@ -357,7 +402,6 @@ export function useCleaningSchedule() {
     return days;
   }, [selectedDate, viewMode, buildDaySchedule]);
 
-  // Monthly invoice data
   const monthlyInvoice = useMemo(() => {
     return cleaners.map(c => ({
       id: c.id,
@@ -368,7 +412,6 @@ export function useCleaningSchedule() {
     })).filter(c => c.cleans > 0);
   }, [cleaners, daySchedule]);
 
-  // Filtered cleaner days
   const filteredCleanerDays = useMemo(() => {
     let days = daySchedule.cleanerDays;
     if (filterCleaner !== "all") days = days.filter(d => d.id === filterCleaner);
@@ -387,17 +430,52 @@ export function useCleaningSchedule() {
     return u;
   }, [daySchedule.unassigned, filterLocation]);
 
-  const regenerate = useCallback(() => {
-    // Invalidate all schedule queries to force a fresh refetch
-    queryClient.invalidateQueries({ queryKey: ["reservations-checkouts"] });
-    queryClient.invalidateQueries({ queryKey: ["reservations-checkins"] });
-    queryClient.invalidateQueries({ queryKey: ["cleaners-schedule"] });
-    queryClient.invalidateQueries({ queryKey: ["listings-schedule"] });
-  }, [queryClient]);
+  // Regenerate calls the edge function
+  const regenerate = useCallback(async () => {
+    setIsRegenerating(true);
+    try {
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const { data, error } = await supabase.functions.invoke("generate-daily-cleaning-schedule", {
+        body: { date: dateStr },
+      });
+      if (error) throw error;
+      toast({
+        title: "Schedule generated",
+        description: `${data?.tasks_created ?? 0} tasks created, ${data?.tasks_unassigned ?? 0} unassigned.`,
+      });
+      // Refresh all queries
+      queryClient.invalidateQueries({ queryKey: ["clean-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["reservations-checkouts"] });
+      queryClient.invalidateQueries({ queryKey: ["reservations-checkins"] });
+      queryClient.invalidateQueries({ queryKey: ["cleaners-schedule"] });
+      queryClient.invalidateQueries({ queryKey: ["listings-schedule"] });
+    } catch (err: any) {
+      toast({ title: "Generation failed", description: err.message, variant: "destructive" });
+    } finally {
+      setIsRegenerating(false);
+    }
+  }, [selectedDate, queryClient, toast]);
+
+  // Complete a task
+  const completeTask = useCallback(async (taskId: string, listingId: string) => {
+    try {
+      // Update clean_tasks status
+      await (supabase.from("clean_tasks" as any) as any)
+        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .eq("id", taskId);
+      // Set is_clean = true on listing
+      await supabase.from("listings").update({ is_clean: true } as any).eq("id", listingId);
+      toast({ title: "Clean completed", description: "Property marked as clean." });
+      queryClient.invalidateQueries({ queryKey: ["clean-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["listings-schedule"] });
+      queryClient.invalidateQueries({ queryKey: ["listings"] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  }, [queryClient, toast]);
 
   const goBack = useCallback(() => setSelectedDate(d => addDays(d, -1)), []);
   const goForward = useCallback(() => setSelectedDate(d => addDays(d, 1)), []);
-
   const isToday = isSameDay(selectedDate, new Date());
 
   const locationGroups = useMemo(() => {
@@ -412,6 +490,6 @@ export function useCleaningSchedule() {
     cleanerDays: filteredCleanerDays, unassigned: filteredUnassigned,
     weekSummary, monthlyInvoice, cleaners, locationGroups,
     totalTasks: daySchedule.tasks.length,
-    regenerate, goBack, goForward, isToday,
+    regenerate, completeTask, goBack, goForward, isToday, isRegenerating,
   };
 }

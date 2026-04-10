@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfDay, endOfDay, addDays, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfDay, addDays, startOfMonth, endOfMonth } from "date-fns";
 
 interface Movement {
   propertyName: string;
@@ -25,6 +25,7 @@ interface TodayData {
   revenueMTD: number;
   occupancyThisWeek: number;
   bookingsNext30: number;
+  dirtyProperties: number;
 }
 
 export function useTodayData() {
@@ -39,7 +40,6 @@ export function useTodayData() {
       const monthEnd = format(endOfMonth(today), "yyyy-MM-dd");
       const next30 = format(addDays(today, 30), "yyyy-MM-dd");
 
-      // Fetch reservations for the week (covers today's movements + week strip)
       const { data: weekRes } = await supabase
         .from("reservations")
         .select("check_in, check_out, guest_name, listing_id, listings(name)")
@@ -47,7 +47,6 @@ export function useTodayData() {
         .lte("check_in", weekEnd)
         .eq("status", "confirmed");
 
-      // Fetch MTD revenue
       const { data: mtdRes } = await supabase
         .from("reservations")
         .select("total_amount")
@@ -55,7 +54,6 @@ export function useTodayData() {
         .lte("check_in", monthEnd)
         .eq("status", "confirmed");
 
-      // Fetch bookings next 30 days
       const { data: next30Res } = await supabase
         .from("reservations")
         .select("id")
@@ -63,15 +61,20 @@ export function useTodayData() {
         .lte("check_in", next30)
         .eq("status", "confirmed");
 
-      // Fetch active listings count for occupancy
       const { count: totalListings } = await supabase
         .from("listings")
         .select("id", { count: "exact", head: true })
         .eq("status", "active");
 
+      // Count dirty properties
+      const { count: dirtyCount } = await supabase
+        .from("listings")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active")
+        .eq("is_clean" as any, false);
+
       const allRes = weekRes || [];
 
-      // Today's movements
       const movements: Movement[] = [];
       const checkoutListings = new Set<string>();
       const checkinListings = new Set<string>();
@@ -90,19 +93,16 @@ export function useTodayData() {
         }
       }
 
-      // Same-day turnarounds
       const sameDayTurnarounds = new Set<string>();
       for (const id of checkoutListings) {
         if (checkinListings.has(id)) sameDayTurnarounds.add(id);
       }
 
-      // Sort: checkouts first, then checkins
       movements.sort((a, b) => {
         if (a.type !== b.type) return a.type === "checkout" ? -1 : 1;
         return a.propertyName.localeCompare(b.propertyName);
       });
 
-      // Week strip
       const weekStrip: DayCount[] = [];
       for (let i = 0; i < 7; i++) {
         const d = addDays(today, i);
@@ -116,10 +116,8 @@ export function useTodayData() {
         weekStrip.push({ date: d, label: format(d, "EEE"), checkouts, checkins });
       }
 
-      // Revenue MTD
       const revenueMTD = (mtdRes || []).reduce((sum, r) => sum + (r.total_amount || 0), 0);
 
-      // Occupancy this week: count distinct listing-days booked this week
       const listingCount = totalListings || 1;
       let bookedDays = 0;
       for (const r of allRes) {
@@ -141,6 +139,7 @@ export function useTodayData() {
         revenueMTD,
         occupancyThisWeek: Math.min(occupancyThisWeek, 100),
         bookingsNext30: (next30Res || []).length,
+        dirtyProperties: dirtyCount ?? 0,
       };
     },
   });

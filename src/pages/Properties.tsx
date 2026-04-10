@@ -29,7 +29,6 @@ export default function Properties() {
     },
   });
 
-  // Derive filter options
   const locationGroups = [...new Set(listings?.map((l) => l.location_group).filter(Boolean) as string[])].sort();
   const owners = [...new Set(listings?.map((l) => (l.property_owners as any)?.name).filter(Boolean) as string[])].sort();
 
@@ -41,53 +40,36 @@ export default function Properties() {
       l.city?.toLowerCase().includes(q) ||
       l.location_group?.toLowerCase().includes(q) ||
       (l.property_owners as any)?.name?.toLowerCase().includes(q);
-
     const matchesLocation = locationFilter === "all" || l.location_group === locationFilter;
     const matchesOwner = ownerFilter === "all" || (l.property_owners as any)?.name === ownerFilter;
-
     return matchesSearch && matchesLocation && matchesOwner;
   });
 
   return (
     <AppLayout>
       <div className="p-4 md:p-6 lg:p-8 space-y-6">
-        {/* Header */}
         <div>
           <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground tracking-tight">Properties</h1>
           <p className="text-sm text-muted-foreground mt-1">Manage all your short-term rental listings</p>
         </div>
 
-        {/* Filter bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search properties..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
+            <Input placeholder="Search properties..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
           </div>
           <Select value={locationFilter} onValueChange={setLocationFilter}>
-            <SelectTrigger className="w-[180px] h-9 text-xs border-border/50">
-              <SelectValue placeholder="Location Group" />
-            </SelectTrigger>
+            <SelectTrigger className="w-[180px] h-9 text-xs border-border/50"><SelectValue placeholder="Location Group" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Locations</SelectItem>
-              {locationGroups.map((lg) => (
-                <SelectItem key={lg} value={lg}>{lg}</SelectItem>
-              ))}
+              {locationGroups.map((lg) => <SelectItem key={lg} value={lg}>{lg}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-            <SelectTrigger className="w-[180px] h-9 text-xs border-border/50">
-              <SelectValue placeholder="Owner" />
-            </SelectTrigger>
+            <SelectTrigger className="w-[180px] h-9 text-xs border-border/50"><SelectValue placeholder="Owner" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Owners</SelectItem>
-              {owners.map((o) => (
-                <SelectItem key={o} value={o}>{o}</SelectItem>
-              ))}
+              {owners.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
             </SelectContent>
           </Select>
           <div className="flex items-center gap-3 ml-auto">
@@ -100,12 +82,9 @@ export default function Properties() {
           </div>
         </div>
 
-        {/* Card Grid */}
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-48 rounded-xl" />
-            ))}
+            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-xl" />)}
           </div>
         ) : filtered?.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground text-sm">No properties found</div>
@@ -114,20 +93,22 @@ export default function Properties() {
             {filtered?.map((l) => {
               const ownerName = (l.property_owners as any)?.name;
               const cleaner = (l as any).primary_cleaner;
+              const isClean = (l as any).is_clean ?? true;
               return (
                 <div
                   key={l.id}
-                  className="glass-card rounded-xl border border-border/30 border-l-2 border-l-primary/60 p-5 flex flex-col gap-3 transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 hover:border-l-primary"
+                  className="glass-card rounded-xl border border-border/30 border-l-2 border-l-primary/60 p-5 flex flex-col gap-3 transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 hover:border-l-primary relative"
                 >
-                  {/* Top: Name + location badge */}
+                  {/* Dirty indicator dot */}
+                  {!isClean && (
+                    <div className="absolute top-3 right-3 h-3 w-3 rounded-full bg-red-500 animate-pulse" title="Needs cleaning" />
+                  )}
+
                   <div>
                     <h3 className="font-display font-bold text-foreground text-base truncate">{l.name}</h3>
-                    {ownerName && (
-                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{ownerName}</p>
-                    )}
+                    {ownerName && <p className="text-xs text-muted-foreground mt-0.5 truncate">{ownerName}</p>}
                   </div>
 
-                  {/* Location group badge */}
                   {l.location_group && (
                     <div>
                       <Badge variant="outline" className="text-[10px] px-2 py-0.5 border-primary/30 text-primary">
@@ -136,7 +117,6 @@ export default function Properties() {
                     </div>
                   )}
 
-                  {/* Chips */}
                   <div className="flex flex-wrap gap-1.5">
                     {l.bedrooms != null && (
                       <span className="flex items-center gap-1 text-[11px] text-muted-foreground bg-secondary/40 px-2 py-0.5 rounded-md">
@@ -160,15 +140,9 @@ export default function Properties() {
                     )}
                   </div>
 
-                  {/* Footer */}
                   <div className="mt-auto flex items-center justify-between pt-2 border-t border-border/20">
-                    <span className="text-[10px] text-muted-foreground/50 font-mono truncate max-w-[140px]">
-                      {l.id.slice(0, 8)}
-                    </span>
-                    <Link
-                      to={`/properties/${l.id}`}
-                      className="text-xs text-primary font-medium flex items-center gap-1 hover:underline transition-colors"
-                    >
+                    <span className="text-[10px] text-muted-foreground/50 font-mono truncate max-w-[140px]">{l.id.slice(0, 8)}</span>
+                    <Link to={`/properties/${l.id}`} className="text-xs text-primary font-medium flex items-center gap-1 hover:underline transition-colors">
                       View Details <ArrowRight className="h-3 w-3" />
                     </Link>
                   </div>
