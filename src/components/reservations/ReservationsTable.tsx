@@ -29,6 +29,7 @@ function statusBadgeClass(s: string) {
 
 export function ReservationsTable() {
   const [search, setSearch] = useState("");
+  const [timeFilter, setTimeFilter] = useState<"all" | "future" | "past">("all");
   const [yearFilter, setYearFilter] = useState("all");
   const [propertyFilter, setPropertyFilter] = useState("all");
   const [locationFilter, setLocationFilter] = useState("all");
@@ -38,6 +39,8 @@ export function ReservationsTable() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
+
+  const todayStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
 
   const { data: reservations, isLoading } = useQuery({
     queryKey: ["reservations_enhanced"],
