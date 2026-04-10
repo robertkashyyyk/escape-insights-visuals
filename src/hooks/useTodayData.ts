@@ -67,11 +67,11 @@ export function useTodayData() {
         .eq("status", "active");
 
       // Count dirty properties
-      const { count: dirtyCount } = await supabase
-        .from("listings")
+      const { count: dirtyCount } = await (supabase
+        .from("listings") as any)
         .select("id", { count: "exact", head: true })
         .eq("status", "active")
-        .eq("is_clean" as any, false);
+        .eq("is_clean", false);
 
       const allRes = weekRes || [];
 
