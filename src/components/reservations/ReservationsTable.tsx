@@ -214,10 +214,28 @@ export function ReservationsTable() {
         <StatPill label="Avg Lead Time" value={`${Math.round(avgLeadTime)} days`} />
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search reservations..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} className="pl-9" />
+      {/* Search + Time Filter */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative max-w-sm flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search reservations..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} className="pl-9" />
+        </div>
+
+        <div className="flex items-center bg-secondary/50 rounded-lg border border-border/30 p-1">
+          {(["all", "future", "past"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => handleTimeFilter(mode)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                timeFilter === mode
+                  ? "bg-primary/20 text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {mode === "all" ? "All" : mode === "future" ? "Future Only" : "Past Only"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Filters */}
