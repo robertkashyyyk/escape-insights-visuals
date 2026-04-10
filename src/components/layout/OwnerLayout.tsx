@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { useOwnerPreview } from "@/contexts/OwnerPreviewContext";
 import { NavLink, useNavigate } from "react-router-dom";
-import { LogOut, Home, CalendarDays, FileText } from "lucide-react";
+import { LogOut, Home, CalendarDays, FileText, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -13,14 +14,41 @@ const navItems = [
 export function OwnerLayout({ children }: { children: React.ReactNode }) {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
+  const { isPreviewMode, selectedOwnerId, setSelectedOwnerId, allOwners, selectedOwnerName } = useOwnerPreview();
 
   const handleSignOut = async () => {
     await signOut();
     navigate("/auth");
   };
 
+  const displayName = isPreviewMode ? selectedOwnerName : profile?.display_name;
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Admin preview banner */}
+      {isPreviewMode && (
+        <div className="bg-primary/15 border-b border-primary/30 px-4 py-2.5 flex items-center gap-2">
+          <Eye className="h-4 w-4 text-primary shrink-0" />
+          <span className="text-xs font-medium text-primary">Preview Mode</span>
+          <div className="flex-1" />
+          <select
+            value={selectedOwnerId ?? ""}
+            onChange={(e) => setSelectedOwnerId(e.target.value)}
+            className="text-xs bg-background/50 border border-border/30 rounded-md px-2 py-1 text-foreground"
+          >
+            {allOwners.map((o) => (
+              <option key={o.id} value={o.id}>{o.name}</option>
+            ))}
+          </select>
+          <a
+            href="/today"
+            className="text-xs text-primary hover:text-primary/80 transition-colors font-medium ml-2"
+          >
+            ← Back to app
+          </a>
+        </div>
+      )}
+
       {/* Top navigation */}
       <header className="sticky top-0 z-50 border-b border-border/30 bg-background/80 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -62,17 +90,19 @@ export function OwnerLayout({ children }: { children: React.ReactNode }) {
             {/* Right — Name + Sign out */}
             <div className="flex items-center gap-3">
               <span className="text-xs text-muted-foreground hidden md:block">
-                {profile?.display_name}
+                {displayName}
               </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSignOut}
-                className="text-xs text-muted-foreground hover:text-foreground gap-1.5 h-8"
-              >
-                <LogOut className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Sign out</span>
-              </Button>
+              {!isPreviewMode && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSignOut}
+                  className="text-xs text-muted-foreground hover:text-foreground gap-1.5 h-8"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Sign out</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>
