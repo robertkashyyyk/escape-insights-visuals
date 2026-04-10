@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, SprayCan, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, SprayCan, AlertTriangle, Loader2 } from "lucide-react";
 
 const LOCATION_GROUPS = ["Castle Hume", "Belfast", "Enniskillen", "North Coast", "Portstewart Coast", "Larne", "Kesh", "Other"];
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -28,6 +28,9 @@ interface Cleaner {
   active: boolean;
   notify_email: boolean;
   notify_whatsapp: boolean;
+  home_postcode: string | null;
+  home_latitude: number | null;
+  home_longitude: number | null;
 }
 
 type CleanerForm = Omit<Cleaner, "id" | "region">;
@@ -37,6 +40,7 @@ const empty: CleanerForm = {
   location_groups: [], workload_share: {},
   non_working_days: [], daily_working_hours: 8, rate_per_clean: 0, active: true,
   notify_email: false, notify_whatsapp: false,
+  home_postcode: "", home_latitude: null, home_longitude: null,
 };
 
 /** Get sum of workload_share for a group across all cleaners, excluding one cleaner by id */
@@ -62,6 +66,8 @@ export function CleanersSettings() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Cleaner | null>(null);
   const [form, setForm] = useState<CleanerForm>(empty);
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeResult, setGeocodeResult] = useState<string | null>(null);
 
   const fetchCleaners = async () => {
     const { data } = await supabase.from("cleaners" as any).select("*").order("name");
@@ -75,7 +81,7 @@ export function CleanersSettings() {
 
   useEffect(() => { fetchCleaners(); }, []);
 
-  const openNew = () => { setEditing(null); setForm(empty); setOpen(true); };
+  const openNew = () => { setEditing(null); setForm(empty); setGeocodeResult(null); setOpen(true); };
   const openEdit = (c: Cleaner) => {
     setEditing(c);
     setForm({
@@ -87,8 +93,36 @@ export function CleanersSettings() {
       rate_per_clean: c.rate_per_clean, active: c.active,
       notify_email: c.notify_email ?? false,
       notify_whatsapp: c.notify_whatsapp ?? false,
+      home_postcode: c.home_postcode || "",
+      home_latitude: c.home_latitude,
+      home_longitude: c.home_longitude,
     });
+    setGeocodeResult(c.home_latitude ? "📍 Coordinates loaded" : null);
     setOpen(true);
+  };
+
+  const geocodePostcode = async (postcode: string) => {
+    if (!postcode.trim()) return;
+    setGeocoding(true);
+    setGeocodeResult(null);
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(postcode.trim())}&country=GB&format=json&addressdetails=1&limit=1`, {
+        headers: { "User-Agent": "EscapeGrids/1.0" },
+      });
+      const data = await res.json();
+      if (data.length > 0) {
+        const { lat, lon, address } = data[0];
+        const parts = [address?.town || address?.city || address?.village, address?.county || address?.state].filter(Boolean);
+        setForm(f => ({ ...f, home_latitude: parseFloat(lat), home_longitude: parseFloat(lon) }));
+        setGeocodeResult(`📍 ${parts.join(", ") || "Location found"}`);
+      } else {
+        setGeocodeResult("❌ Postcode not found");
+      }
+    } catch {
+      setGeocodeResult("❌ Geocoding failed");
+    } finally {
+      setGeocoding(false);
+    }
   };
 
   // Compute save-time warnings for under-allocated groups
@@ -117,6 +151,9 @@ export function CleanersSettings() {
       notify_email: form.notify_email,
       notify_whatsapp: form.notify_whatsapp,
       region: form.location_groups[0] || "Other",
+      home_postcode: form.home_postcode || null,
+      home_latitude: form.home_latitude,
+      home_longitude: form.home_longitude,
     };
     if (editing) {
       await (supabase.from("cleaners" as any) as any).update(payload).eq("id", editing.id);
