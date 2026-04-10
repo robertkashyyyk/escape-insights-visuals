@@ -37,6 +37,10 @@ export interface CleanerDay {
   dailyWorkingHours: number;
   totalScheduledMinutes: number;
   tasks: CleanTask[];
+  homeLatitude: number | null;
+  homeLongitude: number | null;
+  homeToFirstMinutes?: number;
+  lastToHomeMinutes?: number;
 }
 
 export interface WeekDaySummary {
@@ -55,6 +59,8 @@ interface Cleaner {
   daily_working_hours: number;
   rate_per_clean: number;
   active: boolean;
+  home_latitude: number | null;
+  home_longitude: number | null;
 }
 
 interface Listing {
@@ -131,6 +137,8 @@ export function useCleaningSchedule() {
         daily_working_hours: c.daily_working_hours ?? 8,
         rate_per_clean: c.rate_per_clean ?? 0,
         active: c.active,
+        home_latitude: c.home_latitude ?? null,
+        home_longitude: c.home_longitude ?? null,
       }));
     },
   });
