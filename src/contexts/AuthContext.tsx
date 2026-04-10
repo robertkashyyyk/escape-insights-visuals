@@ -98,6 +98,7 @@ export function useRole() {
     isSenior: role === "senior",
     isAdmin: role === "admin",
     isClient: role === "client",
+    isCleaner: role === ("cleaner" as AppRole),
     hasRole: (...roles: AppRole[]) => role !== null && roles.includes(role),
   };
 }
