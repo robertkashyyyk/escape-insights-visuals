@@ -22,12 +22,30 @@ interface CleanTask {
   property_name: string;
   location_group: string | null;
   bedrooms: number | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 interface CleanerProfile {
   id: string;
   name: string;
   daily_working_hours: number;
+  home_latitude: number | null;
+  home_longitude: number | null;
+}
+
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function travelMinutes(lat1: number | null, lon1: number | null, lat2: number | null, lon2: number | null): number {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 15;
+  const km = haversineKm(lat1, lon1, lat2, lon2);
+  return Math.round((km / 40) * 60);
 }
 
 export default function CleanerPortal() {
@@ -51,11 +69,11 @@ export default function CleanerPortal() {
     const fetchCleaners = async () => {
       const { data } = await supabase
         .from("cleaners")
-        .select("id, name, daily_working_hours")
+        .select("id, name, daily_working_hours, home_latitude, home_longitude")
         .eq("active", true)
         .order("name");
       if (data && data.length > 0) {
-        setAllCleaners(data);
+        setAllCleaners(data as any as CleanerProfile[]);
         setSelectedCleanerId(data[0].id);
       }
     };
@@ -92,7 +110,7 @@ export default function CleanerPortal() {
         travel_time_from_previous_minutes, is_same_day_turnaround,
         checkout_time, checkin_time, cleaning_duration_minutes,
         listing_id,
-        listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms)
+        listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms, latitude, longitude)
       `)
       .eq("assigned_cleaner_id", cleanerId)
       .eq("scheduled_date", today)
@@ -119,6 +137,8 @@ export default function CleanerPortal() {
       property_name: t.listings?.name ?? "Unknown",
       location_group: t.listings?.location_group ?? null,
       bedrooms: t.listings?.bedrooms ?? null,
+      latitude: t.listings?.latitude ?? null,
+      longitude: t.listings?.longitude ?? null,
     }));
 
   const fetchData = async () => {
@@ -127,7 +147,7 @@ export default function CleanerPortal() {
 
     const { data: cleanerData } = await supabase
       .from("cleaners")
-      .select("id, name, daily_working_hours")
+      .select("id, name, daily_working_hours, home_latitude, home_longitude")
       .eq("user_id", user.id)
       .single();
 
@@ -135,7 +155,7 @@ export default function CleanerPortal() {
       setLoading(false);
       return;
     }
-    setCleaner(cleanerData);
+    setCleaner(cleanerData as any as CleanerProfile);
 
     const today = format(new Date(), "yyyy-MM-dd");
     const { data: taskData } = await supabase
@@ -145,7 +165,7 @@ export default function CleanerPortal() {
         travel_time_from_previous_minutes, is_same_day_turnaround,
         checkout_time, checkin_time, cleaning_duration_minutes,
         listing_id,
-        listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms)
+        listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms, latitude, longitude)
       `)
       .eq("assigned_cleaner_id", cleanerData.id)
       .eq("scheduled_date", today)
@@ -167,7 +187,7 @@ export default function CleanerPortal() {
         travel_time_from_previous_minutes, is_same_day_turnaround,
         checkout_time, checkin_time, cleaning_duration_minutes,
         listing_id, created_at,
-        listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms)
+        listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms, latitude, longitude)
       `)
       .eq("assigned_cleaner_id", cleaner.id)
       .eq("scheduled_date", today)
@@ -411,11 +431,19 @@ export default function CleanerPortal() {
 
                   return (
                     <div key={task.id}>
-                      {/* Travel connector */}
-                      {idx > 0 && task.travel_time_from_previous_minutes != null && task.travel_time_from_previous_minutes > 0 && (
+                      {/* Home → first travel connector */}
+                      {idx === 0 && cleaner && (
                         <div className="flex items-center justify-center py-2">
                           <span className="text-xs text-muted-foreground">
-                            🚗 ~{task.travel_time_from_previous_minutes} min travel
+                            🏠 ~{travelMinutes(cleaner.home_latitude, cleaner.home_longitude, task.latitude, task.longitude)} min from home
+                          </span>
+                        </div>
+                      )}
+                      {/* Travel connector between tasks */}
+                      {idx > 0 && (
+                        <div className="flex items-center justify-center py-2">
+                          <span className="text-xs text-muted-foreground">
+                            🚗 ~{task.travel_time_from_previous_minutes ?? travelMinutes(tasks[idx - 1].latitude, tasks[idx - 1].longitude, task.latitude, task.longitude)} min travel
                           </span>
                         </div>
                       )}
