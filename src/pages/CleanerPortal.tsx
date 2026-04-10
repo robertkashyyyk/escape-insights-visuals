@@ -147,7 +147,7 @@ export default function CleanerPortal() {
 
     const { data: cleanerData } = await supabase
       .from("cleaners")
-      .select("id, name, daily_working_hours")
+      .select("id, name, daily_working_hours, home_latitude, home_longitude")
       .eq("user_id", user.id)
       .single();
 
@@ -155,7 +155,7 @@ export default function CleanerPortal() {
       setLoading(false);
       return;
     }
-    setCleaner(cleanerData);
+    setCleaner(cleanerData as any as CleanerProfile);
 
     const today = format(new Date(), "yyyy-MM-dd");
     const { data: taskData } = await supabase
