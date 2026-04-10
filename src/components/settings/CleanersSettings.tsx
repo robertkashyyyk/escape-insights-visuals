@@ -342,6 +342,22 @@ export function CleanersSettings() {
               <Label className="text-xs">Active</Label>
             </div>
 
+            {/* Notification toggles */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Notifications</Label>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Switch checked={form.notify_email} onCheckedChange={v => setForm({ ...form, notify_email: v })} />
+                  <Label className="text-xs text-muted-foreground">📧 Email</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={form.notify_whatsapp} onCheckedChange={v => setForm({ ...form, notify_whatsapp: v })} />
+                  <Label className="text-xs text-muted-foreground">💬 WhatsApp</Label>
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Send daily cleaning schedule to this cleaner</p>
+            </div>
+
             {/* Save warnings for under-allocated groups */}
             {saveWarnings.length > 0 && (
               <div className="space-y-2">
