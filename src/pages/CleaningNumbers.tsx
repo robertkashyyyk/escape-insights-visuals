@@ -17,6 +17,18 @@ interface CleanerInfo {
   name: string;
   rate_per_clean: number;
   active: boolean;
+  location_groups: string[];
+  workload_share: Record<string, number>;
+  non_working_days: string[];
+}
+
+interface UnifiedTask {
+  id: string;
+  assigned_cleaner_id: string | null;
+  scheduled_date: string;
+  status: string;
+  cleaning_duration_minutes: number;
+  source: "db" | "reservation";
 }
 
 export default function CleaningNumbers() {
@@ -46,11 +58,30 @@ export default function CleaningNumbers() {
     queryKey: ["cleaners-numbers"],
     queryFn: async () => {
       const { data } = await supabase.from("cleaners" as any).select("*").eq("active", true).order("name");
-      return ((data || []) as any[]).map((c: any): CleanerInfo => ({ id: c.id, name: c.name, rate_per_clean: c.rate_per_clean ?? 0, active: c.active }));
+      return ((data || []) as any[]).map((c: any): CleanerInfo => ({
+        id: c.id, name: c.name, rate_per_clean: c.rate_per_clean ?? 0, active: c.active,
+        location_groups: c.location_groups || [], workload_share: c.workload_share || {},
+        non_working_days: c.non_working_days || [],
+      }));
     },
   });
 
-  const { data: tasks = [] } = useQuery({
+  const { data: listings = [] } = useQuery({
+    queryKey: ["listings-numbers"],
+    queryFn: async () => {
+      const { data } = await supabase.from("listings").select("id, location_group, cleaning_duration_minutes").eq("status", "active");
+      return (data || []) as { id: string; location_group: string | null; cleaning_duration_minutes: number | null }[];
+    },
+  });
+
+  const listingMap = useMemo(() => {
+    const m = new Map<string, { location_group: string | null; cleaning_duration_minutes: number | null }>();
+    listings.forEach(l => m.set(l.id, l));
+    return m;
+  }, [listings]);
+
+  // DB clean_tasks
+  const { data: dbTasks = [] } = useQuery({
     queryKey: ["clean-tasks-numbers", rangeStartStr, rangeEndStr],
     queryFn: async () => {
       const { data } = await supabase
@@ -62,7 +93,36 @@ export default function CleaningNumbers() {
     },
   });
 
-  const { data: prevTasks = [] } = useQuery({
+  // Reservation checkouts in range (to fill dates without DB tasks)
+  const { data: checkoutReservations = [] } = useQuery({
+    queryKey: ["reservations-numbers-checkouts", rangeStartStr, rangeEndStr],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("reservations")
+        .select("id, listing_id, check_out, status")
+        .gte("check_out", rangeStartStr)
+        .lte("check_out", rangeEndStr)
+        .in("status", ["confirmed", "new", "modified"]);
+      return (data || []) as { id: string; listing_id: string; check_out: string; status: string }[];
+    },
+  });
+
+  // Previous period reservations for comparison
+  const { data: prevCheckoutReservations = [] } = useQuery({
+    queryKey: ["reservations-numbers-prev-checkouts", prevStartStr, prevEndStr],
+    enabled: period === "month",
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("reservations")
+        .select("id, listing_id, check_out, status")
+        .gte("check_out", prevStartStr)
+        .lte("check_out", prevEndStr)
+        .in("status", ["confirmed", "new", "modified"]);
+      return (data || []) as { id: string; listing_id: string; check_out: string; status: string }[];
+    },
+  });
+
+  const { data: prevDbTasks = [] } = useQuery({
     queryKey: ["clean-tasks-numbers-prev", prevStartStr, prevEndStr],
     enabled: period === "month",
     queryFn: async () => {
@@ -74,6 +134,88 @@ export default function CleaningNumbers() {
       return (data || []) as any[];
     },
   });
+
+  // Merge: for each date, use DB tasks if they exist, otherwise derive from reservations
+  const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  
+  const tasks: UnifiedTask[] = useMemo(() => {
+    // Find which dates have DB tasks
+    const dbDates = new Set(dbTasks.map((t: any) => t.scheduled_date));
+    
+    // Start with all DB tasks
+    const result: UnifiedTask[] = dbTasks.map((t: any) => ({
+      id: t.id,
+      assigned_cleaner_id: t.assigned_cleaner_id,
+      scheduled_date: t.scheduled_date,
+      status: t.status,
+      cleaning_duration_minutes: t.cleaning_duration_minutes ?? 90,
+      source: "db" as const,
+    }));
+
+    // For dates without DB tasks, derive from reservation checkouts
+    // Simple round-robin allocation based on workload_share
+    const resByDate = new Map<string, typeof checkoutReservations>();
+    checkoutReservations.forEach(r => {
+      if (dbDates.has(r.check_out)) return; // skip dates with DB tasks
+      if (!resByDate.has(r.check_out)) resByDate.set(r.check_out, []);
+      resByDate.get(r.check_out)!.push(r);
+    });
+
+    resByDate.forEach((reservations, dateStr) => {
+      const dayOfWeek = new Date(dateStr + "T00:00:00").getDay();
+      const dayName = DAY_NAMES[dayOfWeek];
+      
+      // Simple allocation: distribute among eligible cleaners by workload_share
+      const cleanerTaskCounts: Record<string, number> = {};
+      
+      reservations.forEach(r => {
+        const listing = listingMap.get(r.listing_id);
+        const locationGroup = listing?.location_group ?? "Other";
+        
+        // Find eligible cleaners
+        const eligible = cleaners.filter(c => {
+          if (!c.location_groups.includes(locationGroup)) return false;
+          if (c.non_working_days.includes(dayName)) return false;
+          return true;
+        });
+
+        let assignedId: string | null = null;
+        if (eligible.length > 0) {
+          // Pick cleaner with highest deficit vs target share
+          let best = eligible[0];
+          let bestDeficit = -Infinity;
+          const totalInRegion = eligible.reduce((sum, c) => sum + (cleanerTaskCounts[c.id] ?? 0), 0);
+          for (const c of eligible) {
+            const targetShare = c.workload_share[locationGroup] ?? 100;
+            const actualShare = totalInRegion > 0 ? ((cleanerTaskCounts[c.id] ?? 0) / totalInRegion) * 100 : 0;
+            const deficit = targetShare - actualShare;
+            if (deficit > bestDeficit) { bestDeficit = deficit; best = c; }
+          }
+          assignedId = best.id;
+          cleanerTaskCounts[best.id] = (cleanerTaskCounts[best.id] ?? 0) + 1;
+        }
+
+        result.push({
+          id: `res-${r.id}`,
+          assigned_cleaner_id: assignedId,
+          scheduled_date: r.check_out,
+          status: "scheduled",
+          cleaning_duration_minutes: listing?.cleaning_duration_minutes ?? 90,
+          source: "reservation",
+        });
+      });
+    });
+
+    return result;
+  }, [dbTasks, checkoutReservations, cleaners, listingMap]);
+
+  // Previous period: merge DB tasks + reservations
+  const prevTotalCleans = useMemo(() => {
+    const prevDbDates = new Set(prevDbTasks.map((t: any) => t.scheduled_date));
+    const fromDb = prevDbTasks.length;
+    const fromRes = prevCheckoutReservations.filter(r => !prevDbDates.has(r.check_out)).length;
+    return fromDb + fromRes;
+  }, [prevDbTasks, prevCheckoutReservations]);
 
   const navigate = (dir: number) => {
     if (period === "week") setSelectedDate(d => dir > 0 ? addWeeks(d, 1) : subWeeks(d, 1));
