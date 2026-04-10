@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, SprayCan, AlertTriangle, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, SprayCan, AlertTriangle, Loader2, UserCheck, KeyRound } from "lucide-react";
 
 const LOCATION_GROUPS = ["Castle Hume", "Belfast", "Enniskillen", "North Coast", "Portstewart Coast", "Larne", "Kesh", "Other"];
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -31,9 +31,10 @@ interface Cleaner {
   home_postcode: string | null;
   home_latitude: number | null;
   home_longitude: number | null;
+  user_id: string | null;
 }
 
-type CleanerForm = Omit<Cleaner, "id" | "region">;
+type CleanerForm = Omit<Cleaner, "id" | "region" | "user_id">;
 
 const empty: CleanerForm = {
   name: "", phone: "", email: "",
@@ -68,6 +69,7 @@ export function CleanersSettings() {
   const [form, setForm] = useState<CleanerForm>(empty);
   const [geocoding, setGeocoding] = useState(false);
   const [geocodeResult, setGeocodeResult] = useState<string | null>(null);
+  const [enablingLogin, setEnablingLogin] = useState<string | null>(null);
 
   const fetchCleaners = async () => {
     const { data } = await supabase.from("cleaners" as any).select("*").order("name");
@@ -171,6 +173,34 @@ export function CleanersSettings() {
     fetchCleaners();
   };
 
+  const handleEnableLogin = async (cleaner: Cleaner) => {
+    if (!cleaner.email) {
+      toast({ title: "No email address", description: "Add an email to this cleaner first.", variant: "destructive" });
+      return;
+    }
+    setEnablingLogin(cleaner.id);
+    try {
+      const tempPassword = crypto.randomUUID().slice(0, 12) + "A1!";
+      const { data, error } = await supabase.functions.invoke("invite-user", {
+        body: {
+          email: cleaner.email,
+          role: "cleaner",
+          password: tempPassword,
+          linkTable: "cleaners",
+          linkId: cleaner.id,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast({ title: "Login enabled", description: `Account created for ${cleaner.name}. Temp password: ${tempPassword}` });
+      fetchCleaners();
+    } catch (err: any) {
+      toast({ title: "Failed to enable login", description: err?.message || "Unknown error", variant: "destructive" });
+    } finally {
+      setEnablingLogin(null);
+    }
+  };
+
   const toggleDay = (day: string) => {
     setForm(f => ({
       ...f,
@@ -230,11 +260,28 @@ export function CleanersSettings() {
             <Card key={c.id} className="border-border/30 bg-card/50 backdrop-blur-sm">
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-foreground" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{c.name}</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-semibold text-foreground" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{c.name}</h4>
+                    {c.user_id && (
+                      <Badge variant="outline" className="text-[10px] border-success/30 text-success px-1.5 py-0">
+                        <UserCheck className="h-2.5 w-2.5 mr-0.5" /> Login
+                      </Badge>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1">
                     <Badge variant={c.active ? "default" : "outline"} className={c.active ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs" : "text-xs"}>
                       {c.active ? "Active" : "Inactive"}
                     </Badge>
+                    {!c.user_id && c.email && (
+                      <Button
+                        size="icon" variant="ghost" className="h-7 w-7 text-primary"
+                        onClick={() => handleEnableLogin(c)}
+                        disabled={enablingLogin === c.id}
+                        title="Enable Login"
+                      >
+                        {enablingLogin === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <KeyRound className="h-3 w-3" />}
+                      </Button>
+                    )}
                     <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(c)}><Pencil className="h-3 w-3" /></Button>
                     <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDelete(c.id)}><Trash2 className="h-3 w-3" /></Button>
                   </div>
@@ -431,9 +478,27 @@ export function CleanersSettings() {
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={!form.name.trim()}>{editing ? "Update" : "Add"}</Button>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            {editing && !editing.user_id && editing.email && (
+              <Button
+                variant="outline"
+                className="border-primary/30 text-primary hover:bg-primary/10"
+                onClick={() => handleEnableLogin(editing)}
+                disabled={enablingLogin === editing.id}
+              >
+                {enablingLogin === editing.id ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <KeyRound className="h-4 w-4 mr-1" />}
+                Enable Login
+              </Button>
+            )}
+            {editing?.user_id && (
+              <Badge variant="outline" className="border-success/30 text-success text-xs h-9 px-3 flex items-center">
+                <UserCheck className="h-3.5 w-3.5 mr-1" /> Login enabled
+              </Badge>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button onClick={handleSave} disabled={!form.name.trim()}>{editing ? "Update" : "Add"}</Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

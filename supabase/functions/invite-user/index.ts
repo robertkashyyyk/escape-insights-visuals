@@ -38,8 +38,6 @@ Deno.serve(async (req) => {
     }
 
     const callerId = claimsData.user.id;
-
-    // Check super role using service role client (bypasses RLS)
     const adminClient = createClient(supabaseUrl, serviceRoleKey);
 
     const { data: roleData } = await adminClient
@@ -59,7 +57,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { email, role } = await req.json();
+    const { email, role, password, linkTable, linkId } = await req.json();
 
     if (!email || !role) {
       return new Response(
@@ -71,7 +69,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const validRoles = ["super", "senior", "admin", "client"];
+    const validRoles = ["super", "senior", "admin", "client", "cleaner"];
     if (!validRoles.includes(role)) {
       return new Response(JSON.stringify({ error: "Invalid role" }), {
         status: 400,
@@ -79,27 +77,71 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Invite user
-    const { data: inviteData, error: inviteError } =
-      await adminClient.auth.admin.inviteUserByEmail(email);
-
-    if (inviteError) {
-      return new Response(JSON.stringify({ error: inviteError.message }), {
+    // Validate linkTable if provided
+    const validLinkTables = ["cleaners", "property_owners"];
+    if (linkTable && !validLinkTables.includes(linkTable)) {
+      return new Response(JSON.stringify({ error: "Invalid linkTable" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Assign role
-    if (inviteData.user) {
-      await adminClient.from("user_roles").insert({
-        user_id: inviteData.user.id,
-        role,
+    let userId: string | undefined;
+
+    if (password) {
+      // Create user with password (silent — no email sent)
+      const { data: createData, error: createError } =
+        await adminClient.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { role },
+        });
+
+      if (createError) {
+        return new Response(JSON.stringify({ error: createError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      userId = createData.user?.id;
+    } else {
+      // Invite user (sends email)
+      const { data: inviteData, error: inviteError } =
+        await adminClient.auth.admin.inviteUserByEmail(email);
+
+      if (inviteError) {
+        return new Response(JSON.stringify({ error: inviteError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      userId = inviteData.user?.id;
+    }
+
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "Failed to create user" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
+    // Assign role
+    await adminClient.from("user_roles").insert({
+      user_id: userId,
+      role,
+    });
+
+    // Link user_id back to the source table (cleaners or property_owners)
+    if (linkTable && linkId) {
+      await adminClient
+        .from(linkTable)
+        .update({ user_id: userId })
+        .eq("id", linkId);
+    }
+
     return new Response(
-      JSON.stringify({ success: true, user_id: inviteData.user?.id }),
+      JSON.stringify({ success: true, user_id: userId }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
