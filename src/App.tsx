@@ -51,17 +51,17 @@ const App = () => (
             <Route path="/owner/reservations" element={<ProtectedRoute requiredRoles={["client"]}><OwnerReservations /></ProtectedRoute>} />
             <Route path="/owner/statements" element={<ProtectedRoute requiredRoles={["client"]}><OwnerStatements /></ProtectedRoute>} />
             <Route path="/today" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><Today /></ProtectedRoute>} />
-            <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/orin" element={<ProtectedRoute><OrinIntelligence /></ProtectedRoute>} />
-            <Route path="/yoy" element={<ProtectedRoute><YoYPerformance /></ProtectedRoute>} />
-            <Route path="/heatmap" element={<ProtectedRoute><OccupancyHeatmap /></ProtectedRoute>} />
-            <Route path="/pricing" element={<ProtectedRoute><PricingStrategy /></ProtectedRoute>} />
-            <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
-            <Route path="/pipeline" element={<ProtectedRoute><FuturePipeline /></ProtectedRoute>} />
-            <Route path="/pacing" element={<ProtectedRoute><RevenuePacing /></ProtectedRoute>} />
-            <Route path="/forecast" element={<ProtectedRoute><RevenueForecaster /></ProtectedRoute>} />
-            <Route path="/properties" element={<ProtectedRoute><Properties /></ProtectedRoute>} />
-            <Route path="/properties/:id" element={<ProtectedRoute><PropertyDetail /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><Index /></ProtectedRoute>} />
+            <Route path="/orin" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><OrinIntelligence /></ProtectedRoute>} />
+            <Route path="/yoy" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><YoYPerformance /></ProtectedRoute>} />
+            <Route path="/heatmap" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><OccupancyHeatmap /></ProtectedRoute>} />
+            <Route path="/pricing" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PricingStrategy /></ProtectedRoute>} />
+            <Route path="/reservations" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><Reservations /></ProtectedRoute>} />
+            <Route path="/pipeline" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><FuturePipeline /></ProtectedRoute>} />
+            <Route path="/pacing" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><RevenuePacing /></ProtectedRoute>} />
+            <Route path="/forecast" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><RevenueForecaster /></ProtectedRoute>} />
+            <Route path="/properties" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><Properties /></ProtectedRoute>} />
+            <Route path="/properties/:id" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PropertyDetail /></ProtectedRoute>} />
             <Route path="/owners" element={<ProtectedRoute requiredRoles={["super", "senior"]}><Owners /></ProtectedRoute>} />
             
             <Route path="/management" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ManagementRevenue /></ProtectedRoute>} />
