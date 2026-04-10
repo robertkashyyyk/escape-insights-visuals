@@ -3,6 +3,7 @@ import {
   Building2, Users, Briefcase, Settings, LogOut, Telescope,
   Gauge, Target, Sparkles, Home, ChevronRight, Brush, BookOpen,
   FileText, Link, UserSearch, Mail, Send, Megaphone, ClipboardList,
+  Eye,
   LucideIcon,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
@@ -120,6 +121,7 @@ const sections: NavSection[] = [
     items: [
       { title: "Properties", url: "/properties", icon: Building2, roles: allRoles },
       { title: "Owner Portfolios", url: "/owners", icon: Users, roles: managementRoles },
+      { title: "Owner Portal", url: "/owner", icon: Eye, roles: managementRoles },
       { title: "Leads & Enquiries", url: "/leads", icon: ClipboardList, roles: allRoles },
     ],
   },

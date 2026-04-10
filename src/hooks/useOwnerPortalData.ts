@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOwnerPreview } from "@/contexts/OwnerPreviewContext";
 
 export interface OwnerProperty {
   id: string;
@@ -28,29 +29,46 @@ export interface OwnerKpis {
 
 export function useOwnerPortalData() {
   const { user } = useAuth();
+  const { isPreviewMode, selectedOwnerId } = useOwnerPreview();
   const currentYear = new Date().getFullYear();
   const today = new Date().toISOString().slice(0, 10);
 
   return useQuery({
-    queryKey: ["owner_portal", user?.id, currentYear],
-    enabled: !!user,
+    queryKey: ["owner_portal", isPreviewMode ? selectedOwnerId : user?.id, currentYear],
+    enabled: !!(isPreviewMode ? selectedOwnerId : user),
     queryFn: async () => {
-      // RLS automatically scopes these to the owner's data
-      const [listingsRes, reservationsRes, ownerRes] = await Promise.all([
-        supabase.from("listings").select("id, name, location_group, bedrooms"),
-        supabase.from("reservations").select("listing_id, check_in, check_out, total_amount, owner_payout, year, month, status"),
-        supabase.from("property_owners").select("id, name"),
+      // In preview mode, query by owner ID; in real mode, RLS scopes automatically
+      let listingsQuery = supabase.from("listings").select("id, name, location_group, bedrooms, owner_id");
+      let ownerQuery = supabase.from("property_owners").select("id, name");
+
+      if (isPreviewMode && selectedOwnerId) {
+        listingsQuery = listingsQuery.eq("owner_id", selectedOwnerId);
+        ownerQuery = ownerQuery.eq("id", selectedOwnerId);
+      }
+
+      const [listingsRes, ownerRes] = await Promise.all([
+        listingsQuery,
+        ownerQuery,
       ]);
 
       const listings = listingsRes.data || [];
-      const reservations = reservationsRes.data || [];
       const owner = ownerRes.data?.[0];
+      const listingIds = listings.map((l) => l.id);
+
+      // Fetch reservations for these listings
+      let reservations: any[] = [];
+      if (listingIds.length > 0) {
+        const { data } = await supabase
+          .from("reservations")
+          .select("listing_id, check_in, check_out, total_amount, owner_payout, year, month, status")
+          .in("listing_id", listingIds);
+        reservations = data || [];
+      }
 
       const prevYear = currentYear - 1;
       const now = new Date();
       const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 1).getTime()) / 86400000) + 1;
 
-      // Build property data
       const properties: OwnerProperty[] = listings.map((l) => {
         const propRes = reservations.filter((r) => r.listing_id === l.id);
         const thisYearRes = propRes.filter((r) => r.year === currentYear && r.status !== "cancelled");
@@ -59,12 +77,10 @@ export function useOwnerPortalData() {
         const revenueThisYear = thisYearRes.reduce((s, r) => s + (r.total_amount || 0), 0);
         const revenuePrevYear = prevYearRes.reduce((s, r) => s + (r.total_amount || 0), 0);
 
-        // Monthly revenue for sparkline (current year)
         const monthlyRevenue = Array.from({ length: 12 }, (_, m) =>
           thisYearRes.filter((r) => r.month === m + 1).reduce((s, r) => s + (r.total_amount || 0), 0)
         );
 
-        // Occupancy: nights booked / days elapsed in year
         const daysInScope = dayOfYear;
         let nightsBooked = 0;
         thisYearRes.forEach((r) => {
@@ -100,7 +116,6 @@ export function useOwnerPortalData() {
         };
       });
 
-      // Aggregate KPIs
       const allThisYear = reservations.filter((r) => r.year === currentYear && r.status !== "cancelled");
       const allPrevYear = reservations.filter((r) => r.year === prevYear && r.status !== "cancelled");
 
@@ -131,7 +146,7 @@ export function useOwnerPortalData() {
         totalRevenue,
         prevYearRevenue,
         occupancy: avgOccupancy,
-        prevYearOccupancy: 0, // simplified
+        prevYearOccupancy: 0,
         adr,
         prevYearAdr,
         ownerPayout,
