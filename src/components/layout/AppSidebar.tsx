@@ -23,7 +23,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-type AppRole = "super" | "senior" | "admin" | "client";
+type AppRole = "super" | "senior" | "admin" | "client" | "cleaner";
 
 interface NavChild {
   title: string;

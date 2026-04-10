@@ -71,14 +71,18 @@ export type Database = {
       clean_tasks: {
         Row: {
           assigned_cleaner_id: string | null
+          checkin_time: string | null
+          checkout_time: string | null
           cleaning_duration_minutes: number
           completed_at: string | null
           created_at: string
           estimated_start_time: string | null
           id: string
+          is_same_day_turnaround: boolean | null
           listing_id: string
           priority: string
           reservation_id: string | null
+          route_order: number | null
           scheduled_date: string
           status: string
           travel_time_from_previous_minutes: number | null
@@ -86,14 +90,18 @@ export type Database = {
         }
         Insert: {
           assigned_cleaner_id?: string | null
+          checkin_time?: string | null
+          checkout_time?: string | null
           cleaning_duration_minutes?: number
           completed_at?: string | null
           created_at?: string
           estimated_start_time?: string | null
           id?: string
+          is_same_day_turnaround?: boolean | null
           listing_id: string
           priority?: string
           reservation_id?: string | null
+          route_order?: number | null
           scheduled_date: string
           status?: string
           travel_time_from_previous_minutes?: number | null
@@ -101,14 +109,18 @@ export type Database = {
         }
         Update: {
           assigned_cleaner_id?: string | null
+          checkin_time?: string | null
+          checkout_time?: string | null
           cleaning_duration_minutes?: number
           completed_at?: string | null
           created_at?: string
           estimated_start_time?: string | null
           id?: string
+          is_same_day_turnaround?: boolean | null
           listing_id?: string
           priority?: string
           reservation_id?: string | null
+          route_order?: number | null
           scheduled_date?: string
           status?: string
           travel_time_from_previous_minutes?: number | null
@@ -157,6 +169,7 @@ export type Database = {
           rate_per_clean: number | null
           region: string
           updated_at: string
+          user_id: string | null
           workload_share: Json | null
         }
         Insert: {
@@ -177,6 +190,7 @@ export type Database = {
           rate_per_clean?: number | null
           region?: string
           updated_at?: string
+          user_id?: string | null
           workload_share?: Json | null
         }
         Update: {
@@ -197,6 +211,7 @@ export type Database = {
           rate_per_clean?: number | null
           region?: string
           updated_at?: string
+          user_id?: string | null
           workload_share?: Json | null
         }
         Relationships: []
@@ -596,7 +611,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "super" | "senior" | "admin" | "client"
+      app_role: "super" | "senior" | "admin" | "client" | "cleaner"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -724,7 +739,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["super", "senior", "admin", "client"],
+      app_role: ["super", "senior", "admin", "client", "cleaner"],
     },
   },
 } as const
