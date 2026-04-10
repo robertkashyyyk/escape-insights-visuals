@@ -30,6 +30,9 @@ import MonthlyReport from "./pages/MonthlyReport";
 import CleaningSchedule from "./pages/CleaningSchedule";
 import CleaningNumbers from "./pages/CleaningNumbers";
 import CleanerPortal from "./pages/CleanerPortal";
+import OwnerPortfolio from "./pages/owner/OwnerPortfolio";
+import OwnerReservations from "./pages/owner/OwnerReservations";
+import OwnerStatements from "./pages/owner/OwnerStatements";
 
 const queryClient = new QueryClient();
 
@@ -44,36 +47,39 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/cleaner" element={<CleanerPortal />} />
-            <Route path="/today" element={<ProtectedRoute><Today /></ProtectedRoute>} />
-            <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/orin" element={<ProtectedRoute><OrinIntelligence /></ProtectedRoute>} />
-            <Route path="/yoy" element={<ProtectedRoute><YoYPerformance /></ProtectedRoute>} />
-            <Route path="/heatmap" element={<ProtectedRoute><OccupancyHeatmap /></ProtectedRoute>} />
-            <Route path="/pricing" element={<ProtectedRoute><PricingStrategy /></ProtectedRoute>} />
-            <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
-            <Route path="/pipeline" element={<ProtectedRoute><FuturePipeline /></ProtectedRoute>} />
-            <Route path="/pacing" element={<ProtectedRoute><RevenuePacing /></ProtectedRoute>} />
-            <Route path="/forecast" element={<ProtectedRoute><RevenueForecaster /></ProtectedRoute>} />
-            <Route path="/properties" element={<ProtectedRoute><Properties /></ProtectedRoute>} />
-            <Route path="/properties/:id" element={<ProtectedRoute><PropertyDetail /></ProtectedRoute>} />
+            <Route path="/owner" element={<ProtectedRoute requiredRoles={["client"]}><OwnerPortfolio /></ProtectedRoute>} />
+            <Route path="/owner/reservations" element={<ProtectedRoute requiredRoles={["client"]}><OwnerReservations /></ProtectedRoute>} />
+            <Route path="/owner/statements" element={<ProtectedRoute requiredRoles={["client"]}><OwnerStatements /></ProtectedRoute>} />
+            <Route path="/today" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><Today /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><Index /></ProtectedRoute>} />
+            <Route path="/orin" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><OrinIntelligence /></ProtectedRoute>} />
+            <Route path="/yoy" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><YoYPerformance /></ProtectedRoute>} />
+            <Route path="/heatmap" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><OccupancyHeatmap /></ProtectedRoute>} />
+            <Route path="/pricing" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PricingStrategy /></ProtectedRoute>} />
+            <Route path="/reservations" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><Reservations /></ProtectedRoute>} />
+            <Route path="/pipeline" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><FuturePipeline /></ProtectedRoute>} />
+            <Route path="/pacing" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><RevenuePacing /></ProtectedRoute>} />
+            <Route path="/forecast" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><RevenueForecaster /></ProtectedRoute>} />
+            <Route path="/properties" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><Properties /></ProtectedRoute>} />
+            <Route path="/properties/:id" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PropertyDetail /></ProtectedRoute>} />
             <Route path="/owners" element={<ProtectedRoute requiredRoles={["super", "senior"]}><Owners /></ProtectedRoute>} />
             
             <Route path="/management" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ManagementRevenue /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute requiredRoles={["super"]}><SettingsPage /></ProtectedRoute>} />
             <Route path="/sync-health" element={<ProtectedRoute requiredRoles={["super", "senior"]}><SyncHealth /></ProtectedRoute>} />
-            <Route path="/operations/schedule" element={<ProtectedRoute><CleaningSchedule /></ProtectedRoute>} />
-            <Route path="/operations/cleaning" element={<ProtectedRoute><CleaningSchedule /></ProtectedRoute>} />
+            <Route path="/operations/schedule" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><CleaningSchedule /></ProtectedRoute>} />
+            <Route path="/operations/cleaning" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><CleaningSchedule /></ProtectedRoute>} />
             <Route path="/operations/numbers" element={<ProtectedRoute requiredRoles={["super", "senior"]}><CleaningNumbers /></ProtectedRoute>} />
-            <Route path="/property-knowledge" element={<ProtectedRoute><ComingSoon title="Property Knowledge" /></ProtectedRoute>} />
+            <Route path="/property-knowledge" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Property Knowledge" /></ProtectedRoute>} />
             <Route path="/owner-reports" element={<ProtectedRoute requiredRoles={["super", "senior"]}><MonthlyReport /></ProtectedRoute>} />
             <Route path="/owner-reports/invoice" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ComingSoon title="Owner Reports — Invoice Generator" /></ProtectedRoute>} />
             <Route path="/xero-sync" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ComingSoon title="Xero Sync" /></ProtectedRoute>} />
-            <Route path="/guests" element={<ProtectedRoute><ComingSoon title="Guest Database" /></ProtectedRoute>} />
-            <Route path="/campaigns" element={<ProtectedRoute><ComingSoon title="Active Campaigns" /></ProtectedRoute>} />
-            <Route path="/campaigns/segments" element={<ProtectedRoute><ComingSoon title="Campaign Segments" /></ProtectedRoute>} />
-            <Route path="/campaigns/history" element={<ProtectedRoute><ComingSoon title="Campaign History" /></ProtectedRoute>} />
-            <Route path="/mailchimp-sync" element={<ProtectedRoute><ComingSoon title="Mailchimp Sync" /></ProtectedRoute>} />
-            <Route path="/leads" element={<ProtectedRoute><ComingSoon title="Leads & Enquiries" /></ProtectedRoute>} />
+            <Route path="/guests" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Guest Database" /></ProtectedRoute>} />
+            <Route path="/campaigns" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Active Campaigns" /></ProtectedRoute>} />
+            <Route path="/campaigns/segments" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Campaign Segments" /></ProtectedRoute>} />
+            <Route path="/campaigns/history" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Campaign History" /></ProtectedRoute>} />
+            <Route path="/mailchimp-sync" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Mailchimp Sync" /></ProtectedRoute>} />
+            <Route path="/leads" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Leads & Enquiries" /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
