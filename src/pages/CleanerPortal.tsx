@@ -110,7 +110,7 @@ export default function CleanerPortal() {
         travel_time_from_previous_minutes, is_same_day_turnaround,
         checkout_time, checkin_time, cleaning_duration_minutes,
         listing_id,
-        listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms)
+        listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms, latitude, longitude)
       `)
       .eq("assigned_cleaner_id", cleanerId)
       .eq("scheduled_date", today)
