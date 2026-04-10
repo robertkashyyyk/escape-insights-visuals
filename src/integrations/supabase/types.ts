@@ -38,6 +38,106 @@ export type Database = {
         }
         Relationships: []
       }
+      automation_logs: {
+        Row: {
+          error_message: string | null
+          id: string
+          run_at: string
+          status: string
+          tasks_created: number
+          tasks_unassigned: number
+          triggered_by: string | null
+        }
+        Insert: {
+          error_message?: string | null
+          id?: string
+          run_at?: string
+          status?: string
+          tasks_created?: number
+          tasks_unassigned?: number
+          triggered_by?: string | null
+        }
+        Update: {
+          error_message?: string | null
+          id?: string
+          run_at?: string
+          status?: string
+          tasks_created?: number
+          tasks_unassigned?: number
+          triggered_by?: string | null
+        }
+        Relationships: []
+      }
+      clean_tasks: {
+        Row: {
+          assigned_cleaner_id: string | null
+          cleaning_duration_minutes: number
+          completed_at: string | null
+          created_at: string
+          estimated_start_time: string | null
+          id: string
+          listing_id: string
+          priority: string
+          reservation_id: string | null
+          scheduled_date: string
+          status: string
+          travel_time_from_previous_minutes: number | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_cleaner_id?: string | null
+          cleaning_duration_minutes?: number
+          completed_at?: string | null
+          created_at?: string
+          estimated_start_time?: string | null
+          id?: string
+          listing_id: string
+          priority?: string
+          reservation_id?: string | null
+          scheduled_date: string
+          status?: string
+          travel_time_from_previous_minutes?: number | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_cleaner_id?: string | null
+          cleaning_duration_minutes?: number
+          completed_at?: string | null
+          created_at?: string
+          estimated_start_time?: string | null
+          id?: string
+          listing_id?: string
+          priority?: string
+          reservation_id?: string | null
+          scheduled_date?: string
+          status?: string
+          travel_time_from_previous_minutes?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clean_tasks_assigned_cleaner_id_fkey"
+            columns: ["assigned_cleaner_id"]
+            isOneToOne: false
+            referencedRelation: "cleaners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clean_tasks_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clean_tasks_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cleaners: {
         Row: {
           active: boolean
@@ -48,6 +148,8 @@ export type Database = {
           location_groups: string[] | null
           name: string
           non_working_days: string[] | null
+          notify_email: boolean
+          notify_whatsapp: boolean
           phone: string | null
           rate_per_clean: number | null
           region: string
@@ -63,6 +165,8 @@ export type Database = {
           location_groups?: string[] | null
           name: string
           non_working_days?: string[] | null
+          notify_email?: boolean
+          notify_whatsapp?: boolean
           phone?: string | null
           rate_per_clean?: number | null
           region?: string
@@ -78,6 +182,8 @@ export type Database = {
           location_groups?: string[] | null
           name?: string
           non_working_days?: string[] | null
+          notify_email?: boolean
+          notify_whatsapp?: boolean
           phone?: string | null
           rate_per_clean?: number | null
           region?: string
@@ -101,6 +207,7 @@ export type Database = {
           hostaway_listing_id: number | null
           id: string
           image_url: string | null
+          is_clean: boolean
           latitude: number | null
           location_group: string | null
           longitude: number | null
@@ -133,6 +240,7 @@ export type Database = {
           hostaway_listing_id?: number | null
           id?: string
           image_url?: string | null
+          is_clean?: boolean
           latitude?: number | null
           location_group?: string | null
           longitude?: number | null
@@ -165,6 +273,7 @@ export type Database = {
           hostaway_listing_id?: number | null
           id?: string
           image_url?: string | null
+          is_clean?: boolean
           latitude?: number | null
           location_group?: string | null
           longitude?: number | null
