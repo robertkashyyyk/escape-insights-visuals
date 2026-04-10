@@ -260,11 +260,28 @@ export function CleanersSettings() {
             <Card key={c.id} className="border-border/30 bg-card/50 backdrop-blur-sm">
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-foreground" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{c.name}</h4>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-semibold text-foreground" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{c.name}</h4>
+                    {c.user_id && (
+                      <Badge variant="outline" className="text-[10px] border-success/30 text-success px-1.5 py-0">
+                        <UserCheck className="h-2.5 w-2.5 mr-0.5" /> Login
+                      </Badge>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1">
                     <Badge variant={c.active ? "default" : "outline"} className={c.active ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs" : "text-xs"}>
                       {c.active ? "Active" : "Inactive"}
                     </Badge>
+                    {!c.user_id && c.email && (
+                      <Button
+                        size="icon" variant="ghost" className="h-7 w-7 text-primary"
+                        onClick={() => handleEnableLogin(c)}
+                        disabled={enablingLogin === c.id}
+                        title="Enable Login"
+                      >
+                        {enablingLogin === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <KeyRound className="h-3 w-3" />}
+                      </Button>
+                    )}
                     <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(c)}><Pencil className="h-3 w-3" /></Button>
                     <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDelete(c.id)}><Trash2 className="h-3 w-3" /></Button>
                   </div>
