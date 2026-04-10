@@ -3,7 +3,6 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const AVG_SPEED_KMH = 40;
 const DEFAULT_CHECKOUT = "10:00";
-const DEFAULT_CHECKIN = "15:00";
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -33,6 +32,32 @@ function addMinutesToTime(time: string, mins: number): string {
   return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
+interface TaskInfo {
+  listing_id: string;
+  reservation_id: string;
+  scheduled_date: string;
+  priority: string;
+  cleaning_duration_minutes: number;
+  latitude: number | null;
+  longitude: number | null;
+  location_group: string;
+  assigned_cleaner_id: string | null;
+  status: string;
+  estimated_start_time: string | null;
+  travel_time_from_previous_minutes: number;
+}
+
+interface CleanerInfo {
+  id: string;
+  name: string;
+  location_groups: string[];
+  workload_share: Record<string, number>;
+  non_working_days: string[];
+  daily_working_hours: number;
+  home_latitude: number | null;
+  home_longitude: number | null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -44,7 +69,6 @@ Deno.serve(async (req) => {
   );
 
   try {
-    // Accept optional date param; default to today in Europe/London
     let targetDate: string;
     try {
       const body = await req.json();
@@ -66,7 +90,6 @@ Deno.serve(async (req) => {
     // 2. Get listings
     const listingIds = [...new Set((checkouts || []).map((r: any) => r.listing_id))];
     if (listingIds.length === 0) {
-      // Log empty run
       await supabase.from("automation_logs").insert({
         tasks_created: 0, tasks_unassigned: 0, status: "success", triggered_by: "edge_function",
       });
@@ -108,20 +131,20 @@ Deno.serve(async (req) => {
       (existingTasks || []).map((t: any) => `${t.reservation_id}_${t.scheduled_date}`)
     );
 
-    // 5. Get active cleaners
+    // 5. Get active cleaners (including home location)
     const { data: cleanersRaw } = await supabase
       .from("cleaners")
       .select("*")
       .eq("active", true);
-    const cleaners = (cleanersRaw || []).map((c: any) => ({
+    const cleaners: CleanerInfo[] = (cleanersRaw || []).map((c: any) => ({
       id: c.id,
       name: c.name,
       location_groups: c.location_groups || [],
       workload_share: c.workload_share || {},
       non_working_days: c.non_working_days || [],
       daily_working_hours: c.daily_working_hours ?? 8,
-      latitude: null as number | null,
-      longitude: null as number | null,
+      home_latitude: c.home_latitude ?? null,
+      home_longitude: c.home_longitude ?? null,
     }));
 
     // 6. Get already-scheduled tasks for today (for capacity calculation)
@@ -132,16 +155,13 @@ Deno.serve(async (req) => {
       .not("status", "eq", "cancelled");
 
     const cleanerScheduledMinutes: Record<string, number> = {};
-    const cleanerTaskList: Record<string, Array<{ latitude: number | null; longitude: number | null }>> = {};
     const cleanerRegionCount: Record<string, Record<string, number>> = {};
 
     for (const c of cleaners) {
       cleanerScheduledMinutes[c.id] = 0;
-      cleanerTaskList[c.id] = [];
       cleanerRegionCount[c.id] = {};
     }
 
-    // Account for existing tasks
     for (const t of todayExistingTasks || []) {
       if (t.assigned_cleaner_id && cleanerScheduledMinutes[t.assigned_cleaner_id] !== undefined) {
         cleanerScheduledMinutes[t.assigned_cleaner_id] +=
@@ -150,22 +170,7 @@ Deno.serve(async (req) => {
     }
 
     // 7. Build new tasks
-    interface NewTask {
-      listing_id: string;
-      reservation_id: string;
-      scheduled_date: string;
-      priority: string;
-      cleaning_duration_minutes: number;
-      latitude: number | null;
-      longitude: number | null;
-      location_group: string;
-      assigned_cleaner_id: string | null;
-      status: string;
-      estimated_start_time: string | null;
-      travel_time_from_previous_minutes: number;
-    }
-
-    const newTasks: NewTask[] = [];
+    const newTasks: TaskInfo[] = [];
 
     for (const r of checkouts || []) {
       const key = `${r.id}_${targetDate}`;
@@ -201,20 +206,20 @@ Deno.serve(async (req) => {
       return 0;
     });
 
-    // 8. Allocate cleaners
+    // 8. Allocate cleaners — group tasks by eligible cleaner pool, then sequence per cleaner
     let unassignedCount = 0;
 
+    // Per-cleaner task buckets for route optimisation
+    const cleanerBuckets: Record<string, TaskInfo[]> = {};
+    for (const c of cleaners) cleanerBuckets[c.id] = [];
+
     for (const task of newTasks) {
-      const eligible = cleaners.filter((c: any) => {
+      const eligible = cleaners.filter((c) => {
         if (!c.location_groups.includes(task.location_group)) return false;
         if (c.non_working_days.includes(targetDayOfWeek)) return false;
-
-        const lastTask = cleanerTaskList[c.id]?.[cleanerTaskList[c.id].length - 1];
-        const travel = lastTask
-          ? travelMinutes(lastTask.latitude, lastTask.longitude, task.latitude, task.longitude)
-          : 0;
-        const projected = cleanerScheduledMinutes[c.id] + travel + task.cleaning_duration_minutes;
-        const maxMins = (c.daily_working_hours ?? 8) * 60;
+        // Rough capacity check (will refine after route ordering)
+        const projected = cleanerScheduledMinutes[c.id] + task.cleaning_duration_minutes + 15; // 15 min est travel
+        const maxMins = c.daily_working_hours * 60;
         return projected <= maxMins;
       });
 
@@ -229,7 +234,7 @@ Deno.serve(async (req) => {
       for (const c of eligible) {
         const targetShare = c.workload_share[task.location_group] ?? 100;
         const totalInRegion = eligible.reduce(
-          (s: number, ec: any) => s + (cleanerRegionCount[ec.id]?.[task.location_group] ?? 0),
+          (s, ec) => s + (cleanerRegionCount[ec.id]?.[task.location_group] ?? 0),
           0
         );
         const actual = totalInRegion > 0
@@ -242,29 +247,96 @@ Deno.serve(async (req) => {
         }
       }
 
-      const lastTask = cleanerTaskList[best.id]?.[cleanerTaskList[best.id].length - 1];
-      const travel = lastTask
-        ? travelMinutes(lastTask.latitude, lastTask.longitude, task.latitude, task.longitude)
-        : 0;
-
-      // Calculate estimated start time
-      const totalBefore = cleanerScheduledMinutes[best.id];
-      const startTime = addMinutesToTime(DEFAULT_CHECKOUT, totalBefore + travel);
-
       task.assigned_cleaner_id = best.id;
       task.status = "scheduled";
-      task.estimated_start_time = startTime;
-      task.travel_time_from_previous_minutes = travel;
-
-      cleanerScheduledMinutes[best.id] += travel + task.cleaning_duration_minutes;
-      cleanerTaskList[best.id].push({ latitude: task.latitude, longitude: task.longitude });
+      cleanerBuckets[best.id].push(task);
+      cleanerScheduledMinutes[best.id] += task.cleaning_duration_minutes + 15;
       cleanerRegionCount[best.id][task.location_group] =
         (cleanerRegionCount[best.id][task.location_group] ?? 0) + 1;
     }
 
-    // 9. Insert tasks
-    if (newTasks.length > 0) {
-      const rows = newTasks.map((t) => ({
+    // 9. Route-optimise each cleaner's tasks using home location
+    for (const c of cleaners) {
+      const tasks = cleanerBuckets[c.id];
+      if (tasks.length === 0) continue;
+
+      const homeLat = c.home_latitude;
+      const homeLon = c.home_longitude;
+
+      if (tasks.length === 1) {
+        // Single task: travel from home
+        const travel = travelMinutes(homeLat, homeLon, tasks[0].latitude, tasks[0].longitude);
+        tasks[0].travel_time_from_previous_minutes = travel;
+        tasks[0].estimated_start_time = addMinutesToTime(DEFAULT_CHECKOUT, travel);
+        continue;
+      }
+
+      // Find the nearest task to home for the first job
+      const remaining = [...tasks];
+      const ordered: TaskInfo[] = [];
+
+      // First job: closest to home
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < remaining.length; i++) {
+        const d = haversineKm(
+          homeLat ?? 54.35, homeLon ?? -7.64,
+          remaining[i].latitude ?? 54.35, remaining[i].longitude ?? -7.64
+        );
+        if (d < bestDist) { bestDist = d; bestIdx = i; }
+      }
+      ordered.push(remaining.splice(bestIdx, 1)[0]);
+
+      // Middle jobs: nearest-next (but hold back the last pick for home-proximity check)
+      while (remaining.length > 1) {
+        const last = ordered[ordered.length - 1];
+        let nearestIdx = 0;
+        let nearestDist = Infinity;
+        for (let i = 0; i < remaining.length; i++) {
+          const d = haversineKm(
+            last.latitude ?? 54.35, last.longitude ?? -7.64,
+            remaining[i].latitude ?? 54.35, remaining[i].longitude ?? -7.64
+          );
+          if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
+        }
+        ordered.push(remaining.splice(nearestIdx, 1)[0]);
+      }
+
+      // Last job: the remaining one (if only 1 left, just add it)
+      // If there were exactly 2 remaining at some point, prefer the one closer to home as last
+      if (remaining.length === 1) {
+        ordered.push(remaining[0]);
+      }
+
+      // Calculate travel times and estimated start times
+      const firstTravel = travelMinutes(homeLat, homeLon, ordered[0].latitude, ordered[0].longitude);
+      ordered[0].travel_time_from_previous_minutes = firstTravel;
+      ordered[0].estimated_start_time = addMinutesToTime(DEFAULT_CHECKOUT, firstTravel);
+
+      let currentTime = addMinutesToTime(DEFAULT_CHECKOUT, firstTravel + ordered[0].cleaning_duration_minutes);
+
+      for (let i = 1; i < ordered.length; i++) {
+        const travel = travelMinutes(
+          ordered[i - 1].latitude, ordered[i - 1].longitude,
+          ordered[i].latitude, ordered[i].longitude
+        );
+        ordered[i].travel_time_from_previous_minutes = travel;
+        ordered[i].estimated_start_time = addMinutesToTime(currentTime, travel);
+        currentTime = addMinutesToTime(currentTime, travel + ordered[i].cleaning_duration_minutes);
+      }
+
+      // Replace tasks in bucket with ordered version
+      cleanerBuckets[c.id] = ordered;
+    }
+
+    // 10. Insert tasks
+    const allOrderedTasks = Object.values(cleanerBuckets).flat();
+    // Also include unassigned tasks
+    const unassignedTasks = newTasks.filter(t => t.status === "unassigned");
+    const allTasks = [...allOrderedTasks, ...unassignedTasks];
+
+    if (allTasks.length > 0) {
+      const rows = allTasks.map((t) => ({
         listing_id: t.listing_id,
         reservation_id: t.reservation_id,
         scheduled_date: t.scheduled_date,
@@ -280,7 +352,7 @@ Deno.serve(async (req) => {
       if (insertErr) throw insertErr;
     }
 
-    // 10. Set is_clean = false for all checkout listings
+    // 11. Set is_clean = false for all checkout listings
     if (listingIds.length > 0) {
       const { error: updateErr } = await supabase
         .from("listings")
@@ -289,9 +361,9 @@ Deno.serve(async (req) => {
       if (updateErr) throw updateErr;
     }
 
-    // 11. Log the run
+    // 12. Log the run
     await supabase.from("automation_logs").insert({
-      tasks_created: newTasks.length,
+      tasks_created: allTasks.length,
       tasks_unassigned: unassignedCount,
       status: "success",
       triggered_by: "edge_function",
@@ -299,7 +371,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        tasks_created: newTasks.length,
+        tasks_created: allTasks.length,
         tasks_unassigned: unassignedCount,
         date: targetDate,
       }),
@@ -325,7 +397,6 @@ Deno.serve(async (req) => {
 
 function todayLondon(): string {
   const now = new Date();
-  // Simple Europe/London approximation — use Intl for accurate TZ
   const londonStr = now.toLocaleDateString("en-CA", { timeZone: "Europe/London" });
-  return londonStr; // Returns YYYY-MM-DD
+  return londonStr;
 }

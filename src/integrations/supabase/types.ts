@@ -144,6 +144,9 @@ export type Database = {
           created_at: string
           daily_working_hours: number
           email: string | null
+          home_latitude: number | null
+          home_longitude: number | null
+          home_postcode: string | null
           id: string
           location_groups: string[] | null
           name: string
@@ -161,6 +164,9 @@ export type Database = {
           created_at?: string
           daily_working_hours?: number
           email?: string | null
+          home_latitude?: number | null
+          home_longitude?: number | null
+          home_postcode?: string | null
           id?: string
           location_groups?: string[] | null
           name: string
@@ -178,6 +184,9 @@ export type Database = {
           created_at?: string
           daily_working_hours?: number
           email?: string | null
+          home_latitude?: number | null
+          home_longitude?: number | null
+          home_postcode?: string | null
           id?: string
           location_groups?: string[] | null
           name?: string

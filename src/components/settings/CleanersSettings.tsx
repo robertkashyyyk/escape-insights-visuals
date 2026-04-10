@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, SprayCan, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, SprayCan, AlertTriangle, Loader2 } from "lucide-react";
 
 const LOCATION_GROUPS = ["Castle Hume", "Belfast", "Enniskillen", "North Coast", "Portstewart Coast", "Larne", "Kesh", "Other"];
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -28,6 +28,9 @@ interface Cleaner {
   active: boolean;
   notify_email: boolean;
   notify_whatsapp: boolean;
+  home_postcode: string | null;
+  home_latitude: number | null;
+  home_longitude: number | null;
 }
 
 type CleanerForm = Omit<Cleaner, "id" | "region">;
@@ -37,6 +40,7 @@ const empty: CleanerForm = {
   location_groups: [], workload_share: {},
   non_working_days: [], daily_working_hours: 8, rate_per_clean: 0, active: true,
   notify_email: false, notify_whatsapp: false,
+  home_postcode: "", home_latitude: null, home_longitude: null,
 };
 
 /** Get sum of workload_share for a group across all cleaners, excluding one cleaner by id */
@@ -62,6 +66,8 @@ export function CleanersSettings() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Cleaner | null>(null);
   const [form, setForm] = useState<CleanerForm>(empty);
+  const [geocoding, setGeocoding] = useState(false);
+  const [geocodeResult, setGeocodeResult] = useState<string | null>(null);
 
   const fetchCleaners = async () => {
     const { data } = await supabase.from("cleaners" as any).select("*").order("name");
@@ -75,7 +81,7 @@ export function CleanersSettings() {
 
   useEffect(() => { fetchCleaners(); }, []);
 
-  const openNew = () => { setEditing(null); setForm(empty); setOpen(true); };
+  const openNew = () => { setEditing(null); setForm(empty); setGeocodeResult(null); setOpen(true); };
   const openEdit = (c: Cleaner) => {
     setEditing(c);
     setForm({
@@ -87,8 +93,35 @@ export function CleanersSettings() {
       rate_per_clean: c.rate_per_clean, active: c.active,
       notify_email: c.notify_email ?? false,
       notify_whatsapp: c.notify_whatsapp ?? false,
+      home_postcode: c.home_postcode || "",
+      home_latitude: c.home_latitude,
+      home_longitude: c.home_longitude,
     });
+    setGeocodeResult(c.home_latitude ? "📍 Coordinates loaded" : null);
     setOpen(true);
+  };
+
+  const geocodePostcode = async (postcode: string) => {
+    if (!postcode.trim()) return;
+    setGeocoding(true);
+    setGeocodeResult(null);
+    try {
+      // Use postcodes.io — free, accurate for UK/NI postcodes
+      const res = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode.trim().replace(/\s+/g, ""))}`);
+      const data = await res.json();
+      if (data.status === 200 && data.result) {
+        const { latitude, longitude, admin_district, admin_county } = data.result;
+        const parts = [admin_district, admin_county].filter(Boolean);
+        setForm(f => ({ ...f, home_latitude: latitude, home_longitude: longitude }));
+        setGeocodeResult(`📍 ${parts.join(", ") || "Location found"}`);
+      } else {
+        setGeocodeResult("❌ Postcode not found");
+      }
+    } catch {
+      setGeocodeResult("❌ Geocoding failed");
+    } finally {
+      setGeocoding(false);
+    }
   };
 
   // Compute save-time warnings for under-allocated groups
@@ -117,6 +150,9 @@ export function CleanersSettings() {
       notify_email: form.notify_email,
       notify_whatsapp: form.notify_whatsapp,
       region: form.location_groups[0] || "Other",
+      home_postcode: form.home_postcode || null,
+      home_latitude: form.home_latitude,
+      home_longitude: form.home_longitude,
     };
     if (editing) {
       await (supabase.from("cleaners" as any) as any).update(payload).eq("id", editing.id);
@@ -207,6 +243,7 @@ export function CleanersSettings() {
                   {c.phone && <p>📞 {c.phone}</p>}
                   {c.email && <p>✉️ {c.email}</p>}
                   <p>{c.daily_working_hours ?? 8}h/day · £{c.rate_per_clean}/clean</p>
+                  {c.home_postcode && <p>🏠 {c.home_postcode}</p>}
                   {c.location_groups?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1">
                       {c.location_groups.map(g => (
@@ -243,6 +280,30 @@ export function CleanersSettings() {
                 <Label className="text-xs">Email</Label>
                 <Input value={form.email || ""} onChange={e => setForm({ ...form, email: e.target.value })} className="bg-secondary/50 border-border/40" />
               </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Home Postcode</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={form.home_postcode || ""}
+                  onChange={e => setForm({ ...form, home_postcode: e.target.value })}
+                  placeholder="e.g. BT93 1UJ"
+                  className="bg-secondary/50 border-border/40 flex-1"
+                />
+                <Button
+                  type="button" size="sm" variant="outline"
+                  onClick={() => geocodePostcode(form.home_postcode || "")}
+                  disabled={geocoding || !form.home_postcode?.trim()}
+                  className="h-9 text-xs"
+                >
+                  {geocoding ? <Loader2 className="h-3 w-3 animate-spin" /> : "Locate"}
+                </Button>
+              </div>
+              {geocodeResult && (
+                <p className={`text-[11px] ${geocodeResult.startsWith("📍") ? "text-emerald-400" : "text-red-400"}`}>
+                  {geocodeResult}
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">

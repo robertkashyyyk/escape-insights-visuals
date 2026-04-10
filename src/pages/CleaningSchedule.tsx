@@ -258,6 +258,12 @@ function CleanerSection({ cleanerDay, cleaners, onComplete }: { cleanerDay: Clea
       </div>
 
       <div className="ml-4 border-l-2 border-border/20 pl-4 space-y-1">
+        {/* Home → First property */}
+        {cleanerDay.homeToFirstMinutes != null && cleanerDay.tasks.length > 0 && (
+          <div className="flex items-center gap-1.5 py-1.5 text-[11px] text-muted-foreground/70">
+            <span>🏠 Home → {cleanerDay.tasks[0].propertyName} · ~{cleanerDay.homeToFirstMinutes} min</span>
+          </div>
+        )}
         {cleanerDay.tasks.map((task) => (
           <div key={task.id}>
             {task.travelMinutes != null && task.travelMinutes > 0 && (
@@ -270,6 +276,12 @@ function CleanerSection({ cleanerDay, cleaners, onComplete }: { cleanerDay: Clea
             <TaskCard task={task} cleaners={cleaners} onComplete={onComplete} />
           </div>
         ))}
+        {/* Last property → Home */}
+        {cleanerDay.lastToHomeMinutes != null && cleanerDay.tasks.length > 0 && (
+          <div className="flex items-center gap-1.5 py-1.5 text-[11px] text-muted-foreground/70">
+            <span>{cleanerDay.tasks[cleanerDay.tasks.length - 1].propertyName} → 🏠 Home · ~{cleanerDay.lastToHomeMinutes} min</span>
+          </div>
+        )}
       </div>
     </div>
   );
