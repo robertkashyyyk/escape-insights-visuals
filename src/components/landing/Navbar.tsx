@@ -17,7 +17,7 @@ export function Navbar() {
   const navLinks = [
     { label: "Features", href: "#features" },
     { label: "Pricing", href: "#pricing" },
-    { label: "About", href: "#story" },
+    { label: "Testimonial", href: "#testimonial" },
   ];
 
   return (
@@ -37,7 +37,6 @@ export function Navbar() {
           <span className="text-primary"> Grids</span>
         </a>
 
-        {/* Desktop */}
         <div className="hidden md:flex items-center gap-8">
           {navLinks.map((l) => (
             <a
@@ -53,7 +52,6 @@ export function Navbar() {
           </Button>
         </div>
 
-        {/* Mobile toggle */}
         <button
           className="md:hidden text-foreground"
           onClick={() => setMobileOpen(!mobileOpen)}
@@ -62,7 +60,6 @@ export function Navbar() {
         </button>
       </div>
 
-      {/* Mobile menu */}
       {mobileOpen && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
