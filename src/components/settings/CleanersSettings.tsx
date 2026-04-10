@@ -69,6 +69,7 @@ export function CleanersSettings() {
   const [form, setForm] = useState<CleanerForm>(empty);
   const [geocoding, setGeocoding] = useState(false);
   const [geocodeResult, setGeocodeResult] = useState<string | null>(null);
+  const [enablingLogin, setEnablingLogin] = useState<string | null>(null);
 
   const fetchCleaners = async () => {
     const { data } = await supabase.from("cleaners" as any).select("*").order("name");
