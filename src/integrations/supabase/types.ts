@@ -311,6 +311,45 @@ export type Database = {
           },
         ]
       }
+      orin_briefs: {
+        Row: {
+          content: Json | null
+          created_at: string
+          generated_at: string | null
+          id: string
+          period_end: string
+          period_label: string
+          period_start: string
+          period_type: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          content?: Json | null
+          created_at?: string
+          generated_at?: string | null
+          id?: string
+          period_end: string
+          period_label: string
+          period_start: string
+          period_type: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          content?: Json | null
+          created_at?: string
+          generated_at?: string | null
+          id?: string
+          period_end?: string
+          period_label?: string
+          period_start?: string
+          period_type?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null

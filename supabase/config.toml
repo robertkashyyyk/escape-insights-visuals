@@ -1,1 +1,4 @@
 project_id = "pftqjrmdksrrpczhomln"
+
+[functions.generate-orin-brief]
+verify_jwt = false
