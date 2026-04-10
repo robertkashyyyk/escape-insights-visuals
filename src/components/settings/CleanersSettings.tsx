@@ -26,6 +26,8 @@ interface Cleaner {
   daily_working_hours: number | null;
   rate_per_clean: number | null;
   active: boolean;
+  notify_email: boolean;
+  notify_whatsapp: boolean;
 }
 
 type CleanerForm = Omit<Cleaner, "id" | "region">;
@@ -34,6 +36,7 @@ const empty: CleanerForm = {
   name: "", phone: "", email: "",
   location_groups: [], workload_share: {},
   non_working_days: [], daily_working_hours: 8, rate_per_clean: 0, active: true,
+  notify_email: false, notify_whatsapp: false,
 };
 
 /** Get sum of workload_share for a group across all cleaners, excluding one cleaner by id */
@@ -82,6 +85,8 @@ export function CleanersSettings() {
       non_working_days: c.non_working_days || [],
       daily_working_hours: c.daily_working_hours,
       rate_per_clean: c.rate_per_clean, active: c.active,
+      notify_email: c.notify_email ?? false,
+      notify_whatsapp: c.notify_whatsapp ?? false,
     });
     setOpen(true);
   };
@@ -109,6 +114,8 @@ export function CleanersSettings() {
       non_working_days: form.non_working_days,
       daily_working_hours: form.daily_working_hours,
       rate_per_clean: form.rate_per_clean, active: form.active,
+      notify_email: form.notify_email,
+      notify_whatsapp: form.notify_whatsapp,
       region: form.location_groups[0] || "Other",
     };
     if (editing) {
