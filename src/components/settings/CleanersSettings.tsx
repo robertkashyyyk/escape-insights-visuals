@@ -23,7 +23,7 @@ interface Cleaner {
   location_groups: string[];
   workload_share: Record<string, number>;
   non_working_days: string[];
-  max_cleans_per_day: number | null;
+  daily_working_hours: number | null;
   rate_per_clean: number | null;
   active: boolean;
 }
@@ -33,7 +33,7 @@ type CleanerForm = Omit<Cleaner, "id" | "region">;
 const empty: CleanerForm = {
   name: "", phone: "", email: "",
   location_groups: [], workload_share: {},
-  non_working_days: [], max_cleans_per_day: 3, rate_per_clean: 0, active: true,
+  non_working_days: [], daily_working_hours: 8, rate_per_clean: 0, active: true,
 };
 
 /** Get sum of workload_share for a group across all cleaners, excluding one cleaner by id */
@@ -80,7 +80,7 @@ export function CleanersSettings() {
       location_groups: c.location_groups || [],
       workload_share: c.workload_share || {},
       non_working_days: c.non_working_days || [],
-      max_cleans_per_day: c.max_cleans_per_day,
+      daily_working_hours: c.daily_working_hours,
       rate_per_clean: c.rate_per_clean, active: c.active,
     });
     setOpen(true);
@@ -107,7 +107,7 @@ export function CleanersSettings() {
       location_groups: form.location_groups,
       workload_share: form.workload_share,
       non_working_days: form.non_working_days,
-      max_cleans_per_day: form.max_cleans_per_day,
+      daily_working_hours: form.daily_working_hours,
       rate_per_clean: form.rate_per_clean, active: form.active,
       region: form.location_groups[0] || "Other",
     };
@@ -199,7 +199,7 @@ export function CleanersSettings() {
                 <div className="text-xs text-muted-foreground space-y-0.5">
                   {c.phone && <p>📞 {c.phone}</p>}
                   {c.email && <p>✉️ {c.email}</p>}
-                  <p>Max {c.max_cleans_per_day}/day · £{c.rate_per_clean}/clean</p>
+                  <p>{c.daily_working_hours ?? 8}h/day · £{c.rate_per_clean}/clean</p>
                   {c.location_groups?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1">
                       {c.location_groups.map(g => (
@@ -239,8 +239,8 @@ export function CleanersSettings() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">Max Cleans / Day</Label>
-                <Input type="number" min={1} value={form.max_cleans_per_day ?? 3} onChange={e => setForm({ ...form, max_cleans_per_day: parseInt(e.target.value) || 1 })} className="bg-secondary/50 border-border/40" />
+                <Label className="text-xs">Daily Working Hours</Label>
+                <Input type="number" min={1} max={16} step={0.5} value={form.daily_working_hours ?? 8} onChange={e => setForm({ ...form, daily_working_hours: parseFloat(e.target.value) || 8 })} className="bg-secondary/50 border-border/40" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Rate per Clean (£)</Label>

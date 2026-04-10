@@ -217,22 +217,35 @@ export default function CleaningSchedule() {
 
 /* ── Cleaner Section ── */
 function CleanerSection({ cleanerDay, cleaners }: { cleanerDay: CleanerDay; cleaners: any[] }) {
+  const totalHours = Math.floor(cleanerDay.totalScheduledMinutes / 60);
+  const totalMins = cleanerDay.totalScheduledMinutes % 60;
+  const maxMinutes = cleanerDay.dailyWorkingHours * 60;
+  const utilisation = maxMinutes > 0 ? (cleanerDay.totalScheduledMinutes / maxMinutes) * 100 : 0;
+  const isHigh = utilisation >= 80;
+
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
           <span className="text-xs font-bold text-primary">{cleanerDay.name.charAt(0)}</span>
         </div>
-        <div>
+        <div className="flex-1">
           <h3 className="text-sm font-display font-semibold text-foreground">{cleanerDay.name}</h3>
-          <p className="text-[10px] text-muted-foreground">
-            {cleanerDay.tasks.length} / {cleanerDay.maxPerDay} cleans
-          </p>
+          <div className="flex items-center gap-2 mt-0.5">
+            <p className={`text-[10px] ${isHigh ? "text-amber-400 font-semibold" : "text-muted-foreground"}`}>
+              {totalHours}h {totalMins}m / {cleanerDay.dailyWorkingHours}h working day
+            </p>
+            <div className="w-20 h-1.5 rounded-full bg-secondary overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${isHigh ? "bg-amber-400" : "bg-primary"}`}
+                style={{ width: `${Math.min(100, utilisation)}%` }}
+              />
+            </div>
+          </div>
         </div>
         <div className="ml-auto">
-          <Badge variant="outline" className="text-[10px] border-primary/30 text-primary">
-            {Math.round(cleanerDay.tasks.reduce((s, t) => s + t.cleaningDuration, 0) / 60)}h{" "}
-            {cleanerDay.tasks.reduce((s, t) => s + t.cleaningDuration, 0) % 60}m total
+          <Badge variant="outline" className={`text-[10px] ${isHigh ? "border-amber-500/30 text-amber-400" : "border-primary/30 text-primary"}`}>
+            {Math.round(utilisation)}% capacity
           </Badge>
         </div>
       </div>

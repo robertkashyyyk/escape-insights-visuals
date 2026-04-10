@@ -31,7 +31,8 @@ export interface CleanTask {
 export interface CleanerDay {
   id: string;
   name: string;
-  maxPerDay: number;
+  dailyWorkingHours: number;
+  totalScheduledMinutes: number;
   tasks: CleanTask[];
 }
 
@@ -48,7 +49,7 @@ interface Cleaner {
   location_groups: string[];
   workload_share: Record<string, number>;
   non_working_days: string[];
-  max_cleans_per_day: number;
+  daily_working_hours: number;
   rate_per_clean: number;
   active: boolean;
 }
@@ -75,7 +76,7 @@ interface Reservation {
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DEFAULT_CHECKOUT = "10:00";
 const DEFAULT_CHECKIN = "15:00";
-const AVG_SPEED_MPH = 30;
+const AVG_SPEED_KMH = 40;
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
@@ -88,8 +89,7 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 function travelMinutes(lat1: number | null, lon1: number | null, lat2: number | null, lon2: number | null): number {
   if (!lat1 || !lon1 || !lat2 || !lon2) return 15;
   const km = haversineKm(lat1, lon1, lat2, lon2);
-  const miles = km * 0.621371;
-  return Math.ceil((miles / AVG_SPEED_MPH) * 60);
+  return Math.round((km / AVG_SPEED_KMH) * 60);
 }
 
 function addMinutesToTime(time: string, mins: number): string {
@@ -123,7 +123,7 @@ export function useCleaningSchedule() {
         location_groups: c.location_groups || [],
         workload_share: c.workload_share || {},
         non_working_days: c.non_working_days || [],
-        max_cleans_per_day: c.max_cleans_per_day ?? 3,
+        daily_working_hours: c.daily_working_hours ?? 8,
         rate_per_clean: c.rate_per_clean ?? 0,
         active: c.active,
       }));
@@ -222,11 +222,16 @@ export function useCleaningSchedule() {
     tasks.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
     // Auto-allocate
+    // Track scheduled minutes per cleaner for capacity checks
+    const cleanerScheduledMinutes: Record<string, number> = {};
     const cleanerTaskCount: Record<string, number> = {};
     const cleanerTotalForRegion: Record<string, Record<string, number>> = {};
+    const cleanerTaskList: Record<string, CleanTask[]> = {};
 
     cleaners.forEach(c => {
+      cleanerScheduledMinutes[c.id] = 0;
       cleanerTaskCount[c.id] = 0;
+      cleanerTaskList[c.id] = [];
       cleanerTotalForRegion[c.id] = {};
       c.location_groups.forEach(lg => { cleanerTotalForRegion[c.id][lg] = 0; });
     });
@@ -235,7 +240,14 @@ export function useCleaningSchedule() {
       const eligible = cleaners.filter(c => {
         if (!c.location_groups.includes(task.locationGroup)) return false;
         if (c.non_working_days.includes(dayName)) return false;
-        if (cleanerTaskCount[c.id] >= c.max_cleans_per_day) return false;
+        // Check hours-based capacity: estimate travel from last task + cleaning duration
+        const lastTask = cleanerTaskList[c.id]?.[cleanerTaskList[c.id].length - 1];
+        const travel = lastTask
+          ? travelMinutes(lastTask.latitude, lastTask.longitude, task.latitude, task.longitude)
+          : 0;
+        const projectedMinutes = cleanerScheduledMinutes[c.id] + travel + task.cleaningDuration;
+        const maxMinutes = (c.daily_working_hours ?? 8) * 60;
+        if (projectedMinutes > maxMinutes) return false;
         return true;
       });
 
@@ -261,21 +273,31 @@ export function useCleaningSchedule() {
         }
       }
 
+      // Calculate travel from last assigned task for the best cleaner
+      const lastTask = cleanerTaskList[bestCleaner.id]?.[cleanerTaskList[bestCleaner.id].length - 1];
+      const travelMins = lastTask
+        ? travelMinutes(lastTask.latitude, lastTask.longitude, task.latitude, task.longitude)
+        : 0;
+
       task.assignedCleanerId = bestCleaner.id;
       task.assignedCleanerName = bestCleaner.name;
       task.status = "scheduled";
+      task.travelMinutes = travelMins > 0 ? travelMins : undefined;
       cleanerTaskCount[bestCleaner.id]++;
+      cleanerScheduledMinutes[bestCleaner.id] += travelMins + task.cleaningDuration;
+      cleanerTaskList[bestCleaner.id].push(task);
       cleanerTotalForRegion[bestCleaner.id][task.locationGroup] = (cleanerTotalForRegion[bestCleaner.id][task.locationGroup] ?? 0) + 1;
     }
 
     // Route optimization per cleaner (nearest-neighbor)
     const cleanerDays: CleanerDay[] = cleaners.map(c => {
       const cTasks = tasks.filter(t => t.assignedCleanerId === c.id);
+      const totalMins = cleanerScheduledMinutes[c.id] ?? 0;
       if (cTasks.length <= 1) {
         if (cTasks.length === 1) {
           cTasks[0].estimatedStart = DEFAULT_CHECKOUT;
         }
-        return { id: c.id, name: c.name, maxPerDay: c.max_cleans_per_day, tasks: cTasks };
+        return { id: c.id, name: c.name, dailyWorkingHours: c.daily_working_hours, totalScheduledMinutes: totalMins, tasks: cTasks };
       }
 
       const ordered: CleanTask[] = [];
@@ -306,7 +328,7 @@ export function useCleaningSchedule() {
         }
       }
 
-      return { id: c.id, name: c.name, maxPerDay: c.max_cleans_per_day, tasks: ordered };
+      return { id: c.id, name: c.name, dailyWorkingHours: c.daily_working_hours, totalScheduledMinutes: totalMins, tasks: ordered };
     }).filter(cd => cd.tasks.length > 0);
 
     const unassigned = tasks.filter(t => t.status === "unassigned");
