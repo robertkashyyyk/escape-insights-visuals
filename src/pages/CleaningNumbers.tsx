@@ -45,8 +45,8 @@ export default function CleaningNumbers() {
   const { data: cleaners = [] } = useQuery({
     queryKey: ["cleaners-numbers"],
     queryFn: async () => {
-      const { data } = await supabase.from("cleaners" as any).select("id, name, rate_per_clean, active").eq("active", true).order("name");
-      return (data || []) as CleanerInfo[];
+      const { data } = await supabase.from("cleaners" as any).select("*").eq("active", true).order("name");
+      return ((data || []) as any[]).map((c: any): CleanerInfo => ({ id: c.id, name: c.name, rate_per_clean: c.rate_per_clean ?? 0, active: c.active }));
     },
   });
 

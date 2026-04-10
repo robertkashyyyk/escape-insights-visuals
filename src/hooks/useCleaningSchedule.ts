@@ -543,5 +543,6 @@ export function useCleaningSchedule() {
     weekSummary, monthlyInvoice, cleaners, locationGroups,
     totalTasks: daySchedule.tasks.length,
     regenerate, completeTask, goBack, goForward, isToday, isRegenerating,
+    buildDaySchedule,
   };
 }
