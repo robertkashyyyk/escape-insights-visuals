@@ -27,6 +27,8 @@ export function PropertiesTable() {
   });
 
   const filtered = listings?.filter((l) => {
+    if (cleanFilter === "clean" && l.is_clean === false) return false;
+    if (cleanFilter === "dirty" && l.is_clean !== false) return false;
     const q = search.toLowerCase();
     return (
       l.name.toLowerCase().includes(q) ||
@@ -51,6 +53,17 @@ export function PropertiesTable() {
             className="pl-9"
           />
         </div>
+        <ToggleGroup
+          type="single"
+          value={cleanFilter}
+          onValueChange={(v) => v && setCleanFilter(v)}
+          size="sm"
+          className="border border-border rounded-lg p-0.5"
+        >
+          <ToggleGroupItem value="all" className="text-xs px-3">All</ToggleGroupItem>
+          <ToggleGroupItem value="clean" className="text-xs px-3">Clean</ToggleGroupItem>
+          <ToggleGroupItem value="dirty" className="text-xs px-3">Dirty</ToggleGroupItem>
+        </ToggleGroup>
         <Button onClick={() => setShowAdd(true)} size="sm">
           <Plus className="h-4 w-4 mr-1.5" /> Add Property
         </Button>
