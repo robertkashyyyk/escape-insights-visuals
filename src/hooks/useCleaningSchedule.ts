@@ -248,7 +248,15 @@ export function useCleaningSchedule() {
       const cleanerDays: CleanerDay[] = cleaners.map(c => {
         const cTasks = tasks.filter(t => t.assignedCleanerId === c.id);
         const totalMins = cTasks.reduce((s, t) => s + t.cleaningDuration + (t.travelMinutes ?? 0), 0);
-        return { id: c.id, name: c.name, dailyWorkingHours: c.daily_working_hours, totalScheduledMinutes: totalMins, tasks: cTasks };
+        const firstTask = cTasks[0];
+        const lastTask = cTasks[cTasks.length - 1];
+        const homeToFirst = firstTask ? travelMinutes(c.home_latitude, c.home_longitude, firstTask.latitude, firstTask.longitude) : undefined;
+        const lastToHome = lastTask ? travelMinutes(lastTask.latitude, lastTask.longitude, c.home_latitude, c.home_longitude) : undefined;
+        return {
+          id: c.id, name: c.name, dailyWorkingHours: c.daily_working_hours, totalScheduledMinutes: totalMins, tasks: cTasks,
+          homeLatitude: c.home_latitude, homeLongitude: c.home_longitude,
+          homeToFirstMinutes: homeToFirst, lastToHomeMinutes: lastToHome,
+        };
       }).filter(cd => cd.tasks.length > 0);
 
       const unassigned = tasks.filter(t => t.status === "unassigned");
@@ -351,19 +359,42 @@ export function useCleaningSchedule() {
       cleanerTotalForRegion[bestCleaner.id][task.locationGroup] = (cleanerTotalForRegion[bestCleaner.id][task.locationGroup] ?? 0) + 1;
     }
 
-    // Route optimization per cleaner
+    // Route optimization per cleaner (using home location)
     const cleanerDays: CleanerDay[] = cleaners.map(c => {
       const cTasks = tasks.filter(t => t.assignedCleanerId === c.id);
       const totalMins = cleanerScheduledMinutes[c.id] ?? 0;
-      if (cTasks.length <= 1) {
-        if (cTasks.length === 1) cTasks[0].estimatedStart = DEFAULT_CHECKOUT;
-        return { id: c.id, name: c.name, dailyWorkingHours: c.daily_working_hours, totalScheduledMinutes: totalMins, tasks: cTasks };
+
+      if (cTasks.length === 0) {
+        return { id: c.id, name: c.name, dailyWorkingHours: c.daily_working_hours, totalScheduledMinutes: totalMins, tasks: cTasks, homeLatitude: c.home_latitude, homeLongitude: c.home_longitude };
       }
 
+      if (cTasks.length === 1) {
+        const homeTravel = travelMinutes(c.home_latitude, c.home_longitude, cTasks[0].latitude, cTasks[0].longitude);
+        cTasks[0].estimatedStart = addMinutesToTime(DEFAULT_CHECKOUT, homeTravel);
+        cTasks[0].travelMinutes = homeTravel;
+        return {
+          id: c.id, name: c.name, dailyWorkingHours: c.daily_working_hours, totalScheduledMinutes: totalMins, tasks: cTasks,
+          homeLatitude: c.home_latitude, homeLongitude: c.home_longitude,
+          homeToFirstMinutes: homeTravel,
+          lastToHomeMinutes: travelMinutes(cTasks[0].latitude, cTasks[0].longitude, c.home_latitude, c.home_longitude),
+        };
+      }
+
+      // Route: start nearest to home, nearest-next for middle, last goes home
       const ordered: CleanTask[] = [];
       const remaining = [...cTasks];
-      ordered.push(remaining.shift()!);
-      while (remaining.length > 0) {
+
+      // First: nearest to home
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < remaining.length; i++) {
+        const d = haversineKm(c.home_latitude ?? 54.35, c.home_longitude ?? -7.64, remaining[i].latitude ?? 54.35, remaining[i].longitude ?? -7.64);
+        if (d < bestDist) { bestDist = d; bestIdx = i; }
+      }
+      ordered.push(remaining.splice(bestIdx, 1)[0]);
+
+      // Middle: nearest-next
+      while (remaining.length > 1) {
         const last = ordered[ordered.length - 1];
         let nearestIdx = 0;
         let nearestDist = Infinity;
@@ -374,17 +405,30 @@ export function useCleaningSchedule() {
         ordered.push(remaining.splice(nearestIdx, 1)[0]);
       }
 
-      let currentTime = DEFAULT_CHECKOUT;
-      for (let i = 0; i < ordered.length; i++) {
+      // Last task
+      if (remaining.length === 1) ordered.push(remaining[0]);
+
+      // Calculate times from home
+      const homeToFirst = travelMinutes(c.home_latitude, c.home_longitude, ordered[0].latitude, ordered[0].longitude);
+      ordered[0].travelMinutes = homeToFirst;
+      let currentTime = addMinutesToTime(DEFAULT_CHECKOUT, homeToFirst);
+      ordered[0].estimatedStart = currentTime;
+
+      for (let i = 1; i < ordered.length; i++) {
+        const travel = travelMinutes(ordered[i - 1].latitude, ordered[i - 1].longitude, ordered[i].latitude, ordered[i].longitude);
+        ordered[i].travelMinutes = travel;
+        currentTime = addMinutesToTime(currentTime, ordered[i - 1].cleaningDuration + travel);
         ordered[i].estimatedStart = currentTime;
-        if (i < ordered.length - 1) {
-          const travel = travelMinutes(ordered[i].latitude, ordered[i].longitude, ordered[i + 1].latitude, ordered[i + 1].longitude);
-          ordered[i + 1].travelMinutes = travel;
-          currentTime = addMinutesToTime(currentTime, ordered[i].cleaningDuration + travel);
-        }
       }
 
-      return { id: c.id, name: c.name, dailyWorkingHours: c.daily_working_hours, totalScheduledMinutes: totalMins, tasks: ordered };
+      const lastTask = ordered[ordered.length - 1];
+      const lastToHome = travelMinutes(lastTask.latitude, lastTask.longitude, c.home_latitude, c.home_longitude);
+
+      return {
+        id: c.id, name: c.name, dailyWorkingHours: c.daily_working_hours, totalScheduledMinutes: totalMins, tasks: ordered,
+        homeLatitude: c.home_latitude, homeLongitude: c.home_longitude,
+        homeToFirstMinutes: homeToFirst, lastToHomeMinutes: lastToHome,
+      };
     }).filter(cd => cd.tasks.length > 0);
 
     const unassigned = tasks.filter(t => t.status === "unassigned");
