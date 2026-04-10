@@ -175,14 +175,23 @@ export function ReservationsTable() {
     setPage(0);
   };
 
-  const hasFilters = yearFilter !== "all" || propertyFilter !== "all" || locationFilter !== "all" || statusFilter !== "all" || platformFilter !== "all";
+  const hasFilters = timeFilter !== "all" || yearFilter !== "all" || propertyFilter !== "all" || locationFilter !== "all" || statusFilter !== "all" || platformFilter !== "all";
 
   const clearFilters = () => {
+    setTimeFilter("all");
     setYearFilter("all");
     setPropertyFilter("all");
     setLocationFilter("all");
     setStatusFilter("all");
     setPlatformFilter("all");
+    setSortDir("desc");
+    setPage(0);
+  };
+
+  const handleTimeFilter = (mode: "all" | "future" | "past") => {
+    setTimeFilter(mode);
+    setSortKey("check_in");
+    setSortDir(mode === "future" ? "asc" : "desc");
     setPage(0);
   };
 
