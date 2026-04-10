@@ -123,7 +123,7 @@ export function useCleaningSchedule() {
         location_groups: c.location_groups || [],
         workload_share: c.workload_share || {},
         non_working_days: c.non_working_days || [],
-        max_cleans_per_day: c.max_cleans_per_day ?? 3,
+        daily_working_hours: c.daily_working_hours ?? 8,
         rate_per_clean: c.rate_per_clean ?? 0,
         active: c.active,
       }));
@@ -222,11 +222,16 @@ export function useCleaningSchedule() {
     tasks.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
     // Auto-allocate
+    // Track scheduled minutes per cleaner for capacity checks
+    const cleanerScheduledMinutes: Record<string, number> = {};
     const cleanerTaskCount: Record<string, number> = {};
     const cleanerTotalForRegion: Record<string, Record<string, number>> = {};
+    const cleanerTaskList: Record<string, CleanTask[]> = {};
 
     cleaners.forEach(c => {
+      cleanerScheduledMinutes[c.id] = 0;
       cleanerTaskCount[c.id] = 0;
+      cleanerTaskList[c.id] = [];
       cleanerTotalForRegion[c.id] = {};
       c.location_groups.forEach(lg => { cleanerTotalForRegion[c.id][lg] = 0; });
     });
@@ -235,7 +240,14 @@ export function useCleaningSchedule() {
       const eligible = cleaners.filter(c => {
         if (!c.location_groups.includes(task.locationGroup)) return false;
         if (c.non_working_days.includes(dayName)) return false;
-        if (cleanerTaskCount[c.id] >= c.max_cleans_per_day) return false;
+        // Check hours-based capacity: estimate travel from last task + cleaning duration
+        const lastTask = cleanerTaskList[c.id]?.[cleanerTaskList[c.id].length - 1];
+        const travel = lastTask
+          ? travelMinutes(lastTask.latitude, lastTask.longitude, task.latitude, task.longitude)
+          : 0;
+        const projectedMinutes = cleanerScheduledMinutes[c.id] + travel + task.cleaningDuration;
+        const maxMinutes = (c.daily_working_hours ?? 8) * 60;
+        if (projectedMinutes > maxMinutes) return false;
         return true;
       });
 
@@ -261,10 +273,19 @@ export function useCleaningSchedule() {
         }
       }
 
+      // Calculate travel from last assigned task for the best cleaner
+      const lastTask = cleanerTaskList[bestCleaner.id]?.[cleanerTaskList[bestCleaner.id].length - 1];
+      const travelMins = lastTask
+        ? travelMinutes(lastTask.latitude, lastTask.longitude, task.latitude, task.longitude)
+        : 0;
+
       task.assignedCleanerId = bestCleaner.id;
       task.assignedCleanerName = bestCleaner.name;
       task.status = "scheduled";
+      task.travelMinutes = travelMins > 0 ? travelMins : undefined;
       cleanerTaskCount[bestCleaner.id]++;
+      cleanerScheduledMinutes[bestCleaner.id] += travelMins + task.cleaningDuration;
+      cleanerTaskList[bestCleaner.id].push(task);
       cleanerTotalForRegion[bestCleaner.id][task.locationGroup] = (cleanerTotalForRegion[bestCleaner.id][task.locationGroup] ?? 0) + 1;
     }
 
