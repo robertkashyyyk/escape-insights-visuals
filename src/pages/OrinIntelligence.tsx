@@ -159,7 +159,7 @@ function BriefDetail({ brief, onBack }: { brief: OrinBrief; onBack: () => void }
           <ChevronLeft className="h-4 w-4" /> Back to archive
         </button>
         <div className="text-center py-12">
-          <AlertTriangle className="h-8 w-8 text-red-400 mx-auto mb-3" />
+          <AlertTriangle className="h-8 w-8 text-destructive mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">This brief failed to generate.</p>
           <Button variant="outline" size="sm" className="mt-4" onClick={() => regenerate.mutate(brief)} disabled={regenerate.isPending}>
             {regenerate.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}

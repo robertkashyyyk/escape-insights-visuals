@@ -98,7 +98,7 @@ export function useGenerateBriefs() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (options?: { force?: boolean; specificPeriods?: any[] }) => {
+    mutationFn: async (options: { force?: boolean; specificPeriods?: any[] } = {}) => {
       const periods = options?.specificPeriods || getExpectedPeriods();
       if (periods.length === 0) {
         toast.info("No completed periods to generate briefs for.");
