@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Bed, Bath, Users, MapPin, PoundSterling, Brush, Building2, Wrench, Key, ClipboardList, Clock } from "lucide-react";
+import { ArrowLeft, Bed, Bath, Users, MapPin, PoundSterling, Brush, Building2, Wrench, Key, ClipboardList, Clock, SprayCan } from "lucide-react";
 
 const DURATION_OPTIONS = [60, 90, 120, 150, 180];
 
@@ -58,6 +58,7 @@ export default function PropertyDetail() {
   const operationalNotes = (listing as any).operational_notes;
   const troubleshootingNotes = (listing as any).troubleshooting_notes;
   const accessDetails = (listing as any).access_details;
+  const isClean = (listing as any).is_clean ?? true;
 
   return (
     <AppLayout>
@@ -69,7 +70,18 @@ export default function PropertyDetail() {
         <div className="glass-card rounded-xl border border-border/30 border-l-2 border-l-primary/60 p-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-display font-bold text-foreground">{listing.name}</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-display font-bold text-foreground">{listing.name}</h1>
+                {isClean ? (
+                  <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
+                    <SprayCan className="h-3 w-3 mr-1" /> Clean
+                  </Badge>
+                ) : (
+                  <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
+                    <SprayCan className="h-3 w-3 mr-1" /> Needs Cleaning
+                  </Badge>
+                )}
+              </div>
               {owner?.name && <p className="text-sm text-muted-foreground mt-1">Owned by {owner.name}</p>}
               <div className="flex flex-wrap gap-2 mt-3">
                 {listing.location_group && (
@@ -185,19 +197,19 @@ export default function PropertyDetail() {
             title="Access Details"
             icon={Key}
             content={accessDetails}
-            placeholder="No access details recorded. Add key safe codes, entry instructions, parking info, etc."
+            placeholder="No access details recorded."
           />
           <OperationalSection
             title="Operational Info"
             icon={ClipboardList}
             content={operationalNotes}
-            placeholder="No operational notes. Add bed sizes, boiler location, stopcock location, Wi-Fi details, etc."
+            placeholder="No operational notes."
           />
           <OperationalSection
             title="Troubleshooting"
             icon={Wrench}
             content={troubleshootingNotes}
-            placeholder="No troubleshooting notes. Add common issues and resolutions for this property."
+            placeholder="No troubleshooting notes."
           />
         </div>
 

@@ -1,8 +1,9 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { format } from "date-fns";
 import { useTodayData } from "@/hooks/useTodayData";
-import { Sparkles, LogOut, LogIn, AlertTriangle, PoundSterling, CalendarCheck, BarChart3, Loader2 } from "lucide-react";
+import { Sparkles, LogOut, LogIn, AlertTriangle, PoundSterling, CalendarCheck, BarChart3, Loader2, SprayCan } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Link } from "react-router-dom";
 
 export default function Today() {
   const { data, isLoading } = useTodayData();
@@ -25,7 +26,17 @@ export default function Today() {
           <div className="flex items-center gap-2">
             <StatChip label="Checkouts" value={isLoading ? "–" : String(data?.checkoutsToday ?? 0)} icon={<LogOut className="h-3.5 w-3.5" />} />
             <StatChip label="Check-ins" value={isLoading ? "–" : String(data?.checkinsToday ?? 0)} icon={<LogIn className="h-3.5 w-3.5" />} />
-            <StatChip label="Cleans" value="–" icon={<CalendarCheck className="h-3.5 w-3.5" />} muted />
+            <StatChip label="Cleans" value={isLoading ? "–" : String(data?.checkoutsToday ?? 0)} icon={<CalendarCheck className="h-3.5 w-3.5" />} />
+            {!isLoading && (data?.dirtyProperties ?? 0) > 0 && (
+              <Link to="/operations/cleaning">
+                <StatChip
+                  label="Needs Cleaning"
+                  value={String(data?.dirtyProperties ?? 0)}
+                  icon={<SprayCan className="h-3.5 w-3.5" />}
+                  alert
+                />
+              </Link>
+            )}
           </div>
         </div>
 
@@ -89,8 +100,8 @@ export default function Today() {
                 </h2>
               </div>
               <p className="text-sm text-foreground/80 leading-relaxed ml-3">
-                3 cleans scheduled today. July is pacing 14% behind last year on the North Coast. 
-                Devenish Manor No.27 has had no new bookings in 19 days. Consider a rate adjustment 
+                3 cleans scheduled today. July is pacing 14% behind last year on the North Coast.
+                Devenish Manor No.27 has had no new bookings in 19 days. Consider a rate adjustment
                 or running a last-minute promotion for gaps in the next 14 days.
               </p>
             </section>
@@ -102,20 +113,18 @@ export default function Today() {
               </h2>
               <div className="grid grid-cols-7 gap-2">
                 {data?.weekStrip.map((day, i) => {
-                  const isToday = i === 0;
+                  const isTodayDay = i === 0;
                   return (
                     <div
                       key={i}
                       className={`flex flex-col items-center gap-1.5 py-3 rounded-lg transition-colors ${
-                        isToday ? "bg-primary/10 ring-1 ring-primary/30" : "bg-secondary/30"
+                        isTodayDay ? "bg-primary/10 ring-1 ring-primary/30" : "bg-secondary/30"
                       }`}
                     >
-                      <span className={`text-[10px] uppercase font-medium tracking-wider ${
-                        isToday ? "text-primary" : "text-muted-foreground"
-                      }`}>
+                      <span className={`text-[10px] uppercase font-medium tracking-wider ${isTodayDay ? "text-primary" : "text-muted-foreground"}`}>
                         {day.label}
                       </span>
-                      <span className={`text-xs font-medium ${isToday ? "text-foreground" : "text-muted-foreground"}`}>
+                      <span className={`text-xs font-medium ${isTodayDay ? "text-foreground" : "text-muted-foreground"}`}>
                         {format(day.date, "d")}
                       </span>
                       <div className="flex gap-1">
@@ -168,21 +177,9 @@ export default function Today() {
                 Portfolio Pulse
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <PulseCard
-                  title="Revenue MTD"
-                  value={`£${(data?.revenueMTD ?? 0).toLocaleString()}`}
-                  icon={<PoundSterling className="h-4 w-4" />}
-                />
-                <PulseCard
-                  title="Occupancy This Week"
-                  value={`${data?.occupancyThisWeek ?? 0}%`}
-                  icon={<BarChart3 className="h-4 w-4" />}
-                />
-                <PulseCard
-                  title="Bookings Next 30 Days"
-                  value={String(data?.bookingsNext30 ?? 0)}
-                  icon={<CalendarCheck className="h-4 w-4" />}
-                />
+                <PulseCard title="Revenue MTD" value={`£${(data?.revenueMTD ?? 0).toLocaleString()}`} icon={<PoundSterling className="h-4 w-4" />} />
+                <PulseCard title="Occupancy This Week" value={`${data?.occupancyThisWeek ?? 0}%`} icon={<BarChart3 className="h-4 w-4" />} />
+                <PulseCard title="Bookings Next 30 Days" value={String(data?.bookingsNext30 ?? 0)} icon={<CalendarCheck className="h-4 w-4" />} />
               </div>
             </section>
           </>
@@ -192,14 +189,14 @@ export default function Today() {
   );
 }
 
-function StatChip({ label, value, icon, muted }: { label: string; value: string; icon: React.ReactNode; muted?: boolean }) {
+function StatChip({ label, value, icon, muted, alert }: { label: string; value: string; icon: React.ReactNode; muted?: boolean; alert?: boolean }) {
   return (
     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
-      muted ? "border-border/20 bg-secondary/20" : "border-border/30 bg-secondary/40"
+      alert ? "border-red-500/30 bg-red-500/10" : muted ? "border-border/20 bg-secondary/20" : "border-border/30 bg-secondary/40"
     }`}>
-      <span className={muted ? "text-muted-foreground/50" : "text-primary"}>{icon}</span>
+      <span className={alert ? "text-red-400" : muted ? "text-muted-foreground/50" : "text-primary"}>{icon}</span>
       <div className="flex flex-col">
-        <span className={`text-xs font-semibold ${muted ? "text-muted-foreground/50" : "text-foreground"}`}>{value}</span>
+        <span className={`text-xs font-semibold ${alert ? "text-red-400" : muted ? "text-muted-foreground/50" : "text-foreground"}`}>{value}</span>
         <span className="text-[9px] text-muted-foreground uppercase tracking-wider">{label}</span>
       </div>
     </div>

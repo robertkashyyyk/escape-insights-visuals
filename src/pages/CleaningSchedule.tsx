@@ -8,7 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { format, addDays } from "date-fns";
 import {
   ChevronLeft, ChevronRight, RefreshCw, Calendar, CheckCircle2,
-  Clock, MapPin, AlertTriangle, ChevronDown, PoundSterling, User,
+  Clock, MapPin, AlertTriangle, ChevronDown, PoundSterling, User, Loader2,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -24,7 +24,7 @@ export default function CleaningSchedule() {
     filterCleaner, setFilterCleaner, filterLocation, setFilterLocation,
     cleanerDays, unassigned, weekSummary, monthlyInvoice,
     cleaners, locationGroups, totalTasks,
-    regenerate, goBack, goForward, isToday,
+    regenerate, completeTask, goBack, goForward, isToday, isRegenerating,
   } = useCleaningSchedule();
 
   const [invoiceOpen, setInvoiceOpen] = useState(false);
@@ -104,8 +104,14 @@ export default function CleaningSchedule() {
             </SelectContent>
           </Select>
 
-          <Button size="sm" variant="outline" onClick={regenerate} className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300">
-            <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Regenerate
+          <Button
+            size="sm" variant="outline"
+            onClick={regenerate}
+            disabled={isRegenerating}
+            className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+          >
+            {isRegenerating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+            {isRegenerating ? "Generating..." : "Regenerate"}
           </Button>
         </div>
 
@@ -114,7 +120,7 @@ export default function CleaningSchedule() {
           <div className="grid grid-cols-7 gap-2">
             {weekSummary.map(day => {
               const isSelected = day.date === format(selectedDate, "yyyy-MM-dd");
-              const isToday = day.date === format(new Date(), "yyyy-MM-dd");
+              const isTodayDay = day.date === format(new Date(), "yyyy-MM-dd");
               return (
                 <button
                   key={day.date}
@@ -123,7 +129,7 @@ export default function CleaningSchedule() {
                     isSelected ? "border-primary/60 bg-primary/5" : "border-border/30"
                   }`}
                 >
-                  <p className={`text-xs font-medium mb-1 ${isToday ? "text-primary" : "text-muted-foreground"}`}>
+                  <p className={`text-xs font-medium mb-1 ${isTodayDay ? "text-primary" : "text-muted-foreground"}`}>
                     {day.dayLabel}
                   </p>
                   <p className="text-2xl font-display font-bold text-foreground">{day.totalCleans}</p>
@@ -143,11 +149,12 @@ export default function CleaningSchedule() {
               <Card className="border-border/30 bg-card/50 p-8 text-center">
                 <Calendar className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">No checkouts scheduled for this date.</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">Click "Regenerate" to generate tasks from reservations.</p>
               </Card>
             )}
 
             {cleanerDays.map(cd => (
-              <CleanerSection key={cd.id} cleanerDay={cd} cleaners={cleaners} />
+              <CleanerSection key={cd.id} cleanerDay={cd} cleaners={cleaners} onComplete={completeTask} />
             ))}
           </div>
         )}
@@ -216,7 +223,7 @@ export default function CleaningSchedule() {
 }
 
 /* ── Cleaner Section ── */
-function CleanerSection({ cleanerDay, cleaners }: { cleanerDay: CleanerDay; cleaners: any[] }) {
+function CleanerSection({ cleanerDay, cleaners, onComplete }: { cleanerDay: CleanerDay; cleaners: any[]; onComplete: (taskId: string, listingId: string) => void }) {
   const totalHours = Math.floor(cleanerDay.totalScheduledMinutes / 60);
   const totalMins = cleanerDay.totalScheduledMinutes % 60;
   const maxMinutes = cleanerDay.dailyWorkingHours * 60;
@@ -251,7 +258,7 @@ function CleanerSection({ cleanerDay, cleaners }: { cleanerDay: CleanerDay; clea
       </div>
 
       <div className="ml-4 border-l-2 border-border/20 pl-4 space-y-1">
-        {cleanerDay.tasks.map((task, i) => (
+        {cleanerDay.tasks.map((task) => (
           <div key={task.id}>
             {task.travelMinutes != null && task.travelMinutes > 0 && (
               <div className="flex items-center gap-1.5 py-1 text-[10px] text-muted-foreground/60">
@@ -260,7 +267,7 @@ function CleanerSection({ cleanerDay, cleaners }: { cleanerDay: CleanerDay; clea
                 <div className="h-px flex-1 bg-border/20" />
               </div>
             )}
-            <TaskCard task={task} cleaners={cleaners} />
+            <TaskCard task={task} cleaners={cleaners} onComplete={onComplete} />
           </div>
         ))}
       </div>
@@ -269,16 +276,22 @@ function CleanerSection({ cleanerDay, cleaners }: { cleanerDay: CleanerDay; clea
 }
 
 /* ── Task Card ── */
-function TaskCard({ task, cleaners, showReason }: { task: CleanTask; cleaners: any[]; showReason?: boolean }) {
+function TaskCard({ task, cleaners, showReason, onComplete }: { task: CleanTask; cleaners: any[]; showReason?: boolean; onComplete?: (taskId: string, listingId: string) => void }) {
   const pc = PRIORITY_CONFIG[task.priority];
+  const isCompleted = task.status === "complete";
 
   return (
-    <div className="glass-card rounded-xl border border-border/30 p-4 space-y-2 hover:border-border/50 transition-colors">
+    <div className={`glass-card rounded-xl border border-border/30 p-4 space-y-2 hover:border-border/50 transition-colors ${isCompleted ? "opacity-60" : ""}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="text-sm">{pc.icon}</span>
             <h4 className="text-sm font-display font-semibold text-foreground">{task.propertyName}</h4>
+            {isCompleted && (
+              <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-[10px]">
+                ✓ Completed
+              </Badge>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <Badge variant="outline" className="text-[10px] border-primary/30 text-primary px-1.5 py-0">
@@ -293,8 +306,12 @@ function TaskCard({ task, cleaners, showReason }: { task: CleanTask; cleaners: a
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {task.status === "scheduled" && (
-            <Button size="sm" variant="outline" className="h-7 text-[10px] border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10">
+          {task.status === "scheduled" && task.dbTaskId && onComplete && (
+            <Button
+              size="sm" variant="outline"
+              className="h-7 text-[10px] border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+              onClick={() => onComplete(task.dbTaskId!, task.listingId)}
+            >
               <CheckCircle2 className="h-3 w-3 mr-1" /> Complete
             </Button>
           )}
@@ -310,7 +327,7 @@ function TaskCard({ task, cleaners, showReason }: { task: CleanTask; cleaners: a
         <span>⏱ {task.cleaningDuration} min</span>
         <span>🚪 CO {task.checkoutTime}</span>
         {task.nextCheckinDate && task.nextCheckinDate === task.checkoutDate && (
-          <span>🔑 CI {task.nextCheckinTime || DEFAULT_CHECKIN}</span>
+          <span>🔑 CI {task.nextCheckinTime || "15:00"}</span>
         )}
         {task.nextCheckinDate && task.nextCheckinDate !== task.checkoutDate && (
           <span className="text-muted-foreground/60">Next CI: {task.nextCheckinDate}</span>
@@ -321,7 +338,7 @@ function TaskCard({ task, cleaners, showReason }: { task: CleanTask; cleaners: a
         <p className="text-[10px] text-red-400 italic">{task.reason}</p>
       )}
 
-      {task.status === "unassigned" && (
+      {task.status === "unassigned" && !task.dbTaskId && (
         <Select>
           <SelectTrigger className="w-40 h-7 text-[10px] bg-secondary/50 border-border/40">
             <SelectValue placeholder="Assign cleaner..." />
@@ -334,5 +351,3 @@ function TaskCard({ task, cleaners, showReason }: { task: CleanTask; cleaners: a
     </div>
   );
 }
-
-const DEFAULT_CHECKIN = "15:00";
