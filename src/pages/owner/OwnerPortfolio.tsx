@@ -125,7 +125,32 @@ export default function OwnerPortfolio() {
             ))}
           </div>
 
-          {/* Period Navigation */}
+          {/* Date Mode Toggle */}
+          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-secondary/50 border border-border/30">
+            <button
+              onClick={() => setDateMode("check_in")}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                dateMode === "check_in"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <CalendarCheck className="h-3 w-3 inline mr-1.5" />
+              Check-in
+            </button>
+            <button
+              onClick={() => setDateMode("created")}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                dateMode === "created"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <BookOpen className="h-3 w-3 inline mr-1.5" />
+              Booking Date
+            </button>
+          </div>
+
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPeriodRef(shiftPeriod(periodRef, periodType, -1))}
