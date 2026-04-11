@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { differenceInDays, parseISO, format } from "date-fns";
+import { differenceInDays, parseISO } from "date-fns";
+
+export type DateMode = "check_in" | "created";
 
 export interface OwnerPerformanceRow {
   id: string;
@@ -18,27 +20,29 @@ export interface OwnerPerformanceRow {
   blendedAdr: number;
   avgOccupancy: number;
   totalNights: number;
-  monthlyRevenue: number[]; // 12 entries Jan-Dec
+  totalBookings: number;
+  monthlyRevenue: number[];
   hasData: boolean;
   userId: string | null;
 }
 
-export function useOwnerPerformance(year: number) {
+export function useOwnerPerformance(year: number, dateMode: DateMode = "check_in") {
   return useQuery({
-    queryKey: ["owner_performance", year],
+    queryKey: ["owner_performance", year, dateMode],
     queryFn: async (): Promise<OwnerPerformanceRow[]> => {
       const yearStart = `${year}-01-01`;
       const yearEnd = `${year}-12-31`;
 
-      // Fetch all owners, listings, and reservations in parallel
+      const dateCol = dateMode === "created" ? "reservation_date" : "check_in";
+
       const [ownersRes, listingsRes, reservationsRes] = await Promise.all([
         supabase.from("property_owners").select("*").order("name"),
         supabase.from("listings").select("id, owner_id, status, location_group"),
         supabase
           .from("reservations")
-          .select("listing_id, check_in, check_out, total_amount, status")
-          .gte("check_in", yearStart)
-          .lte("check_in", yearEnd),
+          .select("listing_id, check_in, check_out, total_amount, status, reservation_date")
+          .gte(dateCol, yearStart)
+          .lte(dateCol, yearEnd),
       ]);
 
       const owners = ownersRes.data ?? [];
@@ -47,7 +51,6 @@ export function useOwnerPerformance(year: number) {
         (r) => r.status !== "cancelled" && r.status !== "declined"
       );
 
-      // Build lookup maps
       const listingsByOwner: Record<string, typeof listings> = {};
       const listingToOwner: Record<string, string> = {};
       for (const l of listings) {
@@ -56,17 +59,18 @@ export function useOwnerPerformance(year: number) {
         listingToOwner[l.id] = l.owner_id;
       }
 
-      // Aggregate reservations by owner
-      const ownerAgg: Record<string, { revenue: number; nights: number; monthly: number[] }> = {};
+      const ownerAgg: Record<string, { revenue: number; nights: number; bookings: number; monthly: number[] }> = {};
       for (const r of reservations) {
         const ownerId = listingToOwner[r.listing_id];
         if (!ownerId) continue;
-        if (!ownerAgg[ownerId]) ownerAgg[ownerId] = { revenue: 0, nights: 0, monthly: new Array(12).fill(0) };
+        if (!ownerAgg[ownerId]) ownerAgg[ownerId] = { revenue: 0, nights: 0, bookings: 0, monthly: new Array(12).fill(0) };
         const nights = Math.max(1, differenceInDays(parseISO(r.check_out), parseISO(r.check_in)));
         const rev = r.total_amount ?? 0;
         ownerAgg[ownerId].revenue += rev;
         ownerAgg[ownerId].nights += nights;
-        const monthIdx = parseISO(r.check_in).getMonth();
+        ownerAgg[ownerId].bookings += 1;
+        const refDate = dateMode === "created" && r.reservation_date ? r.reservation_date : r.check_in;
+        const monthIdx = parseISO(refDate).getMonth();
         ownerAgg[ownerId].monthly[monthIdx] += rev;
       }
 
@@ -74,7 +78,7 @@ export function useOwnerPerformance(year: number) {
         const ownerListings = listingsByOwner[o.id] ?? [];
         const activeCount = ownerListings.filter((l) => l.status === "active").length;
         const locationGroups = [...new Set(ownerListings.map((l) => l.location_group).filter(Boolean))] as string[];
-        const agg = ownerAgg[o.id] ?? { revenue: 0, nights: 0, monthly: new Array(12).fill(0) };
+        const agg = ownerAgg[o.id] ?? { revenue: 0, nights: 0, bookings: 0, monthly: new Array(12).fill(0) };
 
         const ratePct = o.management_rate_pct ?? 0;
         const vatMultiplier = o.vat_inclusive ? 1.2 : 1.0;
@@ -98,6 +102,7 @@ export function useOwnerPerformance(year: number) {
           blendedAdr,
           avgOccupancy,
           totalNights: agg.nights,
+          totalBookings: agg.bookings,
           monthlyRevenue: agg.monthly,
           hasData: agg.revenue > 0,
           userId: o.user_id ?? null,
