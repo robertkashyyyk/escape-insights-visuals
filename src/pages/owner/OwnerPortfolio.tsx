@@ -4,7 +4,7 @@ import { useOwnerPortalData, type OwnerPeriodType, getPeriodLabel, getPeriodRang
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PoundSterling, Percent, BedDouble, TrendingUp, TrendingDown, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { PoundSterling, Percent, BedDouble, TrendingUp, TrendingDown, CalendarDays, ChevronLeft, ChevronRight, BookOpen, Moon } from "lucide-react";
 import { isFuture, startOfWeek, startOfMonth, startOfQuarter, startOfYear } from "date-fns";
 
 const fmt = (n: number) => `£${n.toLocaleString("en-GB", { maximumFractionDigits: 0 })}`;
@@ -86,6 +86,8 @@ export default function OwnerPortfolio() {
 
   const kpiCards = kpis ? [
     { label: "Total Revenue", value: fmt(kpis.totalRevenue), icon: PoundSterling, prev: kpis.prevYearRevenue },
+    { label: "Bookings", value: kpis.totalBookings.toLocaleString(), icon: BookOpen, prev: null },
+    { label: "Nights Sold", value: kpis.totalNights.toLocaleString(), icon: Moon, prev: null },
     { label: "Occupancy Rate", value: `${kpis.occupancy.toFixed(0)}%`, icon: Percent, prev: kpis.prevYearOccupancy },
     { label: "Average Daily Rate", value: fmt(kpis.adr), icon: BedDouble, prev: kpis.prevYearAdr },
   ] : [];
@@ -164,7 +166,7 @@ export default function OwnerPortfolio() {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {kpiCards.map((kpi) => (
             <Card key={kpi.label} className="border-border/30 bg-card/50 backdrop-blur-sm">
               <CardContent className="p-4 space-y-2">
@@ -173,7 +175,9 @@ export default function OwnerPortfolio() {
                   <span className="text-[10px] font-medium uppercase tracking-wider">{kpi.label}</span>
                 </div>
                 <p className="text-xl md:text-2xl font-display font-bold text-foreground">{kpi.value}</p>
-                <TrendBadge current={parseFloat(kpi.value.replace(/[£%,]/g, "")) || 0} previous={kpi.prev} />
+                {kpi.prev != null && (
+                  <TrendBadge current={parseFloat(kpi.value.replace(/[£%,]/g, "")) || 0} previous={kpi.prev} />
+                )}
               </CardContent>
             </Card>
           ))}
@@ -205,10 +209,18 @@ export default function OwnerPortfolio() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-5 gap-2">
                       <div>
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Revenue</p>
                         <p className="text-sm font-display font-bold text-foreground">{fmt(p.revenueThisYear)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Bookings</p>
+                        <p className="text-sm font-display font-bold text-foreground">{p.totalBookings}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Nights</p>
+                        <p className="text-sm font-display font-bold text-foreground">{p.totalNights}</p>
                       </div>
                       <div>
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Occupancy</p>
