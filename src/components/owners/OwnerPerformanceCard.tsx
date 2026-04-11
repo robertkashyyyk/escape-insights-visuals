@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pencil, PoundSterling, Percent, BedDouble, Receipt, KeyRound, Loader2, UserCheck } from "lucide-react";
+import { Pencil, PoundSterling, Percent, BedDouble, Receipt, KeyRound, Loader2, UserCheck, BookOpen, Moon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
