@@ -132,14 +132,19 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
       if (listingIds.length > 0) {
         const { data } = await supabase
           .from("reservations")
-          .select("listing_id, check_in, check_out, total_amount, year, month, status")
+          .select("listing_id, check_in, check_out, total_amount, year, month, status, reservation_date")
           .in("listing_id", listingIds);
         reservations = data || [];
       }
 
-      // Overlap check capped at effective end dates
-      const overlaps = (ci: string, co: string, rangeStart: string, rangeEnd: string) =>
-        ci <= rangeEnd && co > rangeStart;
+      // Filter helper: overlap on check_in/check_out, or point-in-range on reservation_date
+      const inPeriod = (r: any, rangeStart: string, rangeEnd: string) => {
+        if (useCreatedDate) {
+          const rd = r.reservation_date;
+          return rd && rd >= rangeStart && rd <= rangeEnd;
+        }
+        return r.check_in <= rangeEnd && r.check_out > rangeStart;
+      };
 
       const currentYear = now.getFullYear();
 
