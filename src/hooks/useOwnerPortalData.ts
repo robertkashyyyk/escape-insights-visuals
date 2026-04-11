@@ -151,8 +151,8 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
       const properties: OwnerProperty[] = listings.map((l) => {
         const propRes = reservations.filter((r) => r.listing_id === l.id && r.status !== "cancelled");
 
-        const thisPeriodRes = propRes.filter((r) => overlaps(r.check_in, r.check_out, periodStartStr, effectiveEndStr));
-        const prevPeriodRes = propRes.filter((r) => overlaps(r.check_in, r.check_out, prevStartStr, prevEffectiveEndStr));
+        const thisPeriodRes = propRes.filter((r) => inPeriod(r, periodStartStr, effectiveEndStr));
+        const prevPeriodRes = propRes.filter((r) => inPeriod(r, prevStartStr, prevEffectiveEndStr));
 
         const revenueThisYear = thisPeriodRes.reduce((s, r) => s + (r.total_amount || 0), 0);
         const revenuePrevYear = prevPeriodRes.reduce((s, r) => s + (r.total_amount || 0), 0);
@@ -186,8 +186,8 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
       });
 
       // Aggregate KPIs
-      const allThisPeriod = reservations.filter((r) => r.status !== "cancelled" && overlaps(r.check_in, r.check_out, periodStartStr, effectiveEndStr));
-      const allPrevPeriod = reservations.filter((r) => r.status !== "cancelled" && overlaps(r.check_in, r.check_out, prevStartStr, prevEffectiveEndStr));
+      const allThisPeriod = reservations.filter((r) => r.status !== "cancelled" && inPeriod(r, periodStartStr, effectiveEndStr));
+      const allPrevPeriod = reservations.filter((r) => r.status !== "cancelled" && inPeriod(r, prevStartStr, prevEffectiveEndStr));
 
       const totalRevenue = allThisPeriod.reduce((s, r) => s + (r.total_amount || 0), 0);
       const prevYearRevenue = allPrevPeriod.reduce((s, r) => s + (r.total_amount || 0), 0);
