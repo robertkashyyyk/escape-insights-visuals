@@ -20,6 +20,8 @@ export interface OwnerProperty {
   revenuePrevYear: number;
   occupancyPct: number;
   adr: number;
+  totalNights: number;
+  totalBookings: number;
   monthlyRevenue: number[];
   upcomingCount: number;
 }
@@ -31,6 +33,8 @@ export interface OwnerKpis {
   prevYearOccupancy: number;
   adr: number;
   prevYearAdr: number;
+  totalBookings: number;
+  totalNights: number;
 }
 
 /** Returns the start/end of a period given a reference date */
@@ -167,10 +171,11 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
           return s + Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 86400000));
         }, 0);
         const adr = totalNights > 0 ? revenueThisYear / totalNights : 0;
+        const totalBookings = thisPeriodRes.length;
 
         const upcomingCount = propRes.filter((r) => r.check_in >= today).length;
 
-        return { id: l.id, name: l.name, location_group: l.location_group, bedrooms: l.bedrooms, revenueThisYear, revenuePrevYear, occupancyPct, adr, monthlyRevenue, upcomingCount };
+        return { id: l.id, name: l.name, location_group: l.location_group, bedrooms: l.bedrooms, revenueThisYear, revenuePrevYear, occupancyPct, adr, totalNights, totalBookings, monthlyRevenue, upcomingCount };
       });
 
       // Aggregate KPIs
@@ -214,6 +219,8 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
         prevYearOccupancy,
         adr,
         prevYearAdr,
+        totalBookings: allThisPeriod.length,
+        totalNights: totalNightsAll,
       };
 
       return { owner, properties, kpis, currentYear, periodType };
