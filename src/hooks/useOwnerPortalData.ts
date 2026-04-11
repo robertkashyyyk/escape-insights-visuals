@@ -10,6 +10,7 @@ import {
 } from "date-fns";
 
 export type OwnerPeriodType = "Week" | "Month" | "Quarter" | "Year";
+export type OwnerDateMode = "check_in" | "created";
 
 export interface OwnerProperty {
   id: string;
@@ -87,18 +88,16 @@ export function getPeriodLabel(periodType: OwnerPeriodType, ref: Date, now: Date
   }
 }
 
-export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodRef: Date = new Date()) {
+export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodRef: Date = new Date(), dateMode: OwnerDateMode = "check_in") {
   const { user } = useAuth();
   const { isPreviewMode, selectedOwnerId } = useOwnerPreview();
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
 
   const { from: periodStart, to: periodEnd } = getPeriodRange(periodType, periodRef);
-  // Cap at today if the period extends into the future
   const effectiveEnd = dateMin([periodEnd, now]);
   const periodDays = Math.max(1, Math.floor((effectiveEnd.getTime() - periodStart.getTime()) / 86400000));
 
-  // Same period last year, also capped at the same relative day
   const prevPeriodStart = subYears(periodStart, 1);
   const prevPeriodEnd = subYears(periodEnd, 1);
   const prevEffectiveEnd = dateMin([prevPeriodEnd, subYears(effectiveEnd, 1)]);
@@ -109,8 +108,11 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
   const prevStartStr = prevPeriodStart.toISOString().slice(0, 10);
   const prevEffectiveEndStr = prevEffectiveEnd.toISOString().slice(0, 10);
 
+  // For "created" mode, filter by reservation_date instead of check_in overlap
+  const useCreatedDate = dateMode === "created";
+
   return useQuery({
-    queryKey: ["owner_portal", isPreviewMode ? selectedOwnerId : user?.id, periodType, periodStartStr],
+    queryKey: ["owner_portal", isPreviewMode ? selectedOwnerId : user?.id, periodType, periodStartStr, dateMode],
     enabled: !!(isPreviewMode ? selectedOwnerId : user),
     queryFn: async () => {
       let listingsQuery = supabase.from("listings").select("id, name, location_group, bedrooms, owner_id");
@@ -130,22 +132,27 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
       if (listingIds.length > 0) {
         const { data } = await supabase
           .from("reservations")
-          .select("listing_id, check_in, check_out, total_amount, year, month, status")
+          .select("listing_id, check_in, check_out, total_amount, year, month, status, reservation_date")
           .in("listing_id", listingIds);
         reservations = data || [];
       }
 
-      // Overlap check capped at effective end dates
-      const overlaps = (ci: string, co: string, rangeStart: string, rangeEnd: string) =>
-        ci <= rangeEnd && co > rangeStart;
+      // Filter helper: overlap on check_in/check_out, or point-in-range on reservation_date
+      const inPeriod = (r: any, rangeStart: string, rangeEnd: string) => {
+        if (useCreatedDate) {
+          const rd = r.reservation_date;
+          return rd && rd >= rangeStart && rd <= rangeEnd;
+        }
+        return r.check_in <= rangeEnd && r.check_out > rangeStart;
+      };
 
       const currentYear = now.getFullYear();
 
       const properties: OwnerProperty[] = listings.map((l) => {
         const propRes = reservations.filter((r) => r.listing_id === l.id && r.status !== "cancelled");
 
-        const thisPeriodRes = propRes.filter((r) => overlaps(r.check_in, r.check_out, periodStartStr, effectiveEndStr));
-        const prevPeriodRes = propRes.filter((r) => overlaps(r.check_in, r.check_out, prevStartStr, prevEffectiveEndStr));
+        const thisPeriodRes = propRes.filter((r) => inPeriod(r, periodStartStr, effectiveEndStr));
+        const prevPeriodRes = propRes.filter((r) => inPeriod(r, prevStartStr, prevEffectiveEndStr));
 
         const revenueThisYear = thisPeriodRes.reduce((s, r) => s + (r.total_amount || 0), 0);
         const revenuePrevYear = prevPeriodRes.reduce((s, r) => s + (r.total_amount || 0), 0);
@@ -179,8 +186,8 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
       });
 
       // Aggregate KPIs
-      const allThisPeriod = reservations.filter((r) => r.status !== "cancelled" && overlaps(r.check_in, r.check_out, periodStartStr, effectiveEndStr));
-      const allPrevPeriod = reservations.filter((r) => r.status !== "cancelled" && overlaps(r.check_in, r.check_out, prevStartStr, prevEffectiveEndStr));
+      const allThisPeriod = reservations.filter((r) => r.status !== "cancelled" && inPeriod(r, periodStartStr, effectiveEndStr));
+      const allPrevPeriod = reservations.filter((r) => r.status !== "cancelled" && inPeriod(r, prevStartStr, prevEffectiveEndStr));
 
       const totalRevenue = allThisPeriod.reduce((s, r) => s + (r.total_amount || 0), 0);
       const prevYearRevenue = allPrevPeriod.reduce((s, r) => s + (r.total_amount || 0), 0);

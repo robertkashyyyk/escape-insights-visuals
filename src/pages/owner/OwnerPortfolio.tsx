@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { OwnerLayout } from "@/components/layout/OwnerLayout";
-import { useOwnerPortalData, type OwnerPeriodType, getPeriodLabel, getPeriodRange, shiftPeriod } from "@/hooks/useOwnerPortalData";
+import { useOwnerPortalData, type OwnerPeriodType, type OwnerDateMode, getPeriodLabel, getPeriodRange, shiftPeriod } from "@/hooks/useOwnerPortalData";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PoundSterling, Percent, BedDouble, TrendingUp, TrendingDown, CalendarDays, ChevronLeft, ChevronRight, BookOpen, Moon } from "lucide-react";
+import { PoundSterling, Percent, BedDouble, TrendingUp, TrendingDown, CalendarDays, ChevronLeft, ChevronRight, BookOpen, Moon, CalendarCheck } from "lucide-react";
 import { isFuture, startOfWeek, startOfMonth, startOfQuarter, startOfYear } from "date-fns";
 
 const fmt = (n: number) => `£${n.toLocaleString("en-GB", { maximumFractionDigits: 0 })}`;
@@ -49,7 +49,8 @@ export default function OwnerPortfolio() {
   const now = new Date();
   const [periodType, setPeriodType] = useState<OwnerPeriodType>("Year");
   const [periodRef, setPeriodRef] = useState<Date>(now);
-  const { data, isLoading } = useOwnerPortalData(periodType, periodRef);
+  const [dateMode, setDateMode] = useState<OwnerDateMode>("check_in");
+  const { data, isLoading } = useOwnerPortalData(periodType, periodRef, dateMode);
 
   const canGoForward = (() => {
     const next = shiftPeriod(periodRef, periodType, 1);
@@ -124,7 +125,32 @@ export default function OwnerPortfolio() {
             ))}
           </div>
 
-          {/* Period Navigation */}
+          {/* Date Mode Toggle */}
+          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-secondary/50 border border-border/30">
+            <button
+              onClick={() => setDateMode("check_in")}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                dateMode === "check_in"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <CalendarCheck className="h-3 w-3 inline mr-1.5" />
+              Check-in
+            </button>
+            <button
+              onClick={() => setDateMode("created")}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                dateMode === "created"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <BookOpen className="h-3 w-3 inline mr-1.5" />
+              Booking Date
+            </button>
+          </div>
+
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPeriodRef(shiftPeriod(periodRef, periodType, -1))}
