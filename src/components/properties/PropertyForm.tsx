@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import { Minus, Plus } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 
 interface PropertyFormProps {
@@ -15,6 +16,11 @@ interface PropertyFormProps {
   onOpenChange: (open: boolean) => void;
   listing?: Tables<"listings">;
   onSuccess: () => void;
+}
+
+interface BundleComponent {
+  listing_id: string;
+  split_pct: number;
 }
 
 const emptyForm = {
@@ -36,12 +42,12 @@ const emptyForm = {
   tags: "",
   status: "active",
   is_bundle: false,
-  bundle_components: "" as string,
 };
 
 export function PropertyForm({ open, onOpenChange, listing, onSuccess }: PropertyFormProps) {
   const { toast } = useToast();
   const [form, setForm] = useState(emptyForm);
+  const [bundleComponents, setBundleComponents] = useState<BundleComponent[]>([]);
   const [saving, setSaving] = useState(false);
   const isEdit = !!listing;
 
@@ -51,6 +57,22 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
       const { data } = await supabase.from("property_owners").select("id, name").order("name");
       return data ?? [];
     },
+  });
+
+  // Fetch sibling listings for the same owner (for bundle component selection)
+  const { data: siblingListings } = useQuery({
+    queryKey: ["sibling_listings", form.owner_id],
+    queryFn: async () => {
+      if (!form.owner_id) return [];
+      const { data } = await supabase
+        .from("listings")
+        .select("id, name, is_bundle")
+        .eq("owner_id", form.owner_id)
+        .order("name");
+      // Exclude the current listing and other bundles
+      return (data ?? []).filter(l => l.id !== listing?.id && !(l as any).is_bundle);
+    },
+    enabled: !!form.owner_id && form.is_bundle,
   });
 
   useEffect(() => {
@@ -74,18 +96,47 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
         tags: listing.tags ?? "",
         status: listing.status,
         is_bundle: (listing as any).is_bundle ?? false,
-        bundle_components: (listing as any).bundle_components ? JSON.stringify((listing as any).bundle_components, null, 2) : "",
       });
+      const comps = (listing as any).bundle_components;
+      if (Array.isArray(comps)) {
+        setBundleComponents(comps.map((c: any) => ({ listing_id: c.listing_id || "", split_pct: c.split_pct || 0 })));
+      } else {
+        setBundleComponents([]);
+      }
     } else {
       setForm(emptyForm);
+      setBundleComponents([]);
     }
   }, [listing, open]);
 
-  const set = (key: string, val: string) => setForm((f) => ({ ...f, [key]: val }));
+  const set = (key: string, val: any) => setForm((f) => ({ ...f, [key]: val }));
+
+  const splitTotal = bundleComponents.reduce((s, c) => s + (c.split_pct || 0), 0);
+  const splitValid = !form.is_bundle || bundleComponents.length === 0 || splitTotal === 100;
+
+  const updateComponent = (idx: number, field: keyof BundleComponent, val: any) => {
+    setBundleComponents(prev => prev.map((c, i) => i === idx ? { ...c, [field]: val } : c));
+  };
+
+  const addComponent = () => {
+    setBundleComponents(prev => [...prev, { listing_id: "", split_pct: 0 }]);
+  };
+
+  const removeComponent = (idx: number) => {
+    setBundleComponents(prev => prev.filter((_, i) => i !== idx));
+  };
 
   const handleSave = async () => {
     if (!form.name || !form.owner_id) {
       toast({ title: "Name and Owner are required", variant: "destructive" });
+      return;
+    }
+    if (form.is_bundle && !splitValid) {
+      toast({ title: "Split percentages must total 100%", variant: "destructive" });
+      return;
+    }
+    if (form.is_bundle && bundleComponents.some(c => !c.listing_id)) {
+      toast({ title: "Please select a property for each bundle component", variant: "destructive" });
       return;
     }
     setSaving(true);
@@ -108,7 +159,7 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
       tags: form.tags || null,
       status: form.status,
       is_bundle: form.is_bundle,
-      bundle_components: form.bundle_components ? JSON.parse(form.bundle_components) : null,
+      bundle_components: form.is_bundle && bundleComponents.length > 0 ? bundleComponents : null,
     };
 
     const { error } = isEdit
@@ -184,29 +235,83 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
+
+          {/* Bundle / Dual Listing */}
+          <div className="border border-border/30 rounded-lg p-4 space-y-4">
             <div className="flex items-center justify-between">
-              <Label className="text-xs">Bundle / Dual Listing</Label>
+              <div>
+                <Label className="text-xs font-semibold">Bundle / Dual Listing</Label>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  A bundle combines two or more properties into one listing. Bundles don't appear in cleaning schedules.
+                </p>
+              </div>
               <Switch
                 checked={form.is_bundle}
-                onCheckedChange={(v) => set("is_bundle", v as any)}
+                onCheckedChange={(v) => set("is_bundle", v)}
               />
             </div>
-            <p className="text-[10px] text-muted-foreground">Mark this listing as a bundle of two or more component listings.</p>
+
+            {form.is_bundle && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Component Properties</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={addComponent} className="h-7 text-xs gap-1">
+                    <Plus className="h-3 w-3" /> Add
+                  </Button>
+                </div>
+
+                {bundleComponents.length === 0 && (
+                  <p className="text-[11px] text-muted-foreground text-center py-3 border border-dashed border-border/40 rounded-md">
+                    No components added. Click "Add" to select properties.
+                  </p>
+                )}
+
+                {bundleComponents.map((comp, idx) => (
+                  <div key={idx} className="flex items-end gap-2">
+                    <div className="flex-1 space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Property {idx + 1}</Label>
+                      <Select value={comp.listing_id} onValueChange={(v) => updateComponent(idx, "listing_id", v)}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Select property" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {siblingListings?.map((sl) => (
+                            <SelectItem key={sl.id} value={sl.id}>{sl.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="w-20 space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Split %</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        className="h-8 text-xs"
+                        value={comp.split_pct}
+                        onChange={(e) => updateComponent(idx, "split_pct", parseInt(e.target.value) || 0)}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeComponent(idx)}
+                      className="h-8 w-8 shrink-0 rounded-md border border-border/30 flex items-center justify-center text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors"
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+
+                {bundleComponents.length > 0 && (
+                  <div className={`text-xs font-medium text-right ${splitValid ? "text-emerald-400" : "text-destructive"}`}>
+                    Total: {splitTotal}% {!splitValid && "(must be 100%)"}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          {form.is_bundle && (
-            <div className="space-y-1.5">
-              <Label className="text-xs">Bundle Components (JSON)</Label>
-              <textarea
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono min-h-[80px]"
-                placeholder={`[{"listing_id": "uuid", "split_pct": 55}, {"listing_id": "uuid", "split_pct": 45}]`}
-                value={form.bundle_components}
-                onChange={(e) => set("bundle_components", e.target.value)}
-              />
-              <p className="text-[10px] text-muted-foreground">Define component listings and their revenue/night split percentages.</p>
-            </div>
-          )}
-          <Button onClick={handleSave} disabled={saving} className="mt-2">
+
+          <Button onClick={handleSave} disabled={saving || (form.is_bundle && !splitValid)} className="mt-2">
             {saving ? "Saving..." : isEdit ? "Update Property" : "Add Property"}
           </Button>
         </div>
