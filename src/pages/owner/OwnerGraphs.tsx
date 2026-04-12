@@ -165,6 +165,15 @@ export default function OwnerGraphs() {
                       borderRadius: 8,
                       fontSize: 12,
                     }}
+                    formatter={(value: number, name: string) => {
+                      const isRevenue = name.toLowerCase().includes("revenue") || name.toLowerCase().includes("adr");
+                      const formatted = isRevenue
+                        ? `£${value.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : name.toLowerCase().includes("occupancy")
+                          ? `${value}%`
+                          : value.toLocaleString("en-GB", { maximumFractionDigits: 2 });
+                      return [formatted, name];
+                    }}
                   />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   {selectedMetrics.map(m => {
