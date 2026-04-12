@@ -87,9 +87,9 @@ Deno.serve(async (req) => {
       .not("status", "in", '("cancelled","declined")');
     if (coErr) throw coErr;
 
-    // 2. Get listings
-    const listingIds = [...new Set((checkouts || []).map((r: any) => r.listing_id))];
-    if (listingIds.length === 0) {
+    // 2. Get listings (including bundles so we can expand components)
+    const rawListingIds = [...new Set((checkouts || []).map((r: any) => r.listing_id))];
+    if (rawListingIds.length === 0) {
       await supabase.from("automation_logs").insert({
         tasks_created: 0, tasks_unassigned: 0, status: "success", triggered_by: "edge_function",
       });
@@ -98,12 +98,50 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: listings } = await supabase
+    const { data: rawListings } = await supabase
       .from("listings")
-      .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, is_bundle")
-      .in("id", listingIds)
-      .eq("is_bundle", false);
-    const listingMap = new Map((listings || []).map((l: any) => [l.id, l]));
+      .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, is_bundle, bundle_components")
+      .in("id", rawListingIds);
+
+    // Expand bundles → component listing IDs
+    const bundleMap = new Map<string, string[]>(); // bundle listing id → component listing ids
+    const componentIdsFromBundles: string[] = [];
+    for (const l of rawListings || []) {
+      if (l.is_bundle && l.bundle_components) {
+        const components = (l.bundle_components as any[]) || [];
+        const compIds = components.map((c: any) => c.listing_id).filter(Boolean);
+        bundleMap.set(l.id, compIds);
+        componentIdsFromBundles.push(...compIds);
+      }
+    }
+
+    // Fetch component listings if needed
+    let componentListings: any[] = [];
+    if (componentIdsFromBundles.length > 0) {
+      const { data } = await supabase
+        .from("listings")
+        .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, is_bundle")
+        .in("id", componentIdsFromBundles)
+        .eq("is_bundle", false);
+      componentListings = data || [];
+    }
+
+    // Build final listing map: non-bundle direct checkouts + component listings from bundles
+    const allListings = [
+      ...(rawListings || []).filter((l: any) => !l.is_bundle),
+      ...componentListings,
+    ];
+    const listingMap = new Map(allListings.map((l: any) => [l.id, l]));
+
+    // Build the effective listing IDs for cleaning (components replace bundles)
+    const listingIds: string[] = [];
+    for (const id of rawListingIds) {
+      if (bundleMap.has(id)) {
+        listingIds.push(...bundleMap.get(id)!);
+      } else if (listingMap.has(id)) {
+        listingIds.push(id);
+      }
+    }
 
     // 3. Get next check-ins for priority detection
     const { data: nextCheckins } = await supabase
