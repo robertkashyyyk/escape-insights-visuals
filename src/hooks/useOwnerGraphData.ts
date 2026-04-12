@@ -97,13 +97,14 @@ export function useOwnerGraphData(
   metrics: GraphMetric[],
   from: Date,
   to: Date,
-  zoom: ZoomLevel
+  zoom: ZoomLevel,
+  filterListingId?: string | null
 ) {
   const { user } = useAuth();
   const { isPreviewMode, selectedOwnerId } = useOwnerPreview();
 
   return useQuery({
-    queryKey: ["owner_graphs", isPreviewMode ? selectedOwnerId : user?.id, from.toISOString(), to.toISOString(), zoom, metrics],
+    queryKey: ["owner_graphs", isPreviewMode ? selectedOwnerId : user?.id, from.toISOString(), to.toISOString(), zoom, metrics, filterListingId],
     enabled: !!(isPreviewMode ? selectedOwnerId : user) && metrics.length > 0,
     queryFn: async () => {
       let listingsQuery = supabase.from("listings").select("id, is_bundle");
@@ -112,8 +113,13 @@ export function useOwnerGraphData(
       }
       const { data: listings } = await listingsQuery;
       const allListings = listings || [];
-      const listingIds = allListings.map(l => l.id);
-      const nonBundleCount = allListings.filter(l => !(l as any).is_bundle).length || 1;
+
+      // If filtering to a specific listing, scope down
+      const scopedListings = filterListingId
+        ? allListings.filter(l => l.id === filterListingId)
+        : allListings;
+      const listingIds = scopedListings.map(l => l.id);
+      const nonBundleCount = scopedListings.filter(l => !(l as any).is_bundle).length || 1;
 
       let reservations: any[] = [];
       if (listingIds.length > 0) {
