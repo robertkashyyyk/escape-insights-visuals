@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -34,6 +35,8 @@ const emptyForm = {
   base_rate: "",
   tags: "",
   status: "active",
+  is_bundle: false,
+  bundle_components: "" as string,
 };
 
 export function PropertyForm({ open, onOpenChange, listing, onSuccess }: PropertyFormProps) {
@@ -70,6 +73,8 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
         base_rate: listing.base_rate?.toString() ?? "",
         tags: listing.tags ?? "",
         status: listing.status,
+        is_bundle: (listing as any).is_bundle ?? false,
+        bundle_components: (listing as any).bundle_components ? JSON.stringify((listing as any).bundle_components, null, 2) : "",
       });
     } else {
       setForm(emptyForm);
@@ -102,6 +107,8 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
       base_rate: form.base_rate ? parseFloat(form.base_rate) : null,
       tags: form.tags || null,
       status: form.status,
+      is_bundle: form.is_bundle,
+      bundle_components: form.bundle_components ? JSON.parse(form.bundle_components) : null,
     };
 
     const { error } = isEdit
@@ -177,6 +184,28 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Bundle / Dual Listing</Label>
+              <Switch
+                checked={form.is_bundle}
+                onCheckedChange={(v) => set("is_bundle", v as any)}
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground">Mark this listing as a bundle of two or more component listings.</p>
+          </div>
+          {form.is_bundle && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Bundle Components (JSON)</Label>
+              <textarea
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono min-h-[80px]"
+                placeholder={`[{"listing_id": "uuid", "split_pct": 55}, {"listing_id": "uuid", "split_pct": 45}]`}
+                value={form.bundle_components}
+                onChange={(e) => set("bundle_components", e.target.value)}
+              />
+              <p className="text-[10px] text-muted-foreground">Define component listings and their revenue/night split percentages.</p>
+            </div>
+          )}
           <Button onClick={handleSave} disabled={saving} className="mt-2">
             {saving ? "Saving..." : isEdit ? "Update Property" : "Add Property"}
           </Button>

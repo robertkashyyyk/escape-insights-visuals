@@ -34,6 +34,7 @@ import CleanerPortal from "./pages/CleanerPortal";
 import OwnerPortfolio from "./pages/owner/OwnerPortfolio";
 import OwnerReservations from "./pages/owner/OwnerReservations";
 import OwnerStatements from "./pages/owner/OwnerStatements";
+import OwnerGraphs from "./pages/owner/OwnerGraphs";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +52,7 @@ const App = () => (
             <Route path="/owner" element={<ProtectedRoute requiredRoles={["client", "super", "senior"]}><OwnerPreviewProvider><OwnerPortfolio /></OwnerPreviewProvider></ProtectedRoute>} />
             <Route path="/owner/reservations" element={<ProtectedRoute requiredRoles={["client", "super", "senior"]}><OwnerPreviewProvider><OwnerReservations /></OwnerPreviewProvider></ProtectedRoute>} />
             <Route path="/owner/statements" element={<ProtectedRoute requiredRoles={["client", "super", "senior"]}><OwnerPreviewProvider><OwnerStatements /></OwnerPreviewProvider></ProtectedRoute>} />
+            <Route path="/owner/graphs" element={<ProtectedRoute requiredRoles={["client", "super", "senior"]}><OwnerPreviewProvider><OwnerGraphs /></OwnerPreviewProvider></ProtectedRoute>} />
             <Route path="/today" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><Today /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><Index /></ProtectedRoute>} />
             <Route path="/orin" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><OrinIntelligence /></ProtectedRoute>} />
