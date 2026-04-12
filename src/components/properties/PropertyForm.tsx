@@ -159,7 +159,7 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
       tags: form.tags || null,
       status: form.status,
       is_bundle: form.is_bundle,
-      bundle_components: form.is_bundle && bundleComponents.length > 0 ? bundleComponents : null,
+      bundle_components: form.is_bundle && bundleComponents.length > 0 ? JSON.parse(JSON.stringify(bundleComponents)) : null,
     };
 
     const { error } = isEdit
