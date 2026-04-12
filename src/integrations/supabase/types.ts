@@ -223,6 +223,7 @@ export type Database = {
           base_rate: number | null
           bathrooms: number | null
           bedrooms: number | null
+          bundle_components: Json | null
           city: string | null
           cleaning_duration_minutes: number | null
           country: string | null
@@ -231,6 +232,7 @@ export type Database = {
           hostaway_listing_id: number | null
           id: string
           image_url: string | null
+          is_bundle: boolean
           is_clean: boolean
           latitude: number | null
           location_group: string | null
@@ -256,6 +258,7 @@ export type Database = {
           base_rate?: number | null
           bathrooms?: number | null
           bedrooms?: number | null
+          bundle_components?: Json | null
           city?: string | null
           cleaning_duration_minutes?: number | null
           country?: string | null
@@ -264,6 +267,7 @@ export type Database = {
           hostaway_listing_id?: number | null
           id?: string
           image_url?: string | null
+          is_bundle?: boolean
           is_clean?: boolean
           latitude?: number | null
           location_group?: string | null
@@ -289,6 +293,7 @@ export type Database = {
           base_rate?: number | null
           bathrooms?: number | null
           bedrooms?: number | null
+          bundle_components?: Json | null
           city?: string | null
           cleaning_duration_minutes?: number | null
           country?: string | null
@@ -297,6 +302,7 @@ export type Database = {
           hostaway_listing_id?: number | null
           id?: string
           image_url?: string | null
+          is_bundle?: boolean
           is_clean?: boolean
           latitude?: number | null
           location_group?: string | null
