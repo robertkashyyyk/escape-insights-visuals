@@ -100,8 +100,9 @@ Deno.serve(async (req) => {
 
     const { data: listings } = await supabase
       .from("listings")
-      .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude")
-      .in("id", listingIds);
+      .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, is_bundle")
+      .in("id", listingIds)
+      .eq("is_bundle", false);
     const listingMap = new Map((listings || []).map((l: any) => [l.id, l]));
 
     // 3. Get next check-ins for priority detection
