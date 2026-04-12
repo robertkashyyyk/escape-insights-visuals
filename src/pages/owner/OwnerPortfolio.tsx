@@ -222,7 +222,10 @@ export default function OwnerPortfolio() {
                 <Card key={p.id} className="border-border/30 bg-card/50 backdrop-blur-sm hover:border-primary/20 transition-colors">
                   <CardContent className="p-5 space-y-4">
                     <div>
-                      <h3 className="font-display font-semibold text-foreground text-sm">{p.name}</h3>
+                      <h3 className="font-display font-semibold text-foreground text-sm">
+                        {p.name}
+                        {p.isBundle && <Badge variant="outline" className="text-[9px] ml-2 px-1.5 py-0 border-primary/30 text-primary">Bundle</Badge>}
+                      </h3>
                       <div className="flex items-center gap-2 mt-1.5">
                         {p.location_group && (
                           <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{p.location_group}</Badge>

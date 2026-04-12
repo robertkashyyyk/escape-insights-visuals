@@ -1,7 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useOwnerPreview } from "@/contexts/OwnerPreviewContext";
 import { NavLink, useNavigate } from "react-router-dom";
-import { LogOut, Home, CalendarDays, FileText, Eye } from "lucide-react";
+import { LogOut, Home, CalendarDays, FileText, Eye, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { OrinChatFAB } from "@/components/orin/OrinChatFAB";
@@ -10,6 +10,7 @@ const navItems = [
   { to: "/owner", label: "My Portfolio", icon: Home },
   { to: "/owner/reservations", label: "My Reservations", icon: CalendarDays },
   { to: "/owner/statements", label: "My Statements", icon: FileText },
+  { to: "/owner/graphs", label: "My Graphs", icon: BarChart3 },
 ];
 
 export function OwnerLayout({ children }: { children: React.ReactNode }) {
