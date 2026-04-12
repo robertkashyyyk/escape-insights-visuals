@@ -1,10 +1,14 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useOwnerPreview } from "@/contexts/OwnerPreviewContext";
 import { OwnerLayout } from "@/components/layout/OwnerLayout";
 import { useOwnerGraphData, type GraphMetric, type ZoomLevel, METRIC_OPTIONS, METRIC_COLORS } from "@/hooks/useOwnerGraphData";
 import { type OwnerPeriodType, getPeriodRange, getPeriodLabel, shiftPeriod } from "@/hooks/useOwnerPortalData";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { isFuture } from "date-fns";
 import {
@@ -22,15 +26,33 @@ const isLineMetric = (m: GraphMetric) => {
 };
 
 export default function OwnerGraphs() {
+  const { user } = useAuth();
+  const { isPreviewMode, selectedOwnerId } = useOwnerPreview();
+
   const now = new Date();
   const [periodType, setPeriodType] = useState<OwnerPeriodType>("Year");
   const [periodRef, setPeriodRef] = useState<Date>(now);
   const [zoom, setZoom] = useState<ZoomLevel>("Month");
   const [selectedMetrics, setSelectedMetrics] = useState<GraphMetric[]>(["revenue_checkin"]);
+  const [filterListing, setFilterListing] = useState<string>("all");
+
+  // Fetch owner's listings for the property filter dropdown
+  const { data: ownerListings } = useQuery({
+    queryKey: ["owner_graph_listings", isPreviewMode ? selectedOwnerId : user?.id],
+    enabled: !!(isPreviewMode ? selectedOwnerId : user),
+    queryFn: async () => {
+      let q = supabase.from("listings").select("id, name").order("name");
+      if (isPreviewMode && selectedOwnerId) {
+        q = q.eq("owner_id", selectedOwnerId);
+      }
+      const { data } = await q;
+      return data ?? [];
+    },
+  });
 
   const { from, to } = getPeriodRange(periodType, periodRef);
   const label = getPeriodLabel(periodType, periodRef, now);
-  const { data: chartData, isLoading } = useOwnerGraphData(selectedMetrics, from, to, zoom);
+  const { data: chartData, isLoading } = useOwnerGraphData(selectedMetrics, from, to, zoom, filterListing === "all" ? null : filterListing);
 
   const canGoForward = (() => {
     const next = shiftPeriod(periodRef, periodType, 1);
@@ -119,6 +141,21 @@ export default function OwnerGraphs() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Property Filter */}
+          <div className="sm:ml-auto">
+            <Select value={filterListing} onValueChange={setFilterListing}>
+              <SelectTrigger className="h-8 w-[200px] text-xs border-border/30">
+                <SelectValue placeholder="All Properties" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Properties</SelectItem>
+                {ownerListings?.map(l => (
+                  <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
