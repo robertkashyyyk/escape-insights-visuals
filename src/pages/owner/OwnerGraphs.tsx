@@ -166,6 +166,7 @@ export default function OwnerGraphs() {
                       fontSize: 12,
                     }}
                     formatter={(value: number, name: string) => {
+                      if (value === 0) return [null, null]; // hide zero pipeline entries
                       const isRevenue = name.toLowerCase().includes("revenue") || name.toLowerCase().includes("adr");
                       const formatted = isRevenue
                         ? `£${value.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -176,13 +177,31 @@ export default function OwnerGraphs() {
                     }}
                   />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  {selectedMetrics.map(m => {
+                  {selectedMetrics.flatMap(m => {
                     const opt = METRIC_OPTIONS.find(o => o.value === m);
                     const color = METRIC_COLORS[m];
+                    const isCheckin = m.endsWith("_checkin");
+
                     if (isLineMetric(m)) {
-                      return <Line key={m} type="monotone" dataKey={m} name={opt?.label} stroke={color} strokeWidth={2} dot={false} />;
+                      const elements = [
+                        <Line key={m} type="monotone" dataKey={m} name={opt?.label} stroke={color} strokeWidth={2} dot={false} />
+                      ];
+                      if (isCheckin) {
+                        elements.push(
+                          <Line key={`${m}_pipeline`} type="monotone" dataKey={`${m}_pipeline`} name={`${opt?.label} (Pipeline)`} stroke={color} strokeWidth={2} strokeDasharray="5 5" dot={false} opacity={0.4} />
+                        );
+                      }
+                      return elements;
                     }
-                    return <Bar key={m} dataKey={m} name={opt?.label} fill={color} radius={[3, 3, 0, 0]} />;
+
+                    if (isCheckin) {
+                      return [
+                        <Bar key={m} dataKey={m} name={opt?.label} fill={color} stackId={`stack_${m}`} radius={[0, 0, 0, 0]} />,
+                        <Bar key={`${m}_pipeline`} dataKey={`${m}_pipeline`} name={`${opt?.label} (Pipeline)`} fill={color} stackId={`stack_${m}`} opacity={0.3} radius={[3, 3, 0, 0]} />,
+                      ];
+                    }
+
+                    return [<Bar key={m} dataKey={m} name={opt?.label} fill={color} radius={[3, 3, 0, 0]} />];
                   })}
                 </ComposedChart>
               </ResponsiveContainer>
