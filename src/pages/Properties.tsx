@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Search, Bed, Users, MapPin, Plus, ArrowRight, Brush } from "lucide-react";
+import { Search, Bed, Users, MapPin, Plus, ArrowRight, Brush, Pencil } from "lucide-react";
 import { PropertyForm } from "@/components/properties/PropertyForm";
 import { Link } from "react-router-dom";
 
@@ -18,6 +18,7 @@ export default function Properties() {
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [cleanFilter, setCleanFilter] = useState("all");
   const [showAdd, setShowAdd] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const { data: listings, isLoading, refetch } = useQuery({
     queryKey: ["listings"],
@@ -157,9 +158,18 @@ export default function Properties() {
 
                   <div className="mt-auto flex items-center justify-between pt-2 border-t border-border/20">
                     <span className="text-[10px] text-muted-foreground/50 font-mono truncate max-w-[140px]">{l.id.slice(0, 8)}</span>
-                    <Link to={`/properties/${l.id}`} className="text-xs text-primary font-medium flex items-center gap-1 hover:underline transition-colors">
-                      View Details <ArrowRight className="h-3 w-3" />
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setEditingId(l.id)}
+                        className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+                        title="Edit property"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <Link to={`/properties/${l.id}`} className="text-xs text-primary font-medium flex items-center gap-1 hover:underline transition-colors">
+                        View Details <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               );
@@ -168,6 +178,12 @@ export default function Properties() {
         )}
 
         <PropertyForm open={showAdd} onOpenChange={setShowAdd} onSuccess={refetch} />
+        <PropertyForm
+          open={!!editingId}
+          onOpenChange={(open) => { if (!open) setEditingId(null); }}
+          listing={editingId ? listings?.find(l => l.id === editingId) ?? undefined : undefined}
+          onSuccess={refetch}
+        />
       </div>
     </AppLayout>
   );
