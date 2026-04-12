@@ -438,12 +438,14 @@ Deno.serve(async (req) => {
       if (insertErr) throw insertErr;
     }
 
-    // 11. Set is_clean = false for all checkout listings
-    if (listingIds.length > 0) {
+    // 11. Set is_clean = false for component listings (not bundles)
+    const dirtyIds = [...new Set(listingIds)];
+    if (dirtyIds.length > 0) {
       const { error: updateErr } = await supabase
         .from("listings")
         .update({ is_clean: false })
-        .in("id", listingIds);
+        .in("id", dirtyIds)
+        .eq("is_bundle", false);
       if (updateErr) throw updateErr;
     }
 
