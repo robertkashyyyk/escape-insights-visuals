@@ -137,52 +137,58 @@ export function useOwnerGraphData(
 
         const row: Record<string, any> = { label: bucket.label };
 
-        // Check-in: only include reservations that have already checked in (check_in <= today)
-        const checkinRes = reservations.filter(r => r.check_in <= bEndStr && r.check_out > bStartStr && r.check_in <= todayStr);
+        // Check-in: past (already checked in) and future (confirmed but not yet checked in)
+        const checkinPast = reservations.filter(r => r.check_in <= bEndStr && r.check_out > bStartStr && r.check_in <= todayStr);
+        const checkinFuture = reservations.filter(r => r.check_in <= bEndStr && r.check_out > bStartStr && r.check_in > todayStr);
         // Booking date: reservations created in this bucket
         const createdRes = reservations.filter(r => r.reservation_date && r.reservation_date >= bStartStr && r.reservation_date <= bEndStr);
 
         for (const m of metrics) {
           const isCreated = m.endsWith("_created");
-          const set = isCreated ? createdRes : checkinRes;
+          const isCheckin = m.endsWith("_checkin");
           const base = m.replace("_checkin", "").replace("_created", "");
 
-          switch (base) {
-            case "revenue":
-              row[m] = Math.round(set.reduce((s: number, r: any) => s + (r.total_amount || 0), 0) * 100) / 100;
-              break;
-            case "bookings":
-              row[m] = set.length;
-              break;
-            case "nights": {
-              if (isCreated) {
-                row[m] = set.reduce((s: number, r: any) => s + totalNights(new Date(r.check_in), new Date(r.check_out)), 0);
-              } else {
-                row[m] = set.reduce((s: number, r: any) => s + nightsInRange(new Date(r.check_in), new Date(r.check_out), bStart, bEnd), 0);
+          const calcValue = (set: any[]) => {
+            switch (base) {
+              case "revenue":
+                return Math.round(set.reduce((s: number, r: any) => s + (r.total_amount || 0), 0) * 100) / 100;
+              case "bookings":
+                return set.length;
+              case "nights": {
+                if (isCreated) {
+                  return set.reduce((s: number, r: any) => s + totalNights(new Date(r.check_in), new Date(r.check_out)), 0);
+                }
+                return set.reduce((s: number, r: any) => s + nightsInRange(new Date(r.check_in), new Date(r.check_out), bStart, bEnd), 0);
               }
-              break;
-            }
-            case "occupancy": {
-              let nights: number;
-              if (isCreated) {
-                nights = set.reduce((s: number, r: any) => s + totalNights(new Date(r.check_in), new Date(r.check_out)), 0);
-              } else {
-                nights = set.reduce((s: number, r: any) => s + nightsInRange(new Date(r.check_in), new Date(r.check_out), bStart, bEnd), 0);
+              case "occupancy": {
+                let nights: number;
+                if (isCreated) {
+                  nights = set.reduce((s: number, r: any) => s + totalNights(new Date(r.check_in), new Date(r.check_out)), 0);
+                } else {
+                  nights = set.reduce((s: number, r: any) => s + nightsInRange(new Date(r.check_in), new Date(r.check_out), bStart, bEnd), 0);
+                }
+                return Math.round((nights / (bucketDays * nonBundleCount)) * 100);
               }
-              row[m] = Math.round((nights / (bucketDays * nonBundleCount)) * 100);
-              break;
-            }
-            case "adr": {
-              let nights: number;
-              if (isCreated) {
-                nights = set.reduce((s: number, r: any) => s + totalNights(new Date(r.check_in), new Date(r.check_out)), 0);
-              } else {
-                nights = set.reduce((s: number, r: any) => s + nightsInRange(new Date(r.check_in), new Date(r.check_out), bStart, bEnd), 0);
+              case "adr": {
+                let nights: number;
+                if (isCreated) {
+                  nights = set.reduce((s: number, r: any) => s + totalNights(new Date(r.check_in), new Date(r.check_out)), 0);
+                } else {
+                  nights = set.reduce((s: number, r: any) => s + nightsInRange(new Date(r.check_in), new Date(r.check_out), bStart, bEnd), 0);
+                }
+                const rev = Math.round(set.reduce((s: number, r: any) => s + (r.total_amount || 0), 0) * 100) / 100;
+                return nights > 0 ? Math.round((rev / nights) * 100) / 100 : 0;
               }
-              const rev = Math.round(set.reduce((s: number, r: any) => s + (r.total_amount || 0), 0) * 100) / 100;
-              row[m] = nights > 0 ? Math.round((rev / nights) * 100) / 100 : 0;
-              break;
+              default: return 0;
             }
+          };
+
+          if (isCheckin) {
+            row[m] = calcValue(checkinPast);
+            // Pipeline: future confirmed check-ins (stacks on top)
+            row[`${m}_pipeline`] = calcValue(checkinFuture);
+          } else {
+            row[m] = calcValue(isCreated ? createdRes : checkinPast);
           }
         }
         return row;
