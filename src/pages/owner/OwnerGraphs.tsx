@@ -142,6 +142,21 @@ export default function OwnerGraphs() {
               ))}
             </div>
           </div>
+
+          {/* Property Filter */}
+          <div className="sm:ml-auto">
+            <Select value={filterListing} onValueChange={setFilterListing}>
+              <SelectTrigger className="h-8 w-[200px] text-xs border-border/30">
+                <SelectValue placeholder="All Properties" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Properties</SelectItem>
+                {ownerListings?.map(l => (
+                  <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Metric Selector */}
