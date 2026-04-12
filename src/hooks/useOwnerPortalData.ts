@@ -17,6 +17,7 @@ export interface OwnerProperty {
   name: string;
   location_group: string | null;
   bedrooms: number | null;
+  isBundle: boolean;
   revenueThisYear: number;
   revenuePrevYear: number;
   occupancyPct: number;
@@ -108,14 +109,13 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
   const prevStartStr = prevPeriodStart.toISOString().slice(0, 10);
   const prevEffectiveEndStr = prevEffectiveEnd.toISOString().slice(0, 10);
 
-  // For "created" mode, filter by reservation_date instead of check_in overlap
   const useCreatedDate = dateMode === "created";
 
   return useQuery({
     queryKey: ["owner_portal", isPreviewMode ? selectedOwnerId : user?.id, periodType, periodStartStr, dateMode],
     enabled: !!(isPreviewMode ? selectedOwnerId : user),
     queryFn: async () => {
-      let listingsQuery = supabase.from("listings").select("id, name, location_group, bedrooms, owner_id");
+      let listingsQuery = supabase.from("listings").select("id, name, location_group, bedrooms, owner_id, is_bundle, bundle_components");
       let ownerQuery = supabase.from("property_owners").select("id, name");
 
       if (isPreviewMode && selectedOwnerId) {
@@ -128,6 +128,10 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
       const owner = ownerRes.data?.[0];
       const listingIds = listings.map((l) => l.id);
 
+      // Count non-bundle listings for occupancy denominator
+      const nonBundleListings = listings.filter(l => !(l as any).is_bundle);
+      const nonBundleCount = Math.max(1, nonBundleListings.length);
+
       let reservations: any[] = [];
       if (listingIds.length > 0) {
         const { data } = await supabase
@@ -137,7 +141,6 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
         reservations = data || [];
       }
 
-      // Filter helper: overlap on check_in/check_out, or point-in-range on reservation_date
       const inPeriod = (r: any, rangeStart: string, rangeEnd: string) => {
         if (useCreatedDate) {
           const rd = r.reservation_date;
@@ -149,6 +152,7 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
       const currentYear = now.getFullYear();
 
       const properties: OwnerProperty[] = listings.map((l) => {
+        const isBundle = !!(l as any).is_bundle;
         const propRes = reservations.filter((r) => r.listing_id === l.id && r.status !== "cancelled");
 
         const thisPeriodRes = propRes.filter((r) => inPeriod(r, periodStartStr, effectiveEndStr));
@@ -161,28 +165,43 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
           propRes.filter((r) => r.year === currentYear && r.month === m + 1).reduce((s, r) => s + (r.total_amount || 0), 0)
         );
 
-        // Occupancy for period (capped at effective end)
+        // Nights calculation
+        let totalNights = 0;
         let nightsBooked = 0;
         thisPeriodRes.forEach((r) => {
           const ci = new Date(r.check_in);
           const co = new Date(r.check_out);
-          const start = ci < periodStart ? periodStart : ci;
-          const end = co > effectiveEnd ? effectiveEnd : co;
-          nightsBooked += Math.max(0, Math.floor((end.getTime() - start.getTime()) / 86400000));
-        });
-        const occupancyPct = Math.min(100, (nightsBooked / periodDays) * 100);
+          const fullNights = Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 86400000));
 
-        const totalNights = thisPeriodRes.reduce((s, r) => {
-          const ci = new Date(r.check_in);
-          const co = new Date(r.check_out);
-          return s + Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 86400000));
-        }, 0);
+          if (useCreatedDate) {
+            // In booking date mode, count full stay nights
+            totalNights += fullNights;
+            nightsBooked += fullNights;
+          } else {
+            // In check-in mode, clip to period
+            const start = ci < periodStart ? periodStart : ci;
+            const end = co > effectiveEnd ? effectiveEnd : co;
+            const clipped = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 86400000));
+            nightsBooked += clipped;
+            totalNights += fullNights;
+          }
+        });
+
+        // Occupancy: for booking date mode, use full nights / (periodDays * 1 property)
+        // Allow > 100% in booking date mode
+        const occupancyPct = useCreatedDate
+          ? (nightsBooked / periodDays) * 100
+          : Math.min(100, (nightsBooked / periodDays) * 100);
+
         const adr = totalNights > 0 ? revenueThisYear / totalNights : 0;
         const totalBookings = thisPeriodRes.length;
-
         const upcomingCount = propRes.filter((r) => r.check_in >= today).length;
 
-        return { id: l.id, name: l.name, location_group: l.location_group, bedrooms: l.bedrooms, revenueThisYear, revenuePrevYear, occupancyPct, adr, totalNights, totalBookings, monthlyRevenue, upcomingCount };
+        return {
+          id: l.id, name: l.name, location_group: l.location_group, bedrooms: l.bedrooms,
+          isBundle,
+          revenueThisYear, revenuePrevYear, occupancyPct, adr, totalNights, totalBookings, monthlyRevenue, upcomingCount
+        };
       });
 
       // Aggregate KPIs
@@ -192,13 +211,27 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
       const totalRevenue = allThisPeriod.reduce((s, r) => s + (r.total_amount || 0), 0);
       const prevYearRevenue = allPrevPeriod.reduce((s, r) => s + (r.total_amount || 0), 0);
 
-      const avgOccupancy = properties.length > 0 ? properties.reduce((s, p) => s + p.occupancyPct, 0) / properties.length : 0;
-
-      const totalNightsAll = allThisPeriod.reduce((s, r) => {
+      // Aggregate occupancy using non-bundle count
+      let totalNightsBooked = 0;
+      let totalNightsAll = 0;
+      allThisPeriod.forEach((r) => {
         const ci = new Date(r.check_in);
         const co = new Date(r.check_out);
-        return s + Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 86400000));
-      }, 0);
+        const fullNights = Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 86400000));
+        totalNightsAll += fullNights;
+        if (useCreatedDate) {
+          totalNightsBooked += fullNights;
+        } else {
+          const start = ci < periodStart ? periodStart : ci;
+          const end = co > effectiveEnd ? effectiveEnd : co;
+          totalNightsBooked += Math.max(0, Math.floor((end.getTime() - start.getTime()) / 86400000));
+        }
+      });
+
+      const occupancy = useCreatedDate
+        ? (totalNightsBooked / (periodDays * nonBundleCount)) * 100
+        : Math.min(100, (totalNightsBooked / (periodDays * nonBundleCount)) * 100);
+
       const adr = totalNightsAll > 0 ? totalRevenue / totalNightsAll : 0;
 
       const prevTotalNights = allPrevPeriod.reduce((s, r) => {
@@ -217,12 +250,12 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
         const end = co > prevEffectiveEnd ? prevEffectiveEnd : co;
         prevNightsBooked += Math.max(0, Math.floor((end.getTime() - start.getTime()) / 86400000));
       });
-      const prevYearOccupancy = listings.length > 0 ? Math.min(100, (prevNightsBooked / (prevPeriodDays * listings.length)) * 100) : 0;
+      const prevYearOccupancy = nonBundleCount > 0 ? Math.min(100, (prevNightsBooked / (prevPeriodDays * nonBundleCount)) * 100) : 0;
 
       const kpis: OwnerKpis = {
         totalRevenue,
         prevYearRevenue,
-        occupancy: avgOccupancy,
+        occupancy,
         prevYearOccupancy,
         adr,
         prevYearAdr,
