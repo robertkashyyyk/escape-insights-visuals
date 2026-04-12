@@ -215,27 +215,35 @@ Deno.serve(async (req) => {
       const key = `${r.id}_${targetDate}`;
       if (existingSet.has(key)) continue;
 
-      const listing = listingMap.get(r.listing_id);
-      if (!listing) continue;
+      // If this checkout is on a bundle, create tasks for each component instead
+      const componentIds = bundleMap.get(r.listing_id);
+      const targetListingIds = componentIds && componentIds.length > 0
+        ? componentIds
+        : [r.listing_id];
 
-      const nextCI = nextCheckinMap.get(r.listing_id);
-      const isSameDay = nextCI === targetDate;
-      const priority = isSameDay ? "same_day_turnaround" : "standard";
+      for (const targetLid of targetListingIds) {
+        const listing = listingMap.get(targetLid);
+        if (!listing) continue;
 
-      newTasks.push({
-        listing_id: r.listing_id,
-        reservation_id: r.id,
-        scheduled_date: targetDate,
-        priority,
-        cleaning_duration_minutes: listing.cleaning_duration_minutes || 90,
-        latitude: listing.latitude,
-        longitude: listing.longitude,
-        location_group: listing.location_group || "Other",
-        assigned_cleaner_id: null,
-        status: "unassigned",
-        estimated_start_time: null,
-        travel_time_from_previous_minutes: 0,
-      });
+        const nextCI = nextCheckinMap.get(targetLid);
+        const isSameDay = nextCI === targetDate;
+        const priority = isSameDay ? "same_day_turnaround" : "standard";
+
+        newTasks.push({
+          listing_id: targetLid,
+          reservation_id: r.id,
+          scheduled_date: targetDate,
+          priority,
+          cleaning_duration_minutes: listing.cleaning_duration_minutes || 90,
+          latitude: listing.latitude,
+          longitude: listing.longitude,
+          location_group: listing.location_group || "Other",
+          assigned_cleaner_id: null,
+          status: "unassigned",
+          estimated_start_time: null,
+          travel_time_from_previous_minutes: 0,
+        });
+      }
     }
 
     // Sort: same-day turnarounds first
