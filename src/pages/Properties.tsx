@@ -110,14 +110,20 @@ export default function Properties() {
               const ownerName = (l.property_owners as any)?.name;
               const cleaner = (l as any).primary_cleaner;
               const isClean = (l as any).is_clean ?? true;
+              const isBundle = (l as any).is_bundle ?? false;
               return (
                 <div
                   key={l.id}
                   className="glass-card rounded-xl border border-border/30 border-l-2 border-l-primary/60 p-5 flex flex-col gap-3 transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 hover:border-l-primary relative"
                 >
-                  {/* Dirty indicator dot */}
-                  {!isClean && (
+                  {/* Dirty indicator dot — not shown for bundles */}
+                  {!isBundle && !isClean && (
                     <div className="absolute top-3 right-3 h-3 w-3 rounded-full bg-red-500 animate-pulse" title="Needs cleaning" />
+                  )}
+                  {isBundle && (
+                    <div className="absolute top-3 right-3">
+                      <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full border border-primary/30 text-primary bg-primary/10">Bundle</span>
+                    </div>
                   )}
 
                   <div>
