@@ -125,6 +125,8 @@ export function useOwnerGraphData(
       }
 
       const buckets = getBuckets(from, to, zoom);
+      const now = new Date();
+      const todayStr = format(now, "yyyy-MM-dd");
 
       const chartData = buckets.map(bucket => {
         const bStart = bucket.start;
@@ -135,8 +137,9 @@ export function useOwnerGraphData(
 
         const row: Record<string, any> = { label: bucket.label };
 
-        // Filter reservations for each mode
-        const checkinRes = reservations.filter(r => r.check_in <= bEndStr && r.check_out > bStartStr);
+        // Check-in: only include reservations that have already checked in (check_in <= today)
+        const checkinRes = reservations.filter(r => r.check_in <= bEndStr && r.check_out > bStartStr && r.check_in <= todayStr);
+        // Booking date: reservations created in this bucket
         const createdRes = reservations.filter(r => r.reservation_date && r.reservation_date >= bStartStr && r.reservation_date <= bEndStr);
 
         for (const m of metrics) {
@@ -146,7 +149,7 @@ export function useOwnerGraphData(
 
           switch (base) {
             case "revenue":
-              row[m] = set.reduce((s: number, r: any) => s + (r.total_amount || 0), 0);
+              row[m] = Math.round(set.reduce((s: number, r: any) => s + (r.total_amount || 0), 0) * 100) / 100;
               break;
             case "bookings":
               row[m] = set.length;
@@ -176,8 +179,8 @@ export function useOwnerGraphData(
               } else {
                 nights = set.reduce((s: number, r: any) => s + nightsInRange(new Date(r.check_in), new Date(r.check_out), bStart, bEnd), 0);
               }
-              const rev = set.reduce((s: number, r: any) => s + (r.total_amount || 0), 0);
-              row[m] = nights > 0 ? Math.round(rev / nights) : 0;
+              const rev = Math.round(set.reduce((s: number, r: any) => s + (r.total_amount || 0), 0) * 100) / 100;
+              row[m] = nights > 0 ? Math.round((rev / nights) * 100) / 100 : 0;
               break;
             }
           }
