@@ -97,12 +97,12 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
 
   const { from: periodStart, to: periodEnd } = getPeriodRange(periodType, periodRef);
   const effectiveEnd = dateMin([periodEnd, now]);
-  const periodDays = Math.max(1, Math.floor((effectiveEnd.getTime() - periodStart.getTime()) / 86400000));
+  const periodDays = Math.max(1, Math.floor((effectiveEnd.getTime() - periodStart.getTime()) / 86400000) + 1);
 
   const prevPeriodStart = subYears(periodStart, 1);
   const prevPeriodEnd = subYears(periodEnd, 1);
   const prevEffectiveEnd = dateMin([prevPeriodEnd, subYears(effectiveEnd, 1)]);
-  const prevPeriodDays = Math.max(1, Math.floor((prevEffectiveEnd.getTime() - prevPeriodStart.getTime()) / 86400000));
+  const prevPeriodDays = Math.max(1, Math.floor((prevEffectiveEnd.getTime() - prevPeriodStart.getTime()) / 86400000) + 1);
 
   const periodStartStr = periodStart.toISOString().slice(0, 10);
   const effectiveEndStr = effectiveEnd.toISOString().slice(0, 10);
