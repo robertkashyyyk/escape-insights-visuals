@@ -87,9 +87,9 @@ Deno.serve(async (req) => {
       .not("status", "in", '("cancelled","declined")');
     if (coErr) throw coErr;
 
-    // 2. Get listings
-    const listingIds = [...new Set((checkouts || []).map((r: any) => r.listing_id))];
-    if (listingIds.length === 0) {
+    // 2. Get listings (including bundles so we can expand components)
+    const rawListingIds = [...new Set((checkouts || []).map((r: any) => r.listing_id))];
+    if (rawListingIds.length === 0) {
       await supabase.from("automation_logs").insert({
         tasks_created: 0, tasks_unassigned: 0, status: "success", triggered_by: "edge_function",
       });
@@ -98,12 +98,50 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { data: listings } = await supabase
+    const { data: rawListings } = await supabase
       .from("listings")
-      .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, is_bundle")
-      .in("id", listingIds)
-      .eq("is_bundle", false);
-    const listingMap = new Map((listings || []).map((l: any) => [l.id, l]));
+      .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, is_bundle, bundle_components")
+      .in("id", rawListingIds);
+
+    // Expand bundles → component listing IDs
+    const bundleMap = new Map<string, string[]>(); // bundle listing id → component listing ids
+    const componentIdsFromBundles: string[] = [];
+    for (const l of rawListings || []) {
+      if (l.is_bundle && l.bundle_components) {
+        const components = (l.bundle_components as any[]) || [];
+        const compIds = components.map((c: any) => c.listing_id).filter(Boolean);
+        bundleMap.set(l.id, compIds);
+        componentIdsFromBundles.push(...compIds);
+      }
+    }
+
+    // Fetch component listings if needed
+    let componentListings: any[] = [];
+    if (componentIdsFromBundles.length > 0) {
+      const { data } = await supabase
+        .from("listings")
+        .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, is_bundle")
+        .in("id", componentIdsFromBundles)
+        .eq("is_bundle", false);
+      componentListings = data || [];
+    }
+
+    // Build final listing map: non-bundle direct checkouts + component listings from bundles
+    const allListings = [
+      ...(rawListings || []).filter((l: any) => !l.is_bundle),
+      ...componentListings,
+    ];
+    const listingMap = new Map(allListings.map((l: any) => [l.id, l]));
+
+    // Build the effective listing IDs for cleaning (components replace bundles)
+    const listingIds: string[] = [];
+    for (const id of rawListingIds) {
+      if (bundleMap.has(id)) {
+        listingIds.push(...bundleMap.get(id)!);
+      } else if (listingMap.has(id)) {
+        listingIds.push(id);
+      }
+    }
 
     // 3. Get next check-ins for priority detection
     const { data: nextCheckins } = await supabase
@@ -177,27 +215,35 @@ Deno.serve(async (req) => {
       const key = `${r.id}_${targetDate}`;
       if (existingSet.has(key)) continue;
 
-      const listing = listingMap.get(r.listing_id);
-      if (!listing) continue;
+      // If this checkout is on a bundle, create tasks for each component instead
+      const componentIds = bundleMap.get(r.listing_id);
+      const targetListingIds = componentIds && componentIds.length > 0
+        ? componentIds
+        : [r.listing_id];
 
-      const nextCI = nextCheckinMap.get(r.listing_id);
-      const isSameDay = nextCI === targetDate;
-      const priority = isSameDay ? "same_day_turnaround" : "standard";
+      for (const targetLid of targetListingIds) {
+        const listing = listingMap.get(targetLid);
+        if (!listing) continue;
 
-      newTasks.push({
-        listing_id: r.listing_id,
-        reservation_id: r.id,
-        scheduled_date: targetDate,
-        priority,
-        cleaning_duration_minutes: listing.cleaning_duration_minutes || 90,
-        latitude: listing.latitude,
-        longitude: listing.longitude,
-        location_group: listing.location_group || "Other",
-        assigned_cleaner_id: null,
-        status: "unassigned",
-        estimated_start_time: null,
-        travel_time_from_previous_minutes: 0,
-      });
+        const nextCI = nextCheckinMap.get(targetLid);
+        const isSameDay = nextCI === targetDate;
+        const priority = isSameDay ? "same_day_turnaround" : "standard";
+
+        newTasks.push({
+          listing_id: targetLid,
+          reservation_id: r.id,
+          scheduled_date: targetDate,
+          priority,
+          cleaning_duration_minutes: listing.cleaning_duration_minutes || 90,
+          latitude: listing.latitude,
+          longitude: listing.longitude,
+          location_group: listing.location_group || "Other",
+          assigned_cleaner_id: null,
+          status: "unassigned",
+          estimated_start_time: null,
+          travel_time_from_previous_minutes: 0,
+        });
+      }
     }
 
     // Sort: same-day turnarounds first
@@ -392,12 +438,14 @@ Deno.serve(async (req) => {
       if (insertErr) throw insertErr;
     }
 
-    // 11. Set is_clean = false for all checkout listings
-    if (listingIds.length > 0) {
+    // 11. Set is_clean = false for component listings (not bundles)
+    const dirtyIds = [...new Set(listingIds)];
+    if (dirtyIds.length > 0) {
       const { error: updateErr } = await supabase
         .from("listings")
         .update({ is_clean: false })
-        .in("id", listingIds);
+        .in("id", dirtyIds)
+        .eq("is_bundle", false);
       if (updateErr) throw updateErr;
     }
 
