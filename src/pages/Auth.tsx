@@ -52,7 +52,8 @@ export default function Auth() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: window.location.origin + "/today",
+        // Land on /auth so AuthContext loads role, then route accordingly.
+        emailRedirectTo: `${window.location.origin}/auth`,
       },
     });
 
