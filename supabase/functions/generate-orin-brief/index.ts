@@ -168,8 +168,19 @@ serve(async (req) => {
   }
 });
 
+function getNetRevenue(r: any): number {
+  if (!r) return 0;
+  if (r.host_payout != null && Number(r.host_payout) > 0) return Number(r.host_payout);
+  const total = Number(r.total_amount ?? 0);
+  const cleaning = Number(r.cleaning_fee ?? 0);
+  const commission = Number(r.channel_commission ?? 0);
+  const tax = Number(r.tax_amount ?? 0);
+  if (cleaning > 0 || commission > 0 || tax > 0) return Math.max(0, total - cleaning - commission - tax);
+  return total;
+}
+
 function aggregateData(reservations: any[], ownerMap: Record<string, string>) {
-  const totalRevenue = reservations.reduce((s, r) => s + (Number(r.total_amount) || 0), 0);
+  const totalRevenue = reservations.reduce((s, r) => s + getNetRevenue(r), 0);
   const totalNights = reservations.reduce((s, r) => {
     const ci = new Date(r.check_in);
     const co = new Date(r.check_out);
@@ -182,7 +193,7 @@ function aggregateData(reservations: any[], ownerMap: Record<string, string>) {
   const platforms: Record<string, number> = {};
   reservations.forEach(r => {
     const p = r.platform || "Unknown";
-    platforms[p] = (platforms[p] || 0) + (Number(r.total_amount) || 0);
+    platforms[p] = (platforms[p] || 0) + getNetRevenue(r);
   });
 
   // Property performance
@@ -190,7 +201,7 @@ function aggregateData(reservations: any[], ownerMap: Record<string, string>) {
   reservations.forEach(r => {
     const name = r.listing?.name || "Unknown";
     if (!propRevenue[name]) propRevenue[name] = { name, revenue: 0, nights: 0 };
-    propRevenue[name].revenue += Number(r.total_amount) || 0;
+    propRevenue[name].revenue += getNetRevenue(r);
     const ci = new Date(r.check_in);
     const co = new Date(r.check_out);
     propRevenue[name].nights += Math.max(1, Math.round((co.getTime() - ci.getTime()) / 86400000));
@@ -205,7 +216,7 @@ function aggregateData(reservations: any[], ownerMap: Record<string, string>) {
     if (!oid) return;
     const oname = ownerMap[oid] || "Unknown";
     if (!ownerRevenue[oid]) ownerRevenue[oid] = { name: oname, revenue: 0 };
-    ownerRevenue[oid].revenue += Number(r.total_amount) || 0;
+    ownerRevenue[oid].revenue += getNetRevenue(r);
   });
   const ownerList = Object.values(ownerRevenue).sort((a, b) => b.revenue - a.revenue);
 
@@ -214,7 +225,7 @@ function aggregateData(reservations: any[], ownerMap: Record<string, string>) {
   reservations.forEach(r => {
     const lg = r.listing?.location_group || r.listing?.city || "Other";
     if (!locationRevenue[lg]) locationRevenue[lg] = { revenue: 0, nights: 0, bookings: 0 };
-    locationRevenue[lg].revenue += Number(r.total_amount) || 0;
+    locationRevenue[lg].revenue += getNetRevenue(r);
     locationRevenue[lg].bookings += 1;
     const ci = new Date(r.check_in);
     const co = new Date(r.check_out);
@@ -225,7 +236,7 @@ function aggregateData(reservations: any[], ownerMap: Record<string, string>) {
   const monthlyRevenue: Record<string, number> = {};
   reservations.forEach(r => {
     const m = r.check_in?.slice(0, 7); // YYYY-MM
-    if (m) monthlyRevenue[m] = (monthlyRevenue[m] || 0) + (Number(r.total_amount) || 0);
+    if (m) monthlyRevenue[m] = (monthlyRevenue[m] || 0) + getNetRevenue(r);
   });
 
   return {

@@ -7,6 +7,18 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Net (management) revenue: prefer hostPayout, else totalPrice minus fees
+function getNetRevenue(r: any): number {
+  if (!r) return 0;
+  if (r.host_payout != null && Number(r.host_payout) > 0) return Number(r.host_payout);
+  const total = Number(r.total_amount ?? 0);
+  const cleaning = Number(r.cleaning_fee ?? 0);
+  const commission = Number(r.channel_commission ?? 0);
+  const tax = Number(r.tax_amount ?? 0);
+  if (cleaning > 0 || commission > 0 || tax > 0) return Math.max(0, total - cleaning - commission - tax);
+  return total;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
