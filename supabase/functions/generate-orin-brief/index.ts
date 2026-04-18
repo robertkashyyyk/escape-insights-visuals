@@ -109,9 +109,10 @@ serve(async (req) => {
       // Aggregate data
       const stats = aggregateData(reservations, ownerMap);
       const lyStats = lyReservations && lyReservations.length > 0 ? aggregateData(lyReservations, ownerMap) : null;
+      const cancellations = buildCancellationStats(cancelledRes || [], reservations.length);
 
       // Build prompt
-      const prompt = buildPrompt(period_type, period_label, period_start, period_end, stats, lyStats, listings?.length || 0);
+      const prompt = buildPrompt(period_type, period_label, period_start, period_end, stats, lyStats, listings?.length || 0, cancellations);
 
       // Call AI
       const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
