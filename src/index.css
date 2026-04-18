@@ -5,7 +5,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
 
 @layer base {
-  :root {
+  :root,
+  .dark {
     --background: 222 25% 6%;
     --foreground: 220 20% 92%;
 
@@ -59,7 +60,72 @@
     --chart-4: 340 65% 55%;
     --chart-5: 200 70% 50%;
 
+    /* Heatmap traffic-light scale */
+    --heat-empty: 220 13% 18%;
+    --heat-low: 0 84% 60%;
+    --heat-mid: 38 92% 50%;
+    --heat-high: 84 81% 44%;
+    --heat-excellent: 142 71% 45%;
+
     font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  .light {
+    --background: 210 17% 98%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 30 92% 44%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 174 60% 36%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 30 92% 44%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 9% 46%;
+    --sidebar-primary: 30 92% 44%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 30 92% 44%;
+
+    --glass: 0 0% 100%;
+    --glass-border: 220 13% 88%;
+    --glass-highlight: 222 47% 11%;
+    --glow-primary: 30 92% 44%;
+    --glow-accent: 174 60% 36%;
+    --success: 142 71% 38%;
+    --warning: 30 92% 44%;
+    --chart-1: 30 92% 44%;
+    --chart-2: 174 60% 36%;
+    --chart-3: 262 60% 50%;
+    --chart-4: 340 65% 50%;
+    --chart-5: 200 70% 45%;
+
+    --heat-empty: 220 14% 88%;
+    --heat-low: 0 72% 51%;
+    --heat-mid: 30 92% 44%;
+    --heat-high: 84 70% 38%;
+    --heat-excellent: 142 71% 38%;
   }
 }
 
@@ -85,6 +151,12 @@
       0 0 0 1px hsl(var(--glass-border) / 0.3),
       0 4px 24px -4px hsl(222 25% 4% / 0.5),
       inset 0 1px 0 0 hsl(var(--glass-highlight) / 0.05);
+  }
+  .light .glass-card {
+    box-shadow:
+      0 0 0 1px hsl(var(--glass-border) / 0.6),
+      0 4px 16px -8px hsl(222 47% 11% / 0.08),
+      inset 0 1px 0 0 hsl(0 0% 100% / 0.6);
   }
   .glass-card-hover {
     @apply glass-card transition-all duration-300;
