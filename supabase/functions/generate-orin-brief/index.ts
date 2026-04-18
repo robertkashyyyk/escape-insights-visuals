@@ -373,21 +373,6 @@ Return a JSON object with this exact structure:
   "seasonal_commentary": "How this quarter compared to the same quarter last year. Specific patterns and shifts.",
   "forward_outlook": "Based on the data, what should the team focus on next quarter. Be opinionated and specific.",
   "commentary": "One paragraph narrative tying it all together. Sharp and direct."
-
-  return `${base}
-
-Return a JSON object with this exact structure:
-{
-  "headline": "One sentence summary of the quarter",
-  "snapshot": { "total_revenue": "£X", "adr": "£X", "occupancy_note": "text", "vs_last_year": "text" },
-  "monthly_trend": [{ "month": "...", "revenue": "£X" }],
-  "top_properties": [{ "name": "...", "revenue": "£X", "note": "..." }],
-  "watch_list": [{ "name": "...", "issue": "..." }],
-  "owner_rankings": [{ "name": "...", "revenue": "£X" }],
-  "location_performance": [{ "group": "...", "revenue": "£X", "bookings": X, "avg_night_revenue": "£X" }],
-  "platform_breakdown": { "airbnb": "X%", "booking_com": "X%", "direct": "X%", "other": "X%" },
-  "seasonal_commentary": "How this quarter compared to the same quarter last year. Specific patterns and shifts.",
-  "forward_outlook": "Based on the data, what should the team focus on next quarter. Be opinionated and specific.",
-  "commentary": "One paragraph narrative tying it all together. Sharp and direct."
 }`;
 }
+
