@@ -8,6 +8,7 @@ import {
   eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval,
   eachQuarterOfInterval, addYears, isBefore, isAfter
 } from "date-fns";
+import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
 export type ZoomLevel = "Day" | "Week" | "Month" | "Quarter" | "Year";
 
@@ -125,7 +126,7 @@ export function useOwnerGraphData(
       if (listingIds.length > 0) {
         const { data } = await supabase
           .from("reservations")
-          .select("listing_id, check_in, check_out, total_amount, status, reservation_date")
+          .select(`listing_id, check_in, check_out, status, reservation_date, ${REVENUE_FIELDS}`)
           .in("listing_id", listingIds)
           .eq("status", "confirmed");
         reservations = data || [];
@@ -158,7 +159,7 @@ export function useOwnerGraphData(
           const calcValue = (set: any[]) => {
             switch (base) {
               case "revenue":
-                return Math.round(set.reduce((s: number, r: any) => s + (r.total_amount || 0), 0) * 100) / 100;
+                return Math.round(set.reduce((s: number, r: any) => s + getNetRevenue(r), 0) * 100) / 100;
               case "bookings":
                 return set.length;
               case "nights": {
@@ -183,7 +184,7 @@ export function useOwnerGraphData(
                 } else {
                   nights = set.reduce((s: number, r: any) => s + nightsInRange(new Date(r.check_in), new Date(r.check_out), bStart, bEnd), 0);
                 }
-                const rev = Math.round(set.reduce((s: number, r: any) => s + (r.total_amount || 0), 0) * 100) / 100;
+                const rev = Math.round(set.reduce((s: number, r: any) => s + getNetRevenue(r), 0) * 100) / 100;
                 return nights > 0 ? Math.round((rev / nights) * 100) / 100 : 0;
               }
               default: return 0;

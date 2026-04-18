@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { differenceInDays, parseISO, startOfYear, endOfYear, format } from "date-fns";
+import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
 interface PropertyBreakdown {
   listingId: string;
@@ -48,7 +49,7 @@ export function useOwnerPortfolio(ownerId: string | null, year: number) {
       // Fetch all reservations for these listings in the year
       const { data: reservations } = await supabase
         .from("reservations")
-        .select("listing_id, check_in, check_out, total_amount")
+        .select(`listing_id, check_in, check_out, ${REVENUE_FIELDS}`)
         .in("listing_id", listingIds)
         .gte("check_in", yearStart)
         .lte("check_in", yearEnd)
@@ -62,7 +63,7 @@ export function useOwnerPortfolio(ownerId: string | null, year: number) {
 
       for (const r of rows) {
         const nights = Math.max(1, differenceInDays(parseISO(r.check_out), parseISO(r.check_in)));
-        const rev = r.total_amount ?? 0;
+        const rev = getNetRevenue(r as any);
 
         if (!byListing[r.listing_id]) byListing[r.listing_id] = { revenue: 0, nights: 0 };
         byListing[r.listing_id].revenue += rev;

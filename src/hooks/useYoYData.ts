@@ -13,6 +13,7 @@ import {
   differenceInCalendarDays,
   format,
 } from "date-fns";
+import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
 export type PeriodType = "week" | "month" | "quarter";
 
@@ -70,13 +71,13 @@ export function useYoYData(periodType: PeriodType, periodValue: number, year: nu
         await Promise.all([
           supabase
             .from("reservations")
-            .select("listing_id, total_amount, check_in, check_out")
+            .select(`listing_id, check_in, check_out, ${REVENUE_FIELDS}`)
             .gte("check_in", fmt(current.start))
             .lte("check_in", fmt(current.end))
             .eq("status", "confirmed"),
           supabase
             .from("reservations")
-            .select("listing_id, total_amount, check_in, check_out")
+            .select(`listing_id, check_in, check_out, ${REVENUE_FIELDS}`)
             .gte("check_in", fmt(previous.start))
             .lte("check_in", fmt(previous.end))
             .eq("status", "confirmed"),
@@ -93,7 +94,7 @@ export function useYoYData(periodType: PeriodType, periodValue: number, year: nu
         for (const r of rows || []) {
           const nights = differenceInCalendarDays(new Date(r.check_out), new Date(r.check_in));
           const prev = map.get(r.listing_id) || { revenue: 0, nights: 0 };
-          prev.revenue += Number(r.total_amount || 0);
+          prev.revenue += getNetRevenue(r as any);
           prev.nights += nights > 0 ? nights : 1;
           map.set(r.listing_id, prev);
         }

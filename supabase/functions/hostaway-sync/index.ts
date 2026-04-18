@@ -238,6 +238,18 @@ Deno.serve(async (req) => {
         const checkInTime = fmtResTime(r.arrivalTime ?? r.checkInTime);
         const checkOutTime = fmtResTime(r.departureTime ?? r.checkOutTime);
 
+        // Financial fields from Hostaway
+        // totalPrice = full gross amount the guest paid
+        // hostPayout = net amount actually paid to the host (after channel commission, taxes withheld by channel, etc.)
+        const totalPrice = Number(r.totalPrice ?? r.basePrice ?? 0);
+        const hostPayout = r.hostPayout != null ? Number(r.hostPayout) : null;
+        const cleaningFee = Number(r.cleaningFee ?? r.cleaningFeeValue ?? 0);
+        const channelCommission = Number(
+          r.channelCommissionAmount ?? r.channelCommission ?? r.hostChannelFee ?? 0
+        );
+        const taxAmount = Number(r.totalTax ?? r.taxAmount ?? r.cityTax ?? 0);
+        const guestFees = Number(r.guestFeeAmount ?? 0);
+
         rows.push({
           hostaway_reservation_id: r.id,
           listing_id: listingUuid,
@@ -248,9 +260,13 @@ Deno.serve(async (req) => {
           check_out_time: checkOutTime,
           status,
           platform: platform.toLowerCase(),
-          total_amount: r.totalPrice || r.basePrice || 0,
-          owner_payout: r.hostPayout || r.totalPrice || 0,
-          guest_fees: r.guestFeeAmount || 0,
+          total_amount: totalPrice,
+          host_payout: hostPayout,
+          owner_payout: hostPayout ?? totalPrice,
+          cleaning_fee: cleaningFee,
+          channel_commission: channelCommission,
+          tax_amount: taxAmount,
+          guest_fees: guestFees,
           reservation_date: reservationDate,
           booking_lead_days: bookingLeadDays,
           day_of_week: dayOfWeek,

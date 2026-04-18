@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfMonth, addMonths, format, subYears, differenceInDays } from "date-fns";
+import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
 interface ForecastMonth {
   month: string;
@@ -34,7 +35,7 @@ export function useRevenueForecaster() {
       // Fetch current reservations for next 3 months
       const { data: currentRes } = await supabase
         .from("reservations")
-        .select("listing_id, check_in, total_amount")
+        .select(`listing_id, check_in, ${REVENUE_FIELDS}`)
         .gte("check_in", currentStart)
         .lt("check_in", currentEnd)
         .eq("status", "confirmed");
@@ -42,7 +43,7 @@ export function useRevenueForecaster() {
       // Fetch last year's reservations for same 3 months
       const { data: lastYearRes } = await supabase
         .from("reservations")
-        .select("listing_id, check_in, total_amount, reservation_date")
+        .select(`listing_id, check_in, reservation_date, ${REVENUE_FIELDS}`)
         .gte("check_in", lastYearStart)
         .lt("check_in", lastYearEnd)
         .eq("status", "confirmed");
@@ -63,7 +64,7 @@ export function useRevenueForecaster() {
           const ci = new Date(r.check_in);
           if (ci >= monthStart && ci < monthEnd) {
             const grp = listingMap.get(r.listing_id) ?? "Unknown";
-            otbByGroup.set(grp, (otbByGroup.get(grp) ?? 0) + (r.total_amount ?? 0));
+            otbByGroup.set(grp, (otbByGroup.get(grp) ?? 0) + getNetRevenue(r as any));
           }
         });
 
@@ -76,7 +77,7 @@ export function useRevenueForecaster() {
           const ci = new Date(r.check_in);
           if (ci >= lyMonthStart && ci < lyMonthEnd) {
             const grp = listingMap.get(r.listing_id) ?? "Unknown";
-            const amt = r.total_amount ?? 0;
+            const amt = getNetRevenue(r as any);
             lyFinalByGroup.set(grp, (lyFinalByGroup.get(grp) ?? 0) + amt);
             if (r.reservation_date && r.reservation_date <= lyCutoff) {
               lyOtbByGroup.set(grp, (lyOtbByGroup.get(grp) ?? 0) + amt);
