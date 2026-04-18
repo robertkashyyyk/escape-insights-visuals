@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LogOut, Check, Eye } from "lucide-react";
+import { Loader2, LogOut, Check, Eye, Sun, Moon } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
@@ -331,22 +332,25 @@ export default function CleanerPortal() {
             alt="Escape Grids"
             className="h-7 w-7 object-contain opacity-60"
           />
-          {!isPreviewMode ? (
-            <button
-              onClick={signOut}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors min-h-[48px] flex items-center"
-            >
-              <LogOut className="h-3.5 w-3.5 mr-1" />
-              Sign out
-            </button>
-          ) : (
-            <a
-              href="/today"
-              className="text-xs text-primary hover:text-primary/80 transition-colors min-h-[48px] flex items-center font-medium"
-            >
-              ← Back to app
-            </a>
-          )}
+          <div className="flex items-center gap-2">
+            <ThemeToggleButton />
+            {!isPreviewMode ? (
+              <button
+                onClick={signOut}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors min-h-[48px] flex items-center"
+              >
+                <LogOut className="h-3.5 w-3.5 mr-1" />
+                Sign out
+              </button>
+            ) : (
+              <a
+                href="/today"
+                className="text-xs text-primary hover:text-primary/80 transition-colors min-h-[48px] flex items-center font-medium"
+              >
+                ← Back to app
+              </a>
+            )}
+          </div>
         </div>
 
         {/* Sticky header */}
@@ -545,3 +549,18 @@ export default function CleanerPortal() {
     </div>
   );
 }
+
+function ThemeToggleButton() {
+  const { theme, toggleTheme } = useTheme();
+  return (
+    <button
+      onClick={toggleTheme}
+      className="text-muted-foreground hover:text-foreground transition-colors min-h-[48px] min-w-[48px] flex items-center justify-center"
+      aria-label="Toggle theme"
+      title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+    >
+      {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
+  );
+}
+

@@ -3,12 +3,13 @@ import {
   Building2, Users, Briefcase, Settings, LogOut, Telescope,
   Gauge, Target, Sparkles, Home, ChevronRight, Brush, BookOpen,
   FileText, Link, UserSearch, Mail, Send, Megaphone, ClipboardList,
-  Eye,
+  Eye, Sun, Moon,
   LucideIcon,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth, useRole } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Badge } from "@/components/ui/badge";
 import { useState, useCallback } from "react";
 
@@ -132,6 +133,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { user, profile, signOut } = useAuth();
   const { role } = useRole();
+  const { theme, toggleTheme } = useTheme();
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
   const getInitialSectionState = (): Record<string, boolean> => {
@@ -384,6 +386,14 @@ export function AppSidebar() {
                   </Badge>
                 )}
               </div>
+              <button
+                onClick={toggleTheme}
+                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                aria-label="Toggle theme"
+              >
+                {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+              </button>
               <button
                 onClick={signOut}
                 className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"

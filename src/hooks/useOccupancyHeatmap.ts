@@ -7,6 +7,7 @@ export interface MonthCell {
   nightsBooked: number;
   nightsAvailable: number;
   revenue: number;
+  bookings: number;
 }
 
 export interface ListingOccupancy {
@@ -52,6 +53,7 @@ export function useOccupancyHeatmap(year: number) {
           const daysInMonth = getDaysInMonth(mStart);
           let nights = 0;
           let revenue = 0;
+          let bookings = 0;
 
           resos.forEach((r) => {
             const ci = parseISO(r.check_in);
@@ -62,6 +64,7 @@ export function useOccupancyHeatmap(year: number) {
             if (overlapStart < overlapEnd) {
               const overlapNights = differenceInDays(overlapEnd, overlapStart);
               nights += overlapNights;
+              bookings += 1;
               if (r.total_amount && totalNights > 0) {
                 revenue += (r.total_amount / totalNights) * overlapNights;
               }
@@ -69,7 +72,7 @@ export function useOccupancyHeatmap(year: number) {
           });
 
           const occupancy = Math.min(100, Math.round((nights / daysInMonth) * 100));
-          months.push({ occupancy, nightsBooked: nights, nightsAvailable: daysInMonth, revenue: Math.round(revenue) });
+          months.push({ occupancy, nightsBooked: nights, nightsAvailable: daysInMonth, revenue: Math.round(revenue), bookings });
         }
 
         return { id: listing.id, name: listing.name, locationGroup: listing.location_group || "Ungrouped", months };

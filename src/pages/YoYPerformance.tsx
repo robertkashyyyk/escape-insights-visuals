@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus, LayoutGrid, Table as TableIcon } from "lucide-react";
+import { YoYTable } from "@/components/yoy/YoYTable";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const QUARTERS = ["Q1","Q2","Q3","Q4"];
@@ -135,6 +136,17 @@ export default function YoYPerformance() {
   const [periodValue, setPeriodValue] = useState<number>(getDefaultPeriodValue("month"));
   const [year, setYear] = useState(getDefaultYear("month"));
   const [likeForLike, setLikeForLike] = useState(false);
+  const [viewMode, setViewMode] = useState<"card" | "table">(() => {
+    try {
+      const stored = sessionStorage.getItem("yoy-view-mode");
+      return stored === "table" ? "table" : "card";
+    } catch { return "card"; }
+  });
+
+  const handleViewMode = (m: "card" | "table") => {
+    setViewMode(m);
+    try { sessionStorage.setItem("yoy-view-mode", m); } catch {}
+  };
 
   const { data, isLoading } = useYoYData(periodType, periodValue, year);
   const options = getPeriodOptions(periodType);
@@ -213,54 +225,94 @@ export default function YoYPerformance() {
               </span>
             )}
           </p>
-          <div className="flex items-center gap-2">
-            <Switch
-              id="like-for-like"
-              checked={likeForLike}
-              onCheckedChange={setLikeForLike}
-            />
-            <Label htmlFor="like-for-like" className="text-xs text-muted-foreground cursor-pointer">
-              Like-for-like only
-              <span className="block text-[10px] text-muted-foreground/70">
-                Excludes properties without bookings in both years
-              </span>
-            </Label>
+          <div className="flex items-center gap-3">
+            {/* View mode toggle */}
+            <div className="flex rounded-lg border border-border/50 overflow-hidden">
+              <button
+                onClick={() => handleViewMode("card")}
+                className={`px-2.5 py-1 text-xs font-medium gap-1.5 inline-flex items-center transition-colors ${
+                  viewMode === "card"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                }`}
+                aria-pressed={viewMode === "card"}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" /> Cards
+              </button>
+              <button
+                onClick={() => handleViewMode("table")}
+                className={`px-2.5 py-1 text-xs font-medium gap-1.5 inline-flex items-center transition-colors ${
+                  viewMode === "table"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                }`}
+                aria-pressed={viewMode === "table"}
+              >
+                <TableIcon className="h-3.5 w-3.5" /> Table
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="like-for-like"
+                checked={likeForLike}
+                onCheckedChange={setLikeForLike}
+              />
+              <Label htmlFor="like-for-like" className="text-xs text-muted-foreground cursor-pointer">
+                Like-for-like only
+                <span className="block text-[10px] text-muted-foreground/70">
+                  Excludes properties without bookings in both years
+                </span>
+              </Label>
+            </div>
           </div>
         </div>
 
-        {/* Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {isLoading
-            ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
-            : filteredData?.length === 0
-              ? (
-                <div className="col-span-full text-center py-16 text-muted-foreground text-sm">
-                  {likeForLike
-                    ? "No properties have confirmed bookings in both years for this period."
-                    : "No reservation data for this period."}
-                </div>
-              )
-              : filteredData?.map((p) => (
-                <Card key={p.listingId} className="glass-card border-border/30 hover:border-primary/20 transition-colors">
-                  <CardContent className="p-5">
-                    <h3 className="font-display font-semibold text-foreground text-sm truncate">{p.name}</h3>
-                    {p.city && (
-                      <p className="text-[11px] text-muted-foreground mt-0.5">{p.city}</p>
-                    )}
-                    <div className="mt-4">
-                      <MetricRow label="Revenue" value={fmt(p.currentRevenue)} current={p.currentRevenue} previous={p.previousRevenue} />
-                      <MetricRow label="ADR" value={fmt(p.currentAdr)} current={p.currentAdr} previous={p.previousAdr} />
-                      <MetricRow
-                        label="Occupancy"
-                        value={`${p.currentOccupancy.toFixed(1)}%`}
-                        current={p.currentOccupancy}
-                        previous={p.previousOccupancy}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-        </div>
+        {/* Content */}
+        {viewMode === "table" ? (
+          isLoading ? (
+            <div className="glass-card p-6"><Skeleton className="h-64 w-full" /></div>
+          ) : (
+            <YoYTable
+              data={filteredData ?? []}
+              currentYear={year}
+              previousYear={year - 1}
+              filenamePrefix={`yoy-${year - 1}-vs-${year}`}
+            />
+          )
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {isLoading
+              ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+              : filteredData?.length === 0
+                ? (
+                  <div className="col-span-full text-center py-16 text-muted-foreground text-sm">
+                    {likeForLike
+                      ? "No properties have confirmed bookings in both years for this period."
+                      : "No reservation data for this period."}
+                  </div>
+                )
+                : filteredData?.map((p) => (
+                  <Card key={p.listingId} className="glass-card border-border/30 hover:border-primary/20 transition-colors">
+                    <CardContent className="p-5">
+                      <h3 className="font-display font-semibold text-foreground text-sm truncate">{p.name}</h3>
+                      {p.city && (
+                        <p className="text-[11px] text-muted-foreground mt-0.5">{p.city}</p>
+                      )}
+                      <div className="mt-4">
+                        <MetricRow label="Revenue" value={fmt(p.currentRevenue)} current={p.currentRevenue} previous={p.previousRevenue} />
+                        <MetricRow label="ADR" value={fmt(p.currentAdr)} current={p.currentAdr} previous={p.previousAdr} />
+                        <MetricRow
+                          label="Occupancy"
+                          value={`${p.currentOccupancy.toFixed(1)}%`}
+                          current={p.currentOccupancy}
+                          previous={p.previousOccupancy}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+          </div>
+        )}
       </div>
     </AppLayout>
   );

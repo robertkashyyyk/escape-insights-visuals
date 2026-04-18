@@ -1,7 +1,8 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useOwnerPreview } from "@/contexts/OwnerPreviewContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { NavLink, useNavigate } from "react-router-dom";
-import { LogOut, Home, CalendarDays, FileText, Eye, BarChart3 } from "lucide-react";
+import { LogOut, Home, CalendarDays, FileText, Eye, BarChart3, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { OrinChatFAB } from "@/components/orin/OrinChatFAB";
@@ -16,6 +17,7 @@ const navItems = [
 export function OwnerLayout({ children }: { children: React.ReactNode }) {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useTheme();
   const { isPreviewMode, selectedOwnerId, setSelectedOwnerId, allOwners, selectedOwnerName } = useOwnerPreview();
 
   const handleSignOut = async () => {
@@ -94,6 +96,16 @@ export function OwnerLayout({ children }: { children: React.ReactNode }) {
               <span className="text-xs text-muted-foreground hidden md:block">
                 {displayName}
               </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleTheme}
+                className="text-muted-foreground hover:text-foreground h-8 w-8 p-0"
+                aria-label="Toggle theme"
+                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              >
+                {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+              </Button>
               {!isPreviewMode && (
                 <Button
                   variant="ghost"
