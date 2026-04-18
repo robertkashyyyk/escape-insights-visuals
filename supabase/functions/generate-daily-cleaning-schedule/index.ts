@@ -136,13 +136,15 @@ Deno.serve(async (req) => {
     );
   } catch (err) {
     console.error("Schedule generation error:", err);
-    await supabase.from("automation_logs").insert({
-      tasks_created: 0,
-      tasks_unassigned: 0,
-      status: "error",
-      error_message: (err as Error).message,
-      triggered_by: "edge_function",
-    }).catch(() => {});
+    try {
+      await supabase.from("automation_logs").insert({
+        tasks_created: 0,
+        tasks_unassigned: 0,
+        status: "error",
+        error_message: (err as Error).message,
+        triggered_by: "edge_function",
+      });
+    } catch { /* ignore */ }
     return new Response(
       JSON.stringify({ error: (err as Error).message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
