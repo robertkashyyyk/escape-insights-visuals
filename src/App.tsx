@@ -36,6 +36,8 @@ import OwnerPortfolio from "./pages/owner/OwnerPortfolio";
 import OwnerReservations from "./pages/owner/OwnerReservations";
 import OwnerStatements from "./pages/owner/OwnerStatements";
 import OwnerGraphs from "./pages/owner/OwnerGraphs";
+import PropertyKnowledge from "./pages/PropertyKnowledge";
+import PropertyKnowledgeDetail from "./pages/PropertyKnowledgeDetail";
 
 const queryClient = new QueryClient();
 
@@ -75,7 +77,8 @@ const App = () => (
             <Route path="/operations/schedule" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><CleaningSchedule /></ProtectedRoute>} />
             <Route path="/operations/cleaning" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><CleaningSchedule /></ProtectedRoute>} />
             <Route path="/operations/numbers" element={<ProtectedRoute requiredRoles={["super", "senior"]}><CleaningNumbers /></ProtectedRoute>} />
-            <Route path="/property-knowledge" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Property Knowledge" /></ProtectedRoute>} />
+            <Route path="/property-knowledge" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PropertyKnowledge /></ProtectedRoute>} />
+            <Route path="/property-knowledge/:listingId" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PropertyKnowledgeDetail /></ProtectedRoute>} />
             <Route path="/owner-reports" element={<ProtectedRoute requiredRoles={["super", "senior"]}><MonthlyReport /></ProtectedRoute>} />
             <Route path="/owner-reports/invoice" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ComingSoon title="Owner Reports — Invoice Generator" /></ProtectedRoute>} />
             <Route path="/xero-sync" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ComingSoon title="Xero Sync" /></ProtectedRoute>} />

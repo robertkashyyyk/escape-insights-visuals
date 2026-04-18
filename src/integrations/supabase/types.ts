@@ -519,6 +519,414 @@ export type Database = {
         }
         Relationships: []
       }
+      property_appliances: {
+        Row: {
+          common_issues: string | null
+          created_at: string
+          id: string
+          instructions: string | null
+          listing_id: string
+          location: string | null
+          manual_url: string | null
+          model_number: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          common_issues?: string | null
+          created_at?: string
+          id?: string
+          instructions?: string | null
+          listing_id: string
+          location?: string | null
+          manual_url?: string | null
+          model_number?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          common_issues?: string | null
+          created_at?: string
+          id?: string
+          instructions?: string | null
+          listing_id?: string
+          location?: string | null
+          manual_url?: string | null
+          model_number?: string | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_appliances_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          listing_id: string
+          name: string
+          notes: string | null
+          phone: string | null
+          role: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          listing_id: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          role?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          listing_id?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_contacts_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_documents: {
+        Row: {
+          created_at: string
+          expiry_date: string | null
+          id: string
+          listing_id: string
+          notes: string | null
+          title: string
+          type: string
+          url: string | null
+        }
+        Insert: {
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          listing_id: string
+          notes?: string | null
+          title: string
+          type?: string
+          url?: string | null
+        }
+        Update: {
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          listing_id?: string
+          notes?: string | null
+          title?: string
+          type?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_documents_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_knowledge: {
+        Row: {
+          access_notes: string | null
+          alarm_code: string | null
+          backup_network: string | null
+          bin_collection_day: string | null
+          bin_location: string | null
+          boiler_location: string | null
+          boiler_make_model: string | null
+          boiler_reset_procedure: string | null
+          cleaning_duration_hours: number | null
+          cleaning_notes: string | null
+          cleaning_quirks: string | null
+          cleaning_supplies_location: string | null
+          completion_score: number
+          created_at: string
+          electric_meter_location: string | null
+          fusebox_location: string | null
+          gas_meter_location: string | null
+          gate_code: string | null
+          general_notes: string | null
+          has_hot_tub: boolean
+          heating_notes: string | null
+          heating_system_type: string | null
+          hot_tub_chemical_schedule: string | null
+          hot_tub_error_codes: Json | null
+          hot_tub_filter_frequency: string | null
+          hot_tub_last_service: string | null
+          hot_tub_make_model: string | null
+          hot_tub_notes: string | null
+          hot_tub_supplier_contact: string | null
+          hot_tub_target_temp: number | null
+          hot_water_cylinder_location: string | null
+          id: string
+          immersion_heater_details: string | null
+          key_features: string | null
+          key_safe_code: string | null
+          key_safe_location: string | null
+          last_updated_by: string | null
+          linen_storage_location: string | null
+          listing_id: string
+          lock_type: string | null
+          oil_supplier_contact: string | null
+          oil_tank_location: string | null
+          property_type: string | null
+          recycling_notes: string | null
+          router_location: string | null
+          router_reset_procedure: string | null
+          spare_key_location: string | null
+          stopcock_location: string | null
+          thermostat_location: string | null
+          updated_at: string
+          utility_notes: string | null
+          water_pressure_notes: string | null
+          wifi_notes: string | null
+          wifi_password: string | null
+          wifi_ssid: string | null
+        }
+        Insert: {
+          access_notes?: string | null
+          alarm_code?: string | null
+          backup_network?: string | null
+          bin_collection_day?: string | null
+          bin_location?: string | null
+          boiler_location?: string | null
+          boiler_make_model?: string | null
+          boiler_reset_procedure?: string | null
+          cleaning_duration_hours?: number | null
+          cleaning_notes?: string | null
+          cleaning_quirks?: string | null
+          cleaning_supplies_location?: string | null
+          completion_score?: number
+          created_at?: string
+          electric_meter_location?: string | null
+          fusebox_location?: string | null
+          gas_meter_location?: string | null
+          gate_code?: string | null
+          general_notes?: string | null
+          has_hot_tub?: boolean
+          heating_notes?: string | null
+          heating_system_type?: string | null
+          hot_tub_chemical_schedule?: string | null
+          hot_tub_error_codes?: Json | null
+          hot_tub_filter_frequency?: string | null
+          hot_tub_last_service?: string | null
+          hot_tub_make_model?: string | null
+          hot_tub_notes?: string | null
+          hot_tub_supplier_contact?: string | null
+          hot_tub_target_temp?: number | null
+          hot_water_cylinder_location?: string | null
+          id?: string
+          immersion_heater_details?: string | null
+          key_features?: string | null
+          key_safe_code?: string | null
+          key_safe_location?: string | null
+          last_updated_by?: string | null
+          linen_storage_location?: string | null
+          listing_id: string
+          lock_type?: string | null
+          oil_supplier_contact?: string | null
+          oil_tank_location?: string | null
+          property_type?: string | null
+          recycling_notes?: string | null
+          router_location?: string | null
+          router_reset_procedure?: string | null
+          spare_key_location?: string | null
+          stopcock_location?: string | null
+          thermostat_location?: string | null
+          updated_at?: string
+          utility_notes?: string | null
+          water_pressure_notes?: string | null
+          wifi_notes?: string | null
+          wifi_password?: string | null
+          wifi_ssid?: string | null
+        }
+        Update: {
+          access_notes?: string | null
+          alarm_code?: string | null
+          backup_network?: string | null
+          bin_collection_day?: string | null
+          bin_location?: string | null
+          boiler_location?: string | null
+          boiler_make_model?: string | null
+          boiler_reset_procedure?: string | null
+          cleaning_duration_hours?: number | null
+          cleaning_notes?: string | null
+          cleaning_quirks?: string | null
+          cleaning_supplies_location?: string | null
+          completion_score?: number
+          created_at?: string
+          electric_meter_location?: string | null
+          fusebox_location?: string | null
+          gas_meter_location?: string | null
+          gate_code?: string | null
+          general_notes?: string | null
+          has_hot_tub?: boolean
+          heating_notes?: string | null
+          heating_system_type?: string | null
+          hot_tub_chemical_schedule?: string | null
+          hot_tub_error_codes?: Json | null
+          hot_tub_filter_frequency?: string | null
+          hot_tub_last_service?: string | null
+          hot_tub_make_model?: string | null
+          hot_tub_notes?: string | null
+          hot_tub_supplier_contact?: string | null
+          hot_tub_target_temp?: number | null
+          hot_water_cylinder_location?: string | null
+          id?: string
+          immersion_heater_details?: string | null
+          key_features?: string | null
+          key_safe_code?: string | null
+          key_safe_location?: string | null
+          last_updated_by?: string | null
+          linen_storage_location?: string | null
+          listing_id?: string
+          lock_type?: string | null
+          oil_supplier_contact?: string | null
+          oil_tank_location?: string | null
+          property_type?: string | null
+          recycling_notes?: string | null
+          router_location?: string | null
+          router_reset_procedure?: string | null
+          spare_key_location?: string | null
+          stopcock_location?: string | null
+          thermostat_location?: string | null
+          updated_at?: string
+          utility_notes?: string | null
+          water_pressure_notes?: string | null
+          wifi_notes?: string | null
+          wifi_password?: string | null
+          wifi_ssid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_knowledge_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: true
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_known_issues: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          description: string | null
+          id: string
+          listing_id: string
+          next_action: string | null
+          next_action_date: string | null
+          priority: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          listing_id: string
+          next_action?: string | null
+          next_action_date?: string | null
+          priority?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          listing_id?: string
+          next_action?: string | null
+          next_action_date?: string | null
+          priority?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_known_issues_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_maintenance_log: {
+        Row: {
+          action_taken: string | null
+          cost: number | null
+          created_at: string
+          created_by: string | null
+          date: string
+          id: string
+          issue_description: string
+          listing_id: string
+          resolved_by: string | null
+          status: string
+        }
+        Insert: {
+          action_taken?: string | null
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          issue_description: string
+          listing_id: string
+          resolved_by?: string | null
+          status?: string
+        }
+        Update: {
+          action_taken?: string | null
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          id?: string
+          issue_description?: string
+          listing_id?: string
+          resolved_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_maintenance_log_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_owners: {
         Row: {
           company: string | null
@@ -739,9 +1147,163 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      property_knowledge_cleaner: {
+        Row: {
+          access_notes: string | null
+          bin_collection_day: string | null
+          bin_location: string | null
+          boiler_location: string | null
+          cleaning_duration_hours: number | null
+          cleaning_notes: string | null
+          cleaning_quirks: string | null
+          cleaning_supplies_location: string | null
+          completion_score: number | null
+          fusebox_location: string | null
+          has_hot_tub: boolean | null
+          hot_tub_chemical_schedule: string | null
+          hot_tub_filter_frequency: string | null
+          hot_tub_target_temp: number | null
+          id: string | null
+          key_features: string | null
+          key_safe_location: string | null
+          linen_storage_location: string | null
+          listing_id: string | null
+          lock_type: string | null
+          property_type: string | null
+          recycling_notes: string | null
+          router_location: string | null
+          spare_key_location: string | null
+          stopcock_location: string | null
+          updated_at: string | null
+          wifi_ssid: string | null
+        }
+        Insert: {
+          access_notes?: string | null
+          bin_collection_day?: string | null
+          bin_location?: string | null
+          boiler_location?: string | null
+          cleaning_duration_hours?: number | null
+          cleaning_notes?: string | null
+          cleaning_quirks?: string | null
+          cleaning_supplies_location?: string | null
+          completion_score?: number | null
+          fusebox_location?: string | null
+          has_hot_tub?: boolean | null
+          hot_tub_chemical_schedule?: string | null
+          hot_tub_filter_frequency?: string | null
+          hot_tub_target_temp?: number | null
+          id?: string | null
+          key_features?: string | null
+          key_safe_location?: string | null
+          linen_storage_location?: string | null
+          listing_id?: string | null
+          lock_type?: string | null
+          property_type?: string | null
+          recycling_notes?: string | null
+          router_location?: string | null
+          spare_key_location?: string | null
+          stopcock_location?: string | null
+          updated_at?: string | null
+          wifi_ssid?: string | null
+        }
+        Update: {
+          access_notes?: string | null
+          bin_collection_day?: string | null
+          bin_location?: string | null
+          boiler_location?: string | null
+          cleaning_duration_hours?: number | null
+          cleaning_notes?: string | null
+          cleaning_quirks?: string | null
+          cleaning_supplies_location?: string | null
+          completion_score?: number | null
+          fusebox_location?: string | null
+          has_hot_tub?: boolean | null
+          hot_tub_chemical_schedule?: string | null
+          hot_tub_filter_frequency?: string | null
+          hot_tub_target_temp?: number | null
+          id?: string | null
+          key_features?: string | null
+          key_safe_location?: string | null
+          linen_storage_location?: string | null
+          listing_id?: string | null
+          lock_type?: string | null
+          property_type?: string | null
+          recycling_notes?: string | null
+          router_location?: string | null
+          spare_key_location?: string | null
+          stopcock_location?: string | null
+          updated_at?: string | null
+          wifi_ssid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_knowledge_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: true
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_knowledge_owner: {
+        Row: {
+          completion_score: number | null
+          general_notes: string | null
+          has_hot_tub: boolean | null
+          hot_tub_make_model: string | null
+          id: string | null
+          key_features: string | null
+          listing_id: string | null
+          property_type: string | null
+          router_location: string | null
+          updated_at: string | null
+          wifi_notes: string | null
+          wifi_ssid: string | null
+        }
+        Insert: {
+          completion_score?: number | null
+          general_notes?: string | null
+          has_hot_tub?: boolean | null
+          hot_tub_make_model?: string | null
+          id?: string | null
+          key_features?: string | null
+          listing_id?: string | null
+          property_type?: string | null
+          router_location?: string | null
+          updated_at?: string | null
+          wifi_notes?: string | null
+          wifi_ssid?: string | null
+        }
+        Update: {
+          completion_score?: number | null
+          general_notes?: string | null
+          has_hot_tub?: boolean | null
+          hot_tub_make_model?: string | null
+          id?: string | null
+          key_features?: string | null
+          listing_id?: string | null
+          property_type?: string | null
+          router_location?: string | null
+          updated_at?: string | null
+          wifi_notes?: string | null
+          wifi_ssid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_knowledge_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: true
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      cleaner_assigned_to_listing: {
+        Args: { _listing_id: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -756,6 +1318,10 @@ export type Database = {
           supabase_url?: string
         }
         Returns: undefined
+      }
+      owner_owns_listing: {
+        Args: { _listing_id: string; _user_id: string }
+        Returns: boolean
       }
     }
     Enums: {
