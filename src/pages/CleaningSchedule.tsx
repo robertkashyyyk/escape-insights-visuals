@@ -10,7 +10,9 @@ import {
   ChevronLeft, ChevronRight, RefreshCw, Calendar, CheckCircle2,
   Clock, MapPin, AlertTriangle, ChevronDown, User, Loader2,
 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { MatrixView } from "@/components/cleaning/MatrixView";
+import { useRole } from "@/contexts/AuthContext";
 
 const PRIORITY_CONFIG: Record<Priority, { label: string; color: string; icon: string }> = {
   TIGHT_WINDOW: { label: "TIGHT WINDOW", color: "bg-amber-500/20 text-amber-400 border-amber-500/30", icon: "🟡" },
@@ -19,6 +21,9 @@ const PRIORITY_CONFIG: Record<Priority, { label: string; color: string; icon: st
 };
 
 export default function CleaningSchedule() {
+  const { hasRole } = useRole();
+  const isManager = hasRole("super", "senior", "admin");
+
   const {
     selectedDate, setSelectedDate, viewMode, setViewMode,
     filterCleaner, setFilterCleaner, filterLocation, setFilterLocation,
@@ -27,6 +32,14 @@ export default function CleaningSchedule() {
     regenerate, completeTask, goBack, goForward, isToday, isRegenerating,
     buildDaySchedule,
   } = useCleaningSchedule();
+
+  // Default managers to Matrix view on first load
+  const [defaulted, setDefaulted] = useState(false);
+  useEffect(() => {
+    if (defaulted) return;
+    if (isManager) setViewMode("matrix" as any);
+    setDefaulted(true);
+  }, [isManager, defaulted, setViewMode]);
 
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
 
@@ -136,7 +149,14 @@ export default function CleaningSchedule() {
             >
               Week
             </button>
+            <button
+              onClick={() => setViewMode("matrix" as any)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${(viewMode as any) === "matrix" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Matrix
+            </button>
           </div>
+
 
           <Select value={filterCleaner} onValueChange={setFilterCleaner}>
             <SelectTrigger className="w-40 h-9 text-xs bg-secondary/50 border-border/30">
@@ -160,6 +180,11 @@ export default function CleaningSchedule() {
             </SelectContent>
           </Select>
         </div>
+
+        {/* Matrix View */}
+        {(viewMode as any) === "matrix" && (
+          <MatrixView initialDate={selectedDate} />
+        )}
 
         {/* Week View */}
         {viewMode === "week" && (

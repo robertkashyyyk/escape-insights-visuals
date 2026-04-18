@@ -80,11 +80,14 @@ export type Database = {
           id: string
           is_same_day_turnaround: boolean | null
           listing_id: string
+          notes: string | null
           priority: string
           reservation_id: string | null
           route_order: number | null
           scheduled_date: string
+          source: string
           status: string
+          task_type: string
           travel_time_from_previous_minutes: number | null
           updated_at: string
         }
@@ -99,11 +102,14 @@ export type Database = {
           id?: string
           is_same_day_turnaround?: boolean | null
           listing_id: string
+          notes?: string | null
           priority?: string
           reservation_id?: string | null
           route_order?: number | null
           scheduled_date: string
+          source?: string
           status?: string
+          task_type?: string
           travel_time_from_previous_minutes?: number | null
           updated_at?: string
         }
@@ -118,11 +124,14 @@ export type Database = {
           id?: string
           is_same_day_turnaround?: boolean | null
           listing_id?: string
+          notes?: string | null
           priority?: string
           reservation_id?: string | null
           route_order?: number | null
           scheduled_date?: string
+          source?: string
           status?: string
+          task_type?: string
           travel_time_from_previous_minutes?: number | null
           updated_at?: string
         }
