@@ -181,6 +181,11 @@ export default function CleaningSchedule() {
           </Select>
         </div>
 
+        {/* Matrix View */}
+        {(viewMode as any) === "matrix" && (
+          <MatrixView initialDate={selectedDate} />
+        )}
+
         {/* Week View */}
         {viewMode === "week" && (
           <div className="space-y-6">
