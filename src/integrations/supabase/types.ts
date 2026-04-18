@@ -473,14 +473,17 @@ export type Database = {
       reservations: {
         Row: {
           booking_lead_days: number | null
+          channel_commission: number | null
           check_in: string
           check_in_time: string | null
           check_out: string
           check_out_time: string | null
+          cleaning_fee: number | null
           created_at: string
           day_of_week: number | null
           guest_fees: number | null
           guest_name: string
+          host_payout: number | null
           hostaway_reservation_id: number | null
           id: string
           listing_id: string
@@ -490,20 +493,24 @@ export type Database = {
           quarter: number | null
           reservation_date: string | null
           status: string
+          tax_amount: number | null
           total_amount: number | null
           week_number: number | null
           year: number | null
         }
         Insert: {
           booking_lead_days?: number | null
+          channel_commission?: number | null
           check_in: string
           check_in_time?: string | null
           check_out: string
           check_out_time?: string | null
+          cleaning_fee?: number | null
           created_at?: string
           day_of_week?: number | null
           guest_fees?: number | null
           guest_name: string
+          host_payout?: number | null
           hostaway_reservation_id?: number | null
           id?: string
           listing_id: string
@@ -513,20 +520,24 @@ export type Database = {
           quarter?: number | null
           reservation_date?: string | null
           status?: string
+          tax_amount?: number | null
           total_amount?: number | null
           week_number?: number | null
           year?: number | null
         }
         Update: {
           booking_lead_days?: number | null
+          channel_commission?: number | null
           check_in?: string
           check_in_time?: string | null
           check_out?: string
           check_out_time?: string | null
+          cleaning_fee?: number | null
           created_at?: string
           day_of_week?: number | null
           guest_fees?: number | null
           guest_name?: string
+          host_payout?: number | null
           hostaway_reservation_id?: number | null
           id?: string
           listing_id?: string
@@ -536,6 +547,7 @@ export type Database = {
           quarter?: number | null
           reservation_date?: string | null
           status?: string
+          tax_amount?: number | null
           total_amount?: number | null
           week_number?: number | null
           year?: number | null
