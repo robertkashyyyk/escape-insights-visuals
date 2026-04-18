@@ -6,7 +6,7 @@ import {
   format, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   startOfQuarter, endOfQuarter, startOfYear, endOfYear,
   eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval,
-  eachQuarterOfInterval, addYears, isBefore, isAfter
+  eachQuarterOfInterval, addYears, isBefore, isAfter, endOfDay
 } from "date-fns";
 import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
@@ -48,7 +48,7 @@ function getBuckets(from: Date, to: Date, zoom: ZoomLevel): { label: string; sta
   switch (zoom) {
     case "Day": {
       const days = eachDayOfInterval({ start: from, end: to });
-      days.forEach(d => buckets.push({ label: format(d, "d MMM"), start: d, end: d }));
+      days.forEach(d => buckets.push({ label: format(d, "d MMM"), start: d, end: endOfDay(d) }));
       break;
     }
     case "Week": {
@@ -87,7 +87,8 @@ function getBuckets(from: Date, to: Date, zoom: ZoomLevel): { label: string; sta
 function nightsInRange(ci: Date, co: Date, rangeStart: Date, rangeEnd: Date): number {
   const s = ci < rangeStart ? rangeStart : ci;
   const e = co > rangeEnd ? rangeEnd : co;
-  return Math.max(0, Math.floor((e.getTime() - s.getTime()) / 86400000));
+  // Round up to nearest day to handle endOfDay (23:59:59.999) properly
+  return Math.max(0, Math.round((e.getTime() - s.getTime()) / 86400000));
 }
 
 function totalNights(ci: Date, co: Date): number {
