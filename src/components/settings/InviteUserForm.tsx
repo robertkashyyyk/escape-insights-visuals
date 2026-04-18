@@ -8,7 +8,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, UserPlus } from "lucide-react";
 
-export function InviteUserForm() {
+interface InviteUserFormProps {
+  onInvited?: () => void;
+}
+
+export function InviteUserForm({ onInvited }: InviteUserFormProps = {}) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("");
   const [loading, setLoading] = useState(false);
@@ -41,6 +45,7 @@ export function InviteUserForm() {
       });
       setEmail("");
       setRole("");
+      onInvited?.();
     }
   };
 

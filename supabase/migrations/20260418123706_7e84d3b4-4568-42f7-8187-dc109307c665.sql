@@ -1,0 +1,1 @@
+UPDATE public.user_roles SET role = 'client' WHERE user_id = '72ddfa8c-bcaf-40d9-8f52-2aec57e6c516';
