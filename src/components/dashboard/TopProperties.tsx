@@ -1,4 +1,4 @@
-import { TrendingUp, Bed } from "lucide-react";
+import { TrendingUp, Bed, Bath, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface TopProperty {
@@ -7,6 +7,8 @@ interface TopProperty {
   revenue: number;
   occupancy: number;
   bedrooms: number;
+  bathrooms?: number;
+  maxGuests?: number;
 }
 
 interface TopPropertiesProps {
@@ -43,11 +45,24 @@ export function TopProperties({ properties, isLoading }: TopPropertiesProps) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{prop.name}</p>
-                <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <span className="text-[11px] text-muted-foreground">{prop.location}</span>
-                  <span className="text-muted-foreground/30">•</span>
-                  <Bed className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-[11px] text-muted-foreground">{prop.bedrooms}</span>
+                  {prop.bedrooms > 0 && (
+                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <span className="text-muted-foreground/30">•</span>
+                      <Bed className="h-3 w-3" /> {prop.bedrooms}
+                    </span>
+                  )}
+                  {prop.bathrooms != null && prop.bathrooms > 0 && (
+                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <Bath className="h-3 w-3" /> {prop.bathrooms}
+                    </span>
+                  )}
+                  {prop.maxGuests != null && prop.maxGuests > 0 && (
+                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <Users className="h-3 w-3" /> {prop.maxGuests}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="text-right shrink-0">
