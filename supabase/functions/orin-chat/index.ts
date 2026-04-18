@@ -134,7 +134,7 @@ serve(async (req) => {
     const { data: reservations } = listingIds.length
       ? await admin
           .from("reservations")
-          .select("id, listing_id, check_in, check_out, total_amount, platform, status, guest_name")
+          .select("id, listing_id, check_in, check_out, total_amount, host_payout, cleaning_fee, channel_commission, tax_amount, platform, status, guest_name")
           .in("listing_id", listingIds)
           .eq("status", "confirmed")
       : { data: [] };
@@ -144,7 +144,7 @@ serve(async (req) => {
 
     const propertyStats = (listings || []).map((l: any) => {
       const propRes = ytdRes.filter((r: any) => r.listing_id === l.id);
-      const revenue = propRes.reduce((s: number, r: any) => s + (r.total_amount || 0), 0);
+      const revenue = propRes.reduce((s: number, r: any) => s + getNetRevenue(r), 0);
       const totalNights = propRes.reduce((s: number, r: any) => {
         const ci = new Date(r.check_in);
         const co = new Date(r.check_out);
@@ -198,12 +198,12 @@ serve(async (req) => {
 
     const { data: reservations } = await admin
       .from("reservations")
-      .select("id, listing_id, check_in, check_out, total_amount, platform, status")
+      .select("id, listing_id, check_in, check_out, total_amount, host_payout, cleaning_fee, channel_commission, tax_amount, platform, status")
       .eq("status", "confirmed");
 
     const allRes = reservations || [];
     const ytdRes = allRes.filter((r: any) => r.check_in >= yearStart && r.check_in <= todayStr);
-    const totalRevYtd = ytdRes.reduce((s: number, r: any) => s + (r.total_amount || 0), 0);
+    const totalRevYtd = ytdRes.reduce((s: number, r: any) => s + getNetRevenue(r), 0);
 
     const totalNights = ytdRes.reduce((s: number, r: any) => {
       const ci = new Date(r.check_in);
@@ -222,7 +222,7 @@ serve(async (req) => {
       const oListings = (listings || []).filter((l: any) => l.owner_id === o.id);
       const oListingIds = oListings.map((l: any) => l.id);
       const oRes = ytdRes.filter((r: any) => oListingIds.includes(r.listing_id));
-      const rev = oRes.reduce((s: number, r: any) => s + (r.total_amount || 0), 0);
+      const rev = oRes.reduce((s: number, r: any) => s + getNetRevenue(r), 0);
       return { name: o.name, property_count: oListings.length, revenue_ytd: Math.round(rev) };
     });
 
@@ -233,7 +233,7 @@ serve(async (req) => {
       if (!groups[g]) groups[g] = { count: 0, revenue: 0 };
       groups[g].count++;
       const gRes = ytdRes.filter((r: any) => r.listing_id === l.id);
-      groups[g].revenue += gRes.reduce((s: number, r: any) => s + (r.total_amount || 0), 0);
+      groups[g].revenue += gRes.reduce((s: number, r: any) => s + getNetRevenue(r), 0);
     }
 
     dataContext = {
