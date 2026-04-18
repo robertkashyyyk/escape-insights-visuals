@@ -230,6 +230,15 @@ serve(async (req) => {
     const ytdRes = allRes.filter((r: any) => r.check_in >= yearStart && r.check_in <= todayStr);
     const totalRevYtd = ytdRes.reduce((s: number, r: any) => s + getNetRevenue(r), 0);
 
+    // Cancellations (last 30 days) — admin scope
+    const thirtyAgo = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10);
+    const { data: cancelledRes } = await admin
+      .from("reservations")
+      .select("listing_id, check_in, total_amount, host_payout, cleaning_fee, channel_commission, tax_amount, reservation_date")
+      .eq("status", "cancelled")
+      .gte("check_in", thirtyAgo);
+    const cancellations = buildCancellationContext(cancelledRes || [], listings || [], allRes.length, thirtyAgo);
+
     const totalNights = ytdRes.reduce((s: number, r: any) => {
       const ci = new Date(r.check_in);
       const co = new Date(r.check_out);
