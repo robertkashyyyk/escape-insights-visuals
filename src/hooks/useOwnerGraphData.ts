@@ -87,7 +87,8 @@ function getBuckets(from: Date, to: Date, zoom: ZoomLevel): { label: string; sta
 function nightsInRange(ci: Date, co: Date, rangeStart: Date, rangeEnd: Date): number {
   const s = ci < rangeStart ? rangeStart : ci;
   const e = co > rangeEnd ? rangeEnd : co;
-  return Math.max(0, Math.floor((e.getTime() - s.getTime()) / 86400000));
+  // Round up to nearest day to handle endOfDay (23:59:59.999) properly
+  return Math.max(0, Math.round((e.getTime() - s.getTime()) / 86400000));
 }
 
 function totalNights(ci: Date, co: Date): number {
