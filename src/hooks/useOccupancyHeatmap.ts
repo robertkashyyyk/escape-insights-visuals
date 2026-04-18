@@ -29,7 +29,8 @@ export function useOccupancyHeatmap(year: number) {
           .from("reservations")
           .select("listing_id, check_in, check_out, total_amount")
           .gte("check_out", yearStart)
-          .lte("check_in", yearEnd),
+          .lte("check_in", yearEnd)
+          .eq("status", "confirmed"),
       ]);
 
       if (!listings) return { listings: [] as ListingOccupancy[], locationGroups: [] as string[] };

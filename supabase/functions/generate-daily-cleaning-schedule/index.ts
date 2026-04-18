@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
       .from("reservations")
       .select("id, listing_id, check_in, check_out, status")
       .eq("check_out", targetDate)
-      .not("status", "in", '("cancelled","declined")');
+      .eq("status", "confirmed");
     if (coErr) throw coErr;
 
     // 2. Get listings (including bundles so we can expand components)
@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
       .select("listing_id, check_in")
       .in("listing_id", listingIds)
       .gte("check_in", targetDate)
-      .not("status", "in", '("cancelled","declined")')
+      .eq("status", "confirmed")
       .order("check_in");
 
     const nextCheckinMap = new Map<string, string>();

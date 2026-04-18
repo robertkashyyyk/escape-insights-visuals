@@ -136,6 +136,7 @@ serve(async (req) => {
           .from("reservations")
           .select("id, listing_id, check_in, check_out, total_amount, platform, status, guest_name")
           .in("listing_id", listingIds)
+          .eq("status", "confirmed")
       : { data: [] };
 
     const allRes = reservations || [];
@@ -197,7 +198,8 @@ serve(async (req) => {
 
     const { data: reservations } = await admin
       .from("reservations")
-      .select("id, listing_id, check_in, check_out, total_amount, platform, status");
+      .select("id, listing_id, check_in, check_out, total_amount, platform, status")
+      .eq("status", "confirmed");
 
     const allRes = reservations || [];
     const ytdRes = allRes.filter((r: any) => r.check_in >= yearStart && r.check_in <= todayStr);

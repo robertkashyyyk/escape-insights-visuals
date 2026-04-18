@@ -42,14 +42,13 @@ export function useOwnerPerformance(year: number, dateMode: DateMode = "check_in
           .from("reservations")
           .select("listing_id, check_in, check_out, total_amount, status, reservation_date")
           .gte(dateCol, yearStart)
-          .lte(dateCol, yearEnd),
+          .lte(dateCol, yearEnd)
+          .eq("status", "confirmed"),
       ]);
 
       const owners = ownersRes.data ?? [];
       const listings = listingsRes.data ?? [];
-      const reservations = (reservationsRes.data ?? []).filter(
-        (r) => r.status !== "cancelled" && r.status !== "declined"
-      );
+      const reservations = reservationsRes.data ?? [];
 
       const listingsByOwner: Record<string, typeof listings> = {};
       const listingToOwner: Record<string, string> = {};

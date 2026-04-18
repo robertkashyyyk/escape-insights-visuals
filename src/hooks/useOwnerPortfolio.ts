@@ -51,7 +51,8 @@ export function useOwnerPortfolio(ownerId: string | null, year: number) {
         .select("listing_id, check_in, check_out, total_amount")
         .in("listing_id", listingIds)
         .gte("check_in", yearStart)
-        .lte("check_in", yearEnd);
+        .lte("check_in", yearEnd)
+        .eq("status", "confirmed");
 
       const rows = reservations ?? [];
 

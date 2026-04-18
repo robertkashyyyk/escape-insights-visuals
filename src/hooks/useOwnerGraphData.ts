@@ -126,8 +126,9 @@ export function useOwnerGraphData(
         const { data } = await supabase
           .from("reservations")
           .select("listing_id, check_in, check_out, total_amount, status, reservation_date")
-          .in("listing_id", listingIds);
-        reservations = (data || []).filter(r => r.status !== "cancelled");
+          .in("listing_id", listingIds)
+          .eq("status", "confirmed");
+        reservations = data || [];
       }
 
       const buckets = getBuckets(from, to, zoom);
