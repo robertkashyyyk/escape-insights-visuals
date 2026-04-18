@@ -81,15 +81,77 @@ Deno.serve(async (req) => {
   );
 
   try {
-    let targetDate: string;
+    let targetDate: string | null = null;
+    let daysAhead = 0;
     try {
       const body = await req.json();
-      targetDate = body.date || todayLondon();
+      if (body?.date) targetDate = body.date;
+      if (typeof body?.days_ahead === "number") daysAhead = body.days_ahead;
     } catch {
-      targetDate = todayLondon();
+      // no body
     }
 
-    const targetDayOfWeek = DAY_NAMES[new Date(targetDate + "T12:00:00Z").getDay()];
+    // Build list of dates to process
+    const dates: string[] = [];
+    if (targetDate && daysAhead === 0) {
+      dates.push(targetDate);
+    } else {
+      // Default: rolling 30-day window starting today (London)
+      const start = targetDate || todayLondon();
+      const span = daysAhead > 0 ? daysAhead : 30;
+      const startDate = new Date(start + "T12:00:00Z");
+      for (let i = 0; i < span; i++) {
+        const d = new Date(startDate);
+        d.setUTCDate(d.getUTCDate() + i);
+        dates.push(d.toISOString().slice(0, 10));
+      }
+    }
+
+    let grandTotalCreated = 0;
+    let grandTotalUnassigned = 0;
+    const perDayResults: Array<{ date: string; created: number; unassigned: number }> = [];
+
+    for (const targetDate of dates) {
+      const { created, unassigned } = await processDate(supabase, targetDate);
+      grandTotalCreated += created;
+      grandTotalUnassigned += unassigned;
+      perDayResults.push({ date: targetDate, created, unassigned });
+    }
+
+    await supabase.from("automation_logs").insert({
+      tasks_created: grandTotalCreated,
+      tasks_unassigned: grandTotalUnassigned,
+      status: "success",
+      triggered_by: "edge_function",
+    });
+
+    return new Response(
+      JSON.stringify({
+        tasks_created: grandTotalCreated,
+        tasks_unassigned: grandTotalUnassigned,
+        days_processed: dates.length,
+        per_day: perDayResults,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    console.error("Schedule generation error:", err);
+    await supabase.from("automation_logs").insert({
+      tasks_created: 0,
+      tasks_unassigned: 0,
+      status: "error",
+      error_message: (err as Error).message,
+      triggered_by: "edge_function",
+    }).catch(() => {});
+    return new Response(
+      JSON.stringify({ error: (err as Error).message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});
+
+async function processDate(supabase: any, targetDate: string): Promise<{ created: number; unassigned: number }> {
+  const targetDayOfWeek = DAY_NAMES[new Date(targetDate + "T12:00:00Z").getDay()];
 
     // 1. Get checkouts for target date (with checkout time)
     const { data: checkouts, error: coErr } = await supabase
