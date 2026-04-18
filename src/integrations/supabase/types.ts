@@ -68,6 +68,88 @@ export type Database = {
         }
         Relationships: []
       }
+      clean_issues: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          clean_task_id: string | null
+          created_at: string
+          description: string
+          id: string
+          issue_type: string
+          listing_id: string
+          photo_paths: string[] | null
+          reported_by_cleaner_id: string | null
+          reported_by_user_id: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          updated_at: string
+          urgency: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          clean_task_id?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          issue_type: string
+          listing_id: string
+          photo_paths?: string[] | null
+          reported_by_cleaner_id?: string | null
+          reported_by_user_id?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          updated_at?: string
+          urgency?: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          clean_task_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          issue_type?: string
+          listing_id?: string
+          photo_paths?: string[] | null
+          reported_by_cleaner_id?: string | null
+          reported_by_user_id?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          updated_at?: string
+          urgency?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clean_issues_clean_task_id_fkey"
+            columns: ["clean_task_id"]
+            isOneToOne: false
+            referencedRelation: "clean_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clean_issues_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clean_issues_reported_by_cleaner_id_fkey"
+            columns: ["reported_by_cleaner_id"]
+            isOneToOne: false
+            referencedRelation: "cleaners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clean_tasks: {
         Row: {
           assigned_cleaner_id: string | null

@@ -4,6 +4,7 @@ import { useTodayData } from "@/hooks/useTodayData";
 import { Sparkles, LogOut, LogIn, AlertTriangle, PoundSterling, CalendarCheck, BarChart3, Loader2, SprayCan } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
+import { OpenIssuesSection } from "@/components/today/OpenIssuesSection";
 
 export default function Today() {
   const { data, isLoading } = useTodayData();
@@ -89,6 +90,9 @@ export default function Today() {
                 ))}
               </div>
             </section>
+
+            {/* Open Issues (only renders when there are any) */}
+            <OpenIssuesSection />
 
             {/* 3. Orin's Morning Note */}
             <section className="rounded-xl border border-primary/20 bg-primary/5 p-5 relative overflow-hidden">
