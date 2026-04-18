@@ -104,6 +104,21 @@ Deno.serve(async (req) => {
           if (Number.isNaN(n) || n < 0 || n > 23) return null;
           return `${String(n).padStart(2, "0")}:00:00`;
         };
+
+        // Hostaway listingAmenities: array of { id, amenityId, amenityName } objects
+        const rawAmenities: any[] = Array.isArray(l.listingAmenities) ? l.listingAmenities : [];
+        const amenityNames: string[] = rawAmenities
+          .map((a: any) => (typeof a === "string" ? a : a?.amenityName || a?.name || ""))
+          .filter((n: string) => !!n);
+        const amenityLower = amenityNames.map((n) => n.toLowerCase());
+        const hasAmenity = (...keywords: string[]) =>
+          amenityLower.some((n) => keywords.some((k) => n.includes(k)));
+
+        const has_hot_tub = hasAmenity("hot tub", "jacuzzi", "whirlpool");
+        const has_ev_charger = hasAmenity("ev charger", "electric vehicle", "ev charging");
+        const pet_friendly = hasAmenity("pets allowed", "pet friendly", "pet-friendly", "pets welcome");
+        const self_check_in = hasAmenity("self check-in", "self check in", "self-check", "smart lock", "keypad", "lockbox", "key safe");
+
         return {
           hostaway_listing_id: l.id,
           name: l.name || `Listing ${l.id}`,
@@ -111,14 +126,20 @@ Deno.serve(async (req) => {
           city: l.city || null,
           country: l.countryCode || null,
           property_type: l.propertyTypeId ? String(l.propertyTypeId) : null,
-          bedrooms: l.bedrooms || null,
-          bathrooms: l.bathrooms || null,
-          max_guests: l.maxGuests || l.personCapacity || null,
+          // Hostaway uses bedroomsNumber / bathroomsNumber on the listing object
+          bedrooms: l.bedroomsNumber ?? l.bedrooms ?? null,
+          bathrooms: l.bathroomsNumber ?? l.bathrooms ?? null,
+          max_guests: l.personCapacity ?? l.maxGuests ?? null,
           latitude: l.lat || null,
           longitude: l.lng || null,
           image_url: l.imageUrl || l.thumbnailUrl || null,
           default_check_in_time: fmtHour(ciHour) ?? "15:00:00",
           default_check_out_time: fmtHour(coHour) ?? "10:00:00",
+          amenities: amenityNames,
+          has_hot_tub,
+          has_ev_charger,
+          pet_friendly,
+          self_check_in,
         };
       });
 

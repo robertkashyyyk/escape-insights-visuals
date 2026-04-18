@@ -21,6 +21,8 @@ interface TopProperty {
   revenue: number;
   occupancy: number;
   bedrooms: number;
+  bathrooms: number;
+  maxGuests: number;
 }
 
 interface DashboardData {
@@ -85,7 +87,7 @@ export function useDashboardData(dateRange: DateRange, periodType: PeriodType) {
       // Fetch reservations overlapping the date range
       const { data: reservations, error } = await supabase
         .from("reservations")
-        .select("*, listings(name, city, location_group, bedrooms, owner_id)")
+        .select("*, listings(name, city, location_group, bedrooms, bathrooms, max_guests, owner_id)")
         .or(`check_in.lte.${toStr},check_out.gte.${fromStr}`)
         .gte("check_in", fromStr)
         .lte("check_in", toStr)
@@ -108,7 +110,7 @@ export function useDashboardData(dateRange: DateRange, periodType: PeriodType) {
 
       let totalRevenue = 0;
       let nightsBooked = 0;
-      const propertyRevMap = new Map<string, { name: string; location: string; revenue: number; nights: number; bedrooms: number }>();
+      const propertyRevMap = new Map<string, { name: string; location: string; revenue: number; nights: number; bedrooms: number; bathrooms: number; maxGuests: number }>();
       const bucketRevMap = new Map<string, number>();
 
       for (const r of reservations || []) {
@@ -130,6 +132,8 @@ export function useDashboardData(dateRange: DateRange, periodType: PeriodType) {
             revenue: 0,
             nights: 0,
             bedrooms: listing.bedrooms || 0,
+            bathrooms: listing.bathrooms || 0,
+            maxGuests: listing.max_guests || 0,
           };
           existing.revenue += amount;
           existing.nights += nights;
@@ -154,6 +158,8 @@ export function useDashboardData(dateRange: DateRange, periodType: PeriodType) {
           revenue: p.revenue,
           occupancy: Math.round((p.nights / daysInRange) * 100),
           bedrooms: p.bedrooms,
+          bathrooms: p.bathrooms,
+          maxGuests: p.maxGuests,
         }));
 
       return {

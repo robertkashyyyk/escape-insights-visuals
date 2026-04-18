@@ -311,6 +311,7 @@ export type Database = {
         Row: {
           access_details: string | null
           address: string | null
+          amenities: Json
           base_rate: number | null
           bathrooms: number | null
           bedrooms: number | null
@@ -322,6 +323,8 @@ export type Database = {
           default_check_in_time: string | null
           default_check_out_time: string | null
           google_place_id: string | null
+          has_ev_charger: boolean
+          has_hot_tub: boolean
           hostaway_listing_id: number | null
           id: string
           image_url: string | null
@@ -337,9 +340,11 @@ export type Database = {
           nightly_rate: number | null
           operational_notes: string | null
           owner_id: string | null
+          pet_friendly: boolean
           postcode: string | null
           primary_cleaner: string | null
           property_type: string | null
+          self_check_in: boolean
           status: string
           tags: string | null
           troubleshooting_notes: string | null
@@ -348,6 +353,7 @@ export type Database = {
         Insert: {
           access_details?: string | null
           address?: string | null
+          amenities?: Json
           base_rate?: number | null
           bathrooms?: number | null
           bedrooms?: number | null
@@ -359,6 +365,8 @@ export type Database = {
           default_check_in_time?: string | null
           default_check_out_time?: string | null
           google_place_id?: string | null
+          has_ev_charger?: boolean
+          has_hot_tub?: boolean
           hostaway_listing_id?: number | null
           id?: string
           image_url?: string | null
@@ -374,9 +382,11 @@ export type Database = {
           nightly_rate?: number | null
           operational_notes?: string | null
           owner_id?: string | null
+          pet_friendly?: boolean
           postcode?: string | null
           primary_cleaner?: string | null
           property_type?: string | null
+          self_check_in?: boolean
           status?: string
           tags?: string | null
           troubleshooting_notes?: string | null
@@ -385,6 +395,7 @@ export type Database = {
         Update: {
           access_details?: string | null
           address?: string | null
+          amenities?: Json
           base_rate?: number | null
           bathrooms?: number | null
           bedrooms?: number | null
@@ -396,6 +407,8 @@ export type Database = {
           default_check_in_time?: string | null
           default_check_out_time?: string | null
           google_place_id?: string | null
+          has_ev_charger?: boolean
+          has_hot_tub?: boolean
           hostaway_listing_id?: number | null
           id?: string
           image_url?: string | null
@@ -411,9 +424,11 @@ export type Database = {
           nightly_rate?: number | null
           operational_notes?: string | null
           owner_id?: string | null
+          pet_friendly?: boolean
           postcode?: string | null
           primary_cleaner?: string | null
           property_type?: string | null
+          self_check_in?: boolean
           status?: string
           tags?: string | null
           troubleshooting_notes?: string | null

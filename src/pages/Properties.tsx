@@ -8,8 +8,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Search, Bed, Users, MapPin, Plus, ArrowRight, Brush, Pencil } from "lucide-react";
+import { Search, Plus, ArrowRight, Brush, Pencil, LayoutGrid, List } from "lucide-react";
 import { PropertyForm } from "@/components/properties/PropertyForm";
+import { PropertyFeatures } from "@/components/properties/PropertyFeatures";
+import { PropertiesListView } from "@/components/properties/PropertiesListView";
 import { Link } from "react-router-dom";
 
 export default function Properties() {
@@ -17,6 +19,7 @@ export default function Properties() {
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [cleanFilter, setCleanFilter] = useState("all");
+  const [view, setView] = useState<"cards" | "list">("cards");
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -58,8 +61,8 @@ export default function Properties() {
           <p className="text-sm text-muted-foreground mt-1">Manage all your short-term rental listings</p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
+          <div className="relative flex-1 max-w-sm min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Search properties..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
           </div>
@@ -89,6 +92,20 @@ export default function Properties() {
             <ToggleGroupItem value="dirty" className="text-xs px-3">Dirty</ToggleGroupItem>
           </ToggleGroup>
           <div className="flex items-center gap-3 ml-auto">
+            <ToggleGroup
+              type="single"
+              value={view}
+              onValueChange={(v) => v && setView(v as "cards" | "list")}
+              size="sm"
+              className="border border-border rounded-lg p-0.5"
+            >
+              <ToggleGroupItem value="cards" className="text-xs px-2.5" title="Card view">
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="list" className="text-xs px-2.5" title="List view">
+                <List className="h-3.5 w-3.5" />
+              </ToggleGroupItem>
+            </ToggleGroup>
             <span className="text-sm text-muted-foreground font-medium">
               {isLoading ? "…" : `${filtered?.length ?? 0} Properties`}
             </span>
@@ -104,6 +121,8 @@ export default function Properties() {
           </div>
         ) : filtered?.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground text-sm">No properties found</div>
+        ) : view === "list" ? (
+          <PropertiesListView rows={filtered as any} onEdit={(id) => setEditingId(id)} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered?.map((l) => {
@@ -116,7 +135,6 @@ export default function Properties() {
                   key={l.id}
                   className="glass-card rounded-xl border border-border/30 border-l-2 border-l-primary/60 p-5 flex flex-col gap-3 transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 hover:border-l-primary relative"
                 >
-                  {/* Dirty indicator dot — not shown for bundles */}
                   {!isBundle && !isClean && (
                     <div className="absolute top-3 right-3 h-3 w-3 rounded-full bg-red-500 animate-pulse" title="Needs cleaning" />
                   )}
@@ -139,28 +157,21 @@ export default function Properties() {
                     </div>
                   )}
 
-                  <div className="flex flex-wrap gap-1.5">
-                    {l.bedrooms != null && (
-                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground bg-secondary/40 px-2 py-0.5 rounded-md">
-                        <Bed className="h-3 w-3" /> {l.bedrooms} bed{l.bedrooms !== 1 ? "s" : ""}
-                      </span>
-                    )}
-                    {l.max_guests != null && (
-                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground bg-secondary/40 px-2 py-0.5 rounded-md">
-                        <Users className="h-3 w-3" /> {l.max_guests} guests
-                      </span>
-                    )}
-                    {l.city && (
-                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground bg-secondary/40 px-2 py-0.5 rounded-md">
-                        <MapPin className="h-3 w-3" /> {l.city}
-                      </span>
-                    )}
-                    {cleaner && (
-                      <span className="flex items-center gap-1 text-[11px] text-muted-foreground bg-secondary/40 px-2 py-0.5 rounded-md">
-                        <Brush className="h-3 w-3" /> {cleaner}
-                      </span>
-                    )}
-                  </div>
+                  <PropertyFeatures
+                    bedrooms={l.bedrooms}
+                    bathrooms={(l as any).bathrooms}
+                    maxGuests={l.max_guests}
+                    hasHotTub={(l as any).has_hot_tub}
+                    hasEvCharger={(l as any).has_ev_charger}
+                    petFriendly={(l as any).pet_friendly}
+                    selfCheckIn={(l as any).self_check_in}
+                  />
+
+                  {cleaner && (
+                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground w-fit">
+                      <Brush className="h-3 w-3" /> {cleaner}
+                    </span>
+                  )}
 
                   <div className="mt-auto flex items-center justify-between pt-2 border-t border-border/20">
                     <span className="text-[10px] text-muted-foreground/50 font-mono truncate max-w-[140px]">{l.id.slice(0, 8)}</span>
