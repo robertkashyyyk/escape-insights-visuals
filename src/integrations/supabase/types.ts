@@ -14,6 +14,72 @@ export type Database = {
   }
   public: {
     Tables: {
+      amenities: {
+        Row: {
+          added_by: string | null
+          address: string | null
+          category: Database["public"]["Enums"]["amenity_category"]
+          created_at: string
+          google_place_id: string | null
+          id: string
+          is_active: boolean
+          latitude: number | null
+          longitude: number | null
+          name: string
+          notes: string | null
+          opening_hours: string | null
+          phone: string | null
+          postcode: string | null
+          price_range: string | null
+          rating: number | null
+          tags: string[] | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          added_by?: string | null
+          address?: string | null
+          category?: Database["public"]["Enums"]["amenity_category"]
+          created_at?: string
+          google_place_id?: string | null
+          id?: string
+          is_active?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          name: string
+          notes?: string | null
+          opening_hours?: string | null
+          phone?: string | null
+          postcode?: string | null
+          price_range?: string | null
+          rating?: number | null
+          tags?: string[] | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          added_by?: string | null
+          address?: string | null
+          category?: Database["public"]["Enums"]["amenity_category"]
+          created_at?: string
+          google_place_id?: string | null
+          id?: string
+          is_active?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          name?: string
+          notes?: string | null
+          opening_hours?: string | null
+          phone?: string | null
+          postcode?: string | null
+          price_range?: string | null
+          rating?: number | null
+          tags?: string[] | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           id: string
@@ -345,6 +411,7 @@ export type Database = {
           primary_cleaner: string | null
           property_type: string | null
           self_check_in: boolean
+          slug: string | null
           status: string
           tags: string | null
           troubleshooting_notes: string | null
@@ -387,6 +454,7 @@ export type Database = {
           primary_cleaner?: string | null
           property_type?: string | null
           self_check_in?: boolean
+          slug?: string | null
           status?: string
           tags?: string | null
           troubleshooting_notes?: string | null
@@ -429,6 +497,7 @@ export type Database = {
           primary_cleaner?: string | null
           property_type?: string | null
           self_check_in?: boolean
+          slug?: string | null
           status?: string
           tags?: string | null
           troubleshooting_notes?: string | null
@@ -533,6 +602,66 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      property_amenities: {
+        Row: {
+          amenity_id: string
+          created_at: string
+          directions_url: string | null
+          display_order: number
+          distance_km: number | null
+          drive_time_mins: number | null
+          id: string
+          is_featured: boolean
+          listing_id: string
+          staff_note: string | null
+          updated_at: string
+          walk_time_mins: number | null
+        }
+        Insert: {
+          amenity_id: string
+          created_at?: string
+          directions_url?: string | null
+          display_order?: number
+          distance_km?: number | null
+          drive_time_mins?: number | null
+          id?: string
+          is_featured?: boolean
+          listing_id: string
+          staff_note?: string | null
+          updated_at?: string
+          walk_time_mins?: number | null
+        }
+        Update: {
+          amenity_id?: string
+          created_at?: string
+          directions_url?: string | null
+          display_order?: number
+          distance_km?: number | null
+          drive_time_mins?: number | null
+          id?: string
+          is_featured?: boolean
+          listing_id?: string
+          staff_note?: string | null
+          updated_at?: string
+          walk_time_mins?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_amenities_amenity_id_fkey"
+            columns: ["amenity_id"]
+            isOneToOne: false
+            referencedRelation: "amenities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_amenities_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       property_appliances: {
         Row: {
@@ -1313,6 +1442,51 @@ export type Database = {
           },
         ]
       }
+      v_property_amenities: {
+        Row: {
+          address: string | null
+          amenity_id: string | null
+          category: Database["public"]["Enums"]["amenity_category"] | null
+          created_at: string | null
+          directions_url: string | null
+          display_order: number | null
+          distance_km: number | null
+          drive_time_mins: number | null
+          id: string | null
+          is_active: boolean | null
+          is_featured: boolean | null
+          latitude: number | null
+          listing_id: string | null
+          longitude: number | null
+          name: string | null
+          opening_hours: string | null
+          phone: string | null
+          postcode: string | null
+          price_range: string | null
+          rating: number | null
+          staff_note: string | null
+          tags: string[] | null
+          updated_at: string | null
+          walk_time_mins: number | null
+          website: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_amenities_amenity_id_fkey"
+            columns: ["amenity_id"]
+            isOneToOne: false
+            referencedRelation: "amenities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_amenities_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       cleaner_assigned_to_listing: {
@@ -1340,6 +1514,27 @@ export type Database = {
       }
     }
     Enums: {
+      amenity_category:
+        | "grocery"
+        | "supermarket"
+        | "petrol_station"
+        | "ev_charging"
+        | "restaurant"
+        | "bar_pub"
+        | "fast_food"
+        | "cafe"
+        | "golf_course"
+        | "walkway_trail"
+        | "park"
+        | "castle_historic"
+        | "beach"
+        | "activity_centre"
+        | "pharmacy"
+        | "hospital_medical"
+        | "atm_bank"
+        | "tourist_attraction"
+        | "accommodation"
+        | "other"
       app_role: "super" | "senior" | "admin" | "client" | "cleaner"
     }
     CompositeTypes: {
@@ -1468,6 +1663,28 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      amenity_category: [
+        "grocery",
+        "supermarket",
+        "petrol_station",
+        "ev_charging",
+        "restaurant",
+        "bar_pub",
+        "fast_food",
+        "cafe",
+        "golf_course",
+        "walkway_trail",
+        "park",
+        "castle_historic",
+        "beach",
+        "activity_centre",
+        "pharmacy",
+        "hospital_medical",
+        "atm_bank",
+        "tourist_attraction",
+        "accommodation",
+        "other",
+      ],
       app_role: ["super", "senior", "admin", "client", "cleaner"],
     },
   },
