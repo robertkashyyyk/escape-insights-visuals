@@ -9,19 +9,24 @@ import { AppLayout } from "@/components/layout/AppLayout";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-const SCALE: { max: number; bg: string; label: string }[] = [
-  { max: 20, bg: "hsl(222 15% 14%)", label: "0–20%" },
-  { max: 40, bg: "hsl(215 15% 25%)", label: "21–40%" },
-  { max: 60, bg: "hsl(180 20% 30%)", label: "41–60%" },
-  { max: 80, bg: "hsl(38 60% 40%)", label: "61–80%" },
-  { max: 100, bg: "hsl(38 92% 50%)", label: "81–100%" },
+interface ScaleBand {
+  test: (pct: number) => boolean;
+  bg: string;
+  text: string;
+  label: string;
+  range: string;
+}
+
+const SCALE: ScaleBand[] = [
+  { test: (p) => p <= 0,            bg: "hsl(var(--heat-empty))",     text: "text-muted-foreground", label: "Empty",     range: "0%" },
+  { test: (p) => p > 0 && p <= 30,  bg: "hsl(var(--heat-low))",       text: "text-white",            label: "Low",       range: "1–30%" },
+  { test: (p) => p > 30 && p <= 60, bg: "hsl(var(--heat-mid))",       text: "text-foreground",       label: "Moderate",  range: "31–60%" },
+  { test: (p) => p > 60 && p <= 80, bg: "hsl(var(--heat-high))",      text: "text-foreground",       label: "Good",      range: "61–80%" },
+  { test: (p) => p > 80,            bg: "hsl(var(--heat-excellent))", text: "text-white",            label: "Excellent", range: "81–100%" },
 ];
 
-function getCellColor(pct: number): string {
-  for (const s of SCALE) {
-    if (pct <= s.max) return s.bg;
-  }
-  return SCALE[SCALE.length - 1].bg;
+function getBand(pct: number): ScaleBand {
+  return SCALE.find((s) => s.test(pct)) ?? SCALE[0];
 }
 
 export default function OccupancyHeatmap() {
@@ -82,12 +87,16 @@ export default function OccupancyHeatmap() {
           </Select>
 
           {/* Legend */}
-          <div className="flex items-center gap-1 ml-auto">
-            <span className="text-xs text-muted-foreground mr-1.5">0%</span>
+          <div className="flex items-center gap-3 ml-auto flex-wrap">
             {SCALE.map((s) => (
-              <div key={s.label} className="h-4 w-8 rounded-sm" style={{ backgroundColor: s.bg }} title={s.label} />
+              <div key={s.label} className="flex items-center gap-1.5">
+                <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: s.bg }} />
+                <span className="text-[11px] text-muted-foreground">
+                  {s.range}
+                  {s.label !== "Empty" && <span className="ml-1 text-foreground/70">{s.label}</span>}
+                </span>
+              </div>
             ))}
-            <span className="text-xs text-muted-foreground ml-1.5">100%</span>
           </div>
         </div>
 
