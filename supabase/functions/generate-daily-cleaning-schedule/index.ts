@@ -541,39 +541,8 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       if (updateErr) throw updateErr;
     }
 
-    // 12. Log the run
-    await supabase.from("automation_logs").insert({
-      tasks_created: allTasks.length,
-      tasks_unassigned: unassignedCount,
-      status: "success",
-      triggered_by: "edge_function",
-    });
-
-    return new Response(
-      JSON.stringify({
-        tasks_created: allTasks.length,
-        tasks_unassigned: unassignedCount,
-        date: targetDate,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (err) {
-    console.error("Schedule generation error:", err);
-
-    await supabase.from("automation_logs").insert({
-      tasks_created: 0,
-      tasks_unassigned: 0,
-      status: "error",
-      error_message: (err as Error).message,
-      triggered_by: "edge_function",
-    }).catch(() => {});
-
-    return new Response(
-      JSON.stringify({ error: (err as Error).message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-});
+  return { created: allTasks.length, unassigned: unassignedCount };
+}
 
 function todayLondon(): string {
   const now = new Date();
