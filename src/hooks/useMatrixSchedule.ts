@@ -123,14 +123,25 @@ export function useMatrixSchedule(weekAnchor: Date) {
     },
   });
 
-  // Realtime subscription — refresh tasks on any change
+  // Realtime subscription — scoped to the current week's tasks only.
+  // Filter by scheduled_date range so we don't listen to the entire table.
   useEffect(() => {
     const channel = supabase
-      .channel("matrix-clean-tasks")
+      .channel(`matrix-clean-tasks-${weekStartStr}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "clean_tasks" },
-        () => {
+        {
+          event: "*",
+          schema: "public",
+          table: "clean_tasks",
+          filter: `scheduled_date=gte.${weekStartStr}`,
+        },
+        (payload: any) => {
+          // Secondary client-side guard for the upper bound (Realtime filters
+          // only support a single predicate per subscription).
+          const row = payload.new ?? payload.old;
+          const d = row?.scheduled_date as string | undefined;
+          if (!d || d > weekEndStr) return;
           qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
         }
       )
