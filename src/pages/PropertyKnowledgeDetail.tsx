@@ -17,6 +17,7 @@ import {
   type PropertyKnowledge,
 } from "@/hooks/usePropertyKnowledge";
 import { KField, KSection } from "@/components/property-knowledge/KField";
+import { PropertyAmenitiesTab } from "@/components/amenities/PropertyAmenitiesTab";
 import { formatDistanceToNow } from "date-fns";
 
 export default function PropertyKnowledgeDetail() {
@@ -358,6 +359,11 @@ export default function PropertyKnowledgeDetail() {
               { key: "notes", label: "Notes", multiline: true },
             ]}
           />
+        </KSection>
+
+        {/* Section 11.5: Local Area */}
+        <KSection title="Local Area" description="Nearby amenities linked to this property — used by Orin and the guest guide">
+          <PropertyAmenitiesTab listingId={listingId!} />
         </KSection>
 
         {/* Section 12: Documents */}
