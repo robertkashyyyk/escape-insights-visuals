@@ -236,6 +236,19 @@ export function useCleaningSchedule() {
           .filter(nr => nr.listing_id === t.listing_id && nr.check_in >= ds && nr.id !== t.reservation_id)
           .sort((a, b) => a.check_in.localeCompare(b.check_in))[0];
 
+        // Resolve checkout time: stored on task > reservation > listing default > 10:00
+        const checkoutTime = normaliseTime(
+          t.checkout_time,
+          normaliseTime(checkout?.check_out_time, normaliseTime(listing?.default_check_out_time, DEFAULT_CHECKOUT))
+        );
+        const sameDay = nextCheckIn?.check_in === ds;
+        const checkinTime = sameDay
+          ? normaliseTime(
+              t.checkin_time,
+              normaliseTime(nextCheckIn?.check_in_time, normaliseTime(listing?.default_check_in_time, DEFAULT_CHECKIN))
+            )
+          : null;
+
         return {
           id: t.id,
           dbTaskId: t.id,
@@ -244,9 +257,9 @@ export function useCleaningSchedule() {
           propertyName: listing?.name ?? "Unknown Property",
           locationGroup: listing?.location_group ?? "Other",
           checkoutDate: ds,
-          checkoutTime: DEFAULT_CHECKOUT,
+          checkoutTime,
           nextCheckinDate: nextCheckIn?.check_in ?? null,
-          nextCheckinTime: nextCheckIn?.check_in === ds ? DEFAULT_CHECKIN : null,
+          nextCheckinTime: checkinTime,
           cleaningDuration: t.cleaning_duration_minutes ?? 90,
           assignedCleanerId: t.assigned_cleaner_id,
           assignedCleanerName: cleaner?.name ?? null,
@@ -287,11 +300,22 @@ export function useCleaningSchedule() {
         .filter(nr => nr.listing_id === r.listing_id && nr.check_in >= ds && nr.id !== r.id)
         .sort((a, b) => a.check_in.localeCompare(b.check_in))[0];
 
+      const checkoutTime = normaliseTime(
+        r.check_out_time,
+        normaliseTime(listing?.default_check_out_time, DEFAULT_CHECKOUT)
+      );
       const sameDay = nextCheckIn?.check_in === ds;
+      const checkinTime = sameDay
+        ? normaliseTime(
+            nextCheckIn?.check_in_time,
+            normaliseTime(listing?.default_check_in_time, DEFAULT_CHECKIN)
+          )
+        : null;
+
       let priority: Priority = "STANDARD";
-      if (sameDay) {
-        const [coH, coM] = DEFAULT_CHECKOUT.split(":").map(Number);
-        const [ciH, ciM] = DEFAULT_CHECKIN.split(":").map(Number);
+      if (sameDay && checkinTime) {
+        const [coH, coM] = checkoutTime.split(":").map(Number);
+        const [ciH, ciM] = checkinTime.split(":").map(Number);
         const gap = (ciH * 60 + ciM) - (coH * 60 + coM);
         priority = gap < 180 ? "TIGHT_WINDOW" : "SAME_DAY";
       }
@@ -303,9 +327,9 @@ export function useCleaningSchedule() {
         propertyName: listing?.name ?? "Unknown Property",
         locationGroup: listing?.location_group ?? "Other",
         checkoutDate: ds,
-        checkoutTime: DEFAULT_CHECKOUT,
+        checkoutTime,
         nextCheckinDate: nextCheckIn?.check_in ?? null,
-        nextCheckinTime: sameDay ? DEFAULT_CHECKIN : null,
+        nextCheckinTime: checkinTime,
         cleaningDuration: listing?.cleaning_duration_minutes ?? 90,
         assignedCleanerId: null,
         assignedCleanerName: null,
