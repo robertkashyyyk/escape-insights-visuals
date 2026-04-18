@@ -4,8 +4,10 @@ import { useOwnerPortalData, type OwnerPeriodType, type OwnerDateMode, getPeriod
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PoundSterling, Percent, BedDouble, TrendingUp, TrendingDown, CalendarDays, ChevronLeft, ChevronRight, BookOpen, Moon, CalendarCheck } from "lucide-react";
+import { PoundSterling, Percent, BedDouble, TrendingUp, TrendingDown, CalendarDays, ChevronLeft, ChevronRight, BookOpen, Moon, CalendarCheck, MapPin } from "lucide-react";
 import { isFuture, startOfWeek, startOfMonth, startOfQuarter, startOfYear } from "date-fns";
+import { OwnerLocalAreaTab } from "@/components/amenities/OwnerLocalAreaTab";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const fmt = (n: number) => `£${n.toLocaleString("en-GB", { maximumFractionDigits: 0 })}`;
 
@@ -269,6 +271,15 @@ export default function OwnerPortfolio() {
                         {p.upcomingCount} upcoming {p.upcomingCount === 1 ? "reservation" : "reservations"}
                       </div>
                     )}
+
+                    <Collapsible>
+                      <CollapsibleTrigger className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+                        <MapPin className="h-3 w-3" /> Local area
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-2">
+                        <OwnerLocalAreaTab listingId={p.id} />
+                      </CollapsibleContent>
+                    </Collapsible>
                   </CardContent>
                 </Card>
               ))}
