@@ -246,8 +246,21 @@ Deno.serve(async (req) => {
         if (!listing) continue;
 
         const nextCI = nextCheckinMap.get(targetLid);
-        const isSameDay = nextCI === targetDate;
+        const isSameDay = nextCI?.date === targetDate;
         const priority = isSameDay ? "same_day_turnaround" : "standard";
+
+        // Resolve checkout time: reservation > listing default > 10:00
+        const checkoutTime = normaliseTime(
+          r.check_out_time,
+          normaliseTime(listing.default_check_out_time, DEFAULT_CHECKOUT)
+        );
+        // Next checkin time only matters when same-day; resolve from next reservation > listing default > 15:00
+        const checkinTime = isSameDay
+          ? normaliseTime(
+              nextCI?.time,
+              normaliseTime(listing.default_check_in_time, DEFAULT_CHECKIN)
+            )
+          : null;
 
         newTasks.push({
           listing_id: targetLid,
@@ -262,6 +275,9 @@ Deno.serve(async (req) => {
           status: "unassigned",
           estimated_start_time: null,
           travel_time_from_previous_minutes: 0,
+          checkout_time: checkoutTime,
+          checkin_time: checkinTime,
+          is_same_day_turnaround: isSameDay,
         });
       }
     }
