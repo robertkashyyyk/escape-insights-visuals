@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useYoYData, PeriodType } from "@/hooks/useYoYData";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -132,9 +134,19 @@ export default function YoYPerformance() {
   const [periodType, setPeriodType] = useState<PeriodType>("month");
   const [periodValue, setPeriodValue] = useState<number>(getDefaultPeriodValue("month"));
   const [year, setYear] = useState(getDefaultYear("month"));
+  const [likeForLike, setLikeForLike] = useState(false);
 
   const { data, isLoading } = useYoYData(periodType, periodValue, year);
   const options = getPeriodOptions(periodType);
+
+  // Like-for-like: only properties with confirmed reservations in BOTH years
+  const filteredData = useMemo(() => {
+    if (!data) return data;
+    if (!likeForLike) return data;
+    return data.filter(
+      (p) => !p.isNew && p.previousRevenue > 0 && p.currentRevenue > 0
+    );
+  }, [data, likeForLike]);
 
   const handleTypeChange = (type: PeriodType) => {
     setPeriodType(type);
@@ -192,21 +204,43 @@ export default function YoYPerformance() {
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground">
-          Comparing {year} vs {year - 1} · Sorted by revenue growth
-        </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground">
+            Comparing {year} vs {year - 1} · Sorted by revenue growth
+            {likeForLike && filteredData && data && (
+              <span className="ml-2 text-foreground/70">
+                · Showing {filteredData.length} of {data.length} properties (like-for-like)
+              </span>
+            )}
+          </p>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="like-for-like"
+              checked={likeForLike}
+              onCheckedChange={setLikeForLike}
+            />
+            <Label htmlFor="like-for-like" className="text-xs text-muted-foreground cursor-pointer">
+              Like-for-like only
+              <span className="block text-[10px] text-muted-foreground/70">
+                Excludes properties without bookings in both years
+              </span>
+            </Label>
+          </div>
+        </div>
 
         {/* Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {isLoading
             ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
-            : data?.length === 0
+            : filteredData?.length === 0
               ? (
                 <div className="col-span-full text-center py-16 text-muted-foreground text-sm">
-                  No reservation data for this period.
+                  {likeForLike
+                    ? "No properties have confirmed bookings in both years for this period."
+                    : "No reservation data for this period."}
                 </div>
               )
-              : data?.map((p) => (
+              : filteredData?.map((p) => (
                 <Card key={p.listingId} className="glass-card border-border/30 hover:border-primary/20 transition-colors">
                   <CardContent className="p-5">
                     <h3 className="font-display font-semibold text-foreground text-sm truncate">{p.name}</h3>

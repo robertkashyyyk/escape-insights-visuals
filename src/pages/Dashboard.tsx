@@ -1,16 +1,60 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PoundSterling, Calendar, TrendingUp, Moon, Hash } from "lucide-react";
-import { startOfYear, endOfYear } from "date-fns";
+import { startOfMonth, endOfMonth } from "date-fns";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { TopProperties } from "@/components/dashboard/TopProperties";
 import { DateFilter } from "@/components/dashboard/DateFilter";
 import { useDashboardData, type PeriodType } from "@/hooks/useDashboardData";
 
+const STORAGE_KEY = "dashboard.dateFilter.v1";
+
+interface PersistedFilter {
+  from: string;
+  to: string;
+  periodType: PeriodType;
+}
+
+function loadPersisted(): PersistedFilter | null {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedFilter;
+    if (!parsed.from || !parsed.to || !parsed.periodType) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 export default function Dashboard() {
   const now = new Date();
-  const [dateRange, setDateRange] = useState({ from: startOfYear(now), to: endOfYear(now) });
-  const [periodType, setPeriodType] = useState<PeriodType>("Year");
+  const persisted = loadPersisted();
+
+  const [dateRange, setDateRange] = useState(() =>
+    persisted
+      ? { from: new Date(persisted.from), to: new Date(persisted.to) }
+      : { from: startOfMonth(now), to: endOfMonth(now) }
+  );
+  const [periodType, setPeriodType] = useState<PeriodType>(
+    persisted?.periodType ?? "Month"
+  );
+
+  // Persist selection across navigation within the session
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          from: dateRange.from.toISOString(),
+          to: dateRange.to.toISOString(),
+          periodType,
+        })
+      );
+    } catch {
+      // sessionStorage unavailable — silently ignore
+    }
+  }, [dateRange, periodType]);
 
   const { data, isLoading } = useDashboardData(dateRange, periodType);
   const kpis = data?.kpis;
