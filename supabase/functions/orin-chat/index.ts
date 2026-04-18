@@ -154,6 +154,18 @@ serve(async (req) => {
     const allRes = reservations || [];
     const ytdRes = allRes.filter((r: any) => r.check_in >= yearStart && r.check_in <= todayStr);
 
+    // Cancellations (last 30 days) — owner scope
+    const thirtyAgo = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10);
+    const { data: cancelledRes } = listingIds.length
+      ? await admin
+          .from("reservations")
+          .select("listing_id, check_in, total_amount, host_payout, cleaning_fee, channel_commission, tax_amount, reservation_date")
+          .in("listing_id", listingIds)
+          .eq("status", "cancelled")
+          .gte("check_in", thirtyAgo)
+      : { data: [] };
+    const cancellations = buildCancellationContext(cancelledRes || [], listings || [], allRes.length, thirtyAgo);
+
     const propertyStats = (listings || []).map((l: any) => {
       const propRes = ytdRes.filter((r: any) => r.listing_id === l.id);
       const revenue = propRes.reduce((s: number, r: any) => s + getNetRevenue(r), 0);
