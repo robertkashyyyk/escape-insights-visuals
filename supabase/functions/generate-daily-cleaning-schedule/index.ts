@@ -164,7 +164,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
   if (coErr) throw coErr;
 
   // 2. Get listings (including bundles so we can expand components)
-  const rawListingIds: string[] = [...new Set((checkouts || []).map((r: any) => r.listing_id as string))];
+  const rawListingIds: string[] = Array.from(new Set((checkouts || []).map((r: any) => String(r.listing_id))));
   if (rawListingIds.length === 0) {
     return { created: 0, unassigned: 0 };
   }
