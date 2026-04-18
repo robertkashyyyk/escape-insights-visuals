@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, Loader2, Lock, Eye, EyeOff } from "lucide-react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -24,17 +24,24 @@ export default function Auth() {
   const isCleaner = (role as string) === "cleaner";
   const isClient = (role as string) === "client";
 
+  // Show the "Preparing your workspace…" animation for ALL authenticated arrivals
+  // (magic-link returns, refreshed sessions, and post-password-login), not just
+  // after a fresh password login.
+  useEffect(() => {
+    if (!authLoading && user && !showTransition) {
+      setShowTransition(true);
+      const dest = isClient ? "/owner" : isCleaner ? "/cleaner" : "/today";
+      const t = setTimeout(() => navigate(dest, { replace: true }), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [authLoading, user, isClient, isCleaner, navigate, showTransition]);
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
-  }
-
-  if (user && !showTransition) {
-    const dest = isClient ? "/owner" : isCleaner ? "/cleaner" : "/today";
-    return <Navigate to={dest} replace />;
   }
 
   const handleLoginSuccess = () => {
