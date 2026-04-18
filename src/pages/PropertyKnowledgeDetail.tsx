@@ -361,8 +361,49 @@ export default function PropertyKnowledgeDetail() {
           />
         </KSection>
 
-        {/* Section 11.5: Local Area */}
-        <KSection title="Local Area" description="Nearby amenities linked to this property — used by Orin and the guest guide">
+        {/* Section 11.5: Guest Guide (TouchStay imported) */}
+        <KSection title="Guest Guide" description="Welcome message, local area, checkout, parking — text imported from TouchStay, fully editable">
+          <KField label="Guest welcome / overview" value={k.guest_info} onChange={set("guest_info")} editing={editing} multiline placeholder="Welcome message guests see when they open the guide..." />
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Local area notes</Label>
+            {editing ? (
+              <Textarea
+                value={k.local_area || ""}
+                onChange={(e) => set("local_area")(e.target.value)}
+                placeholder="Restaurants, walks, things to do nearby..."
+                rows={5}
+              />
+            ) : (
+              <div className="min-h-[2rem]">
+                {k.local_area ? (
+                  <p className="text-sm whitespace-pre-wrap break-words">{k.local_area}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">Not set</p>
+                )}
+              </div>
+            )}
+            <Link
+              to={`/property-knowledge/${listingId}#linked-amenities`}
+              onClick={(e) => {
+                e.preventDefault();
+                document.getElementById("linked-amenities")?.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+            >
+              Manage linked amenities <ExternalLink className="h-3 w-3" />
+            </Link>
+          </div>
+          <KField label="Checkout instructions" value={k.checkout_instructions} onChange={set("checkout_instructions")} editing={editing} multiline placeholder="Strip beds, leave keys in lockbox, lock back door..." />
+          <KField label="Parking info" value={k.parking_info} onChange={set("parking_info")} editing={editing} multiline placeholder="Parking is on the street, free after 6pm and weekends..." />
+          <KField label="Emergency contacts" value={k.emergency_contacts} onChange={set("emergency_contacts")} editing={editing} multiline placeholder="Out-of-hours: 999 / 112; Local emergency contact name + number..." />
+          <KField label="Appliances info (guest version)" value={k.appliances_info} onChange={set("appliances_info")} editing={editing} multiline placeholder="Quick how-to for the dishwasher, oven, washing machine..." />
+          <KField label="WiFi info (guest version)" value={k.wifi_info} onChange={set("wifi_info")} editing={editing} multiline placeholder="Network name, password, troubleshooting steps for guests..." />
+          <KField label="Bins & recycling" value={k.bins_recycling} onChange={set("bins_recycling")} editing={editing} multiline placeholder="Black bin out Tues, blue bin alternate weeks..." />
+        </KSection>
+
+        {/* Section 11.6: Linked Amenities */}
+        <div id="linked-amenities" />
+        <KSection title="Linked Amenities" description="Nearby places linked to this property — used by Orin and the guest guide">
           <PropertyAmenitiesTab listingId={listingId!} />
         </KSection>
 
