@@ -796,12 +796,15 @@ export type Database = {
         Row: {
           access_notes: string | null
           alarm_code: string | null
+          appliances_info: string | null
           backup_network: string | null
           bin_collection_day: string | null
           bin_location: string | null
+          bins_recycling: string | null
           boiler_location: string | null
           boiler_make_model: string | null
           boiler_reset_procedure: string | null
+          checkout_instructions: string | null
           cleaning_duration_hours: number | null
           cleaning_notes: string | null
           cleaning_quirks: string | null
@@ -809,10 +812,12 @@ export type Database = {
           completion_score: number
           created_at: string
           electric_meter_location: string | null
+          emergency_contacts: string | null
           fusebox_location: string | null
           gas_meter_location: string | null
           gate_code: string | null
           general_notes: string | null
+          guest_info: string | null
           has_hot_tub: boolean
           heating_notes: string | null
           heating_system_type: string | null
@@ -833,9 +838,11 @@ export type Database = {
           last_updated_by: string | null
           linen_storage_location: string | null
           listing_id: string
+          local_area: string | null
           lock_type: string | null
           oil_supplier_contact: string | null
           oil_tank_location: string | null
+          parking_info: string | null
           property_type: string | null
           recycling_notes: string | null
           router_location: string | null
@@ -846,6 +853,7 @@ export type Database = {
           updated_at: string
           utility_notes: string | null
           water_pressure_notes: string | null
+          wifi_info: string | null
           wifi_notes: string | null
           wifi_password: string | null
           wifi_ssid: string | null
@@ -853,12 +861,15 @@ export type Database = {
         Insert: {
           access_notes?: string | null
           alarm_code?: string | null
+          appliances_info?: string | null
           backup_network?: string | null
           bin_collection_day?: string | null
           bin_location?: string | null
+          bins_recycling?: string | null
           boiler_location?: string | null
           boiler_make_model?: string | null
           boiler_reset_procedure?: string | null
+          checkout_instructions?: string | null
           cleaning_duration_hours?: number | null
           cleaning_notes?: string | null
           cleaning_quirks?: string | null
@@ -866,10 +877,12 @@ export type Database = {
           completion_score?: number
           created_at?: string
           electric_meter_location?: string | null
+          emergency_contacts?: string | null
           fusebox_location?: string | null
           gas_meter_location?: string | null
           gate_code?: string | null
           general_notes?: string | null
+          guest_info?: string | null
           has_hot_tub?: boolean
           heating_notes?: string | null
           heating_system_type?: string | null
@@ -890,9 +903,11 @@ export type Database = {
           last_updated_by?: string | null
           linen_storage_location?: string | null
           listing_id: string
+          local_area?: string | null
           lock_type?: string | null
           oil_supplier_contact?: string | null
           oil_tank_location?: string | null
+          parking_info?: string | null
           property_type?: string | null
           recycling_notes?: string | null
           router_location?: string | null
@@ -903,6 +918,7 @@ export type Database = {
           updated_at?: string
           utility_notes?: string | null
           water_pressure_notes?: string | null
+          wifi_info?: string | null
           wifi_notes?: string | null
           wifi_password?: string | null
           wifi_ssid?: string | null
@@ -910,12 +926,15 @@ export type Database = {
         Update: {
           access_notes?: string | null
           alarm_code?: string | null
+          appliances_info?: string | null
           backup_network?: string | null
           bin_collection_day?: string | null
           bin_location?: string | null
+          bins_recycling?: string | null
           boiler_location?: string | null
           boiler_make_model?: string | null
           boiler_reset_procedure?: string | null
+          checkout_instructions?: string | null
           cleaning_duration_hours?: number | null
           cleaning_notes?: string | null
           cleaning_quirks?: string | null
@@ -923,10 +942,12 @@ export type Database = {
           completion_score?: number
           created_at?: string
           electric_meter_location?: string | null
+          emergency_contacts?: string | null
           fusebox_location?: string | null
           gas_meter_location?: string | null
           gate_code?: string | null
           general_notes?: string | null
+          guest_info?: string | null
           has_hot_tub?: boolean
           heating_notes?: string | null
           heating_system_type?: string | null
@@ -947,9 +968,11 @@ export type Database = {
           last_updated_by?: string | null
           linen_storage_location?: string | null
           listing_id?: string
+          local_area?: string | null
           lock_type?: string | null
           oil_supplier_contact?: string | null
           oil_tank_location?: string | null
+          parking_info?: string | null
           property_type?: string | null
           recycling_notes?: string | null
           router_location?: string | null
@@ -960,6 +983,7 @@ export type Database = {
           updated_at?: string
           utility_notes?: string | null
           water_pressure_notes?: string | null
+          wifi_info?: string | null
           wifi_notes?: string | null
           wifi_password?: string | null
           wifi_ssid?: string | null
