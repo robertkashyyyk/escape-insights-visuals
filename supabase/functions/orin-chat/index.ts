@@ -285,6 +285,7 @@ serve(async (req) => {
       })),
       current_month: now.toLocaleString("en-GB", { month: "long", year: "numeric" }),
       current_page: current_page || "unknown",
+      cancellations,
     };
   }
 
