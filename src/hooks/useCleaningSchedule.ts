@@ -408,7 +408,7 @@ export function useCleaningSchedule() {
 
       if (cTasks.length === 1) {
         const homeTravel = travelMinutes(c.home_latitude, c.home_longitude, cTasks[0].latitude, cTasks[0].longitude);
-        cTasks[0].estimatedStart = addMinutesToTime(DEFAULT_CHECKOUT, homeTravel);
+        cTasks[0].estimatedStart = addMinutesToTime(cTasks[0].checkoutTime, homeTravel);
         cTasks[0].travelMinutes = homeTravel;
         return {
           id: c.id, name: c.name, dailyWorkingHours: c.daily_working_hours, totalScheduledMinutes: totalMins, tasks: cTasks,
@@ -446,16 +446,18 @@ export function useCleaningSchedule() {
       // Last task
       if (remaining.length === 1) ordered.push(remaining[0]);
 
-      // Calculate times from home
+      // Calculate times from home — first task can't start before its checkout time
       const homeToFirst = travelMinutes(c.home_latitude, c.home_longitude, ordered[0].latitude, ordered[0].longitude);
       ordered[0].travelMinutes = homeToFirst;
-      let currentTime = addMinutesToTime(DEFAULT_CHECKOUT, homeToFirst);
+      let currentTime = addMinutesToTime(ordered[0].checkoutTime, homeToFirst);
       ordered[0].estimatedStart = currentTime;
 
       for (let i = 1; i < ordered.length; i++) {
         const travel = travelMinutes(ordered[i - 1].latitude, ordered[i - 1].longitude, ordered[i].latitude, ordered[i].longitude);
         ordered[i].travelMinutes = travel;
-        currentTime = addMinutesToTime(currentTime, ordered[i - 1].cleaningDuration + travel);
+        const arrival = addMinutesToTime(currentTime, ordered[i - 1].cleaningDuration + travel);
+        // Don't start before this property's own checkout time
+        currentTime = arrival >= ordered[i].checkoutTime ? arrival : ordered[i].checkoutTime;
         ordered[i].estimatedStart = currentTime;
       }
 
