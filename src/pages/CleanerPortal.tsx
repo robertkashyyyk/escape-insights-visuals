@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LogOut, Check, Eye, Sun, Moon } from "lucide-react";
+import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { Navigate } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
+import { FlagIssueModal } from "@/components/cleaner/FlagIssueModal";
 
 interface CleanTask {
   id: string;
@@ -55,6 +56,7 @@ export default function CleanerPortal() {
   const [tasks, setTasks] = useState<CleanTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [completingId, setCompletingId] = useState<string | null>(null);
+  const [flagTask, setFlagTask] = useState<CleanTask | null>(null);
   const pageLoadTime = useRef(new Date().toISOString());
   const isCleaner = (role as string) === "cleaner";
   const isAdmin = (role as string) === "super" || (role as string) === "senior";
@@ -529,6 +531,13 @@ export default function CleanerPortal() {
                                 )}
                               </motion.button>
                             )}
+                            <button
+                              onClick={() => isPreviewMode ? toast.info("Preview mode — actions disabled") : setFlagTask(task)}
+                              className="w-full mt-2 min-h-[44px] rounded-lg border border-destructive/30 text-destructive text-sm font-medium flex items-center justify-center gap-2 hover:bg-destructive/10 transition-colors"
+                            >
+                              <Flag className="h-3.5 w-3.5" />
+                              Flag an Issue
+                            </button>
                           </div>
                         </div>
                       </motion.div>
@@ -546,6 +555,15 @@ export default function CleanerPortal() {
           )}
         </div>
       </div>
+      {flagTask && cleaner && (
+        <FlagIssueModal
+          open={!!flagTask}
+          onClose={() => setFlagTask(null)}
+          task={{ id: flagTask.id, listing_id: flagTask.listing_id, property_name: flagTask.property_name }}
+          cleanerId={cleaner.id}
+          cleanerName={cleaner.name}
+        />
+      )}
     </div>
   );
 }
