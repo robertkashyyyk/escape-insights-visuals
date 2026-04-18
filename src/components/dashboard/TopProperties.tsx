@@ -1,5 +1,6 @@
 import { TrendingUp, Bed, Bath, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { shortenName } from "@/lib/shortenName";
 
 interface TopProperty {
   name: string;
@@ -44,7 +45,12 @@ export function TopProperties({ properties, isLoading }: TopPropertiesProps) {
                 {i + 1}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">{prop.name}</p>
+                <p
+                  className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors"
+                  title={prop.name}
+                >
+                  {shortenName(prop.name)}
+                </p>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <span className="text-[11px] text-muted-foreground">{prop.location}</span>
                   {prop.bedrooms > 0 && (

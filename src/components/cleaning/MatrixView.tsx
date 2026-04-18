@@ -24,6 +24,7 @@ import {
 } from "@/lib/cleanerColors";
 import { TaskDetailPanel } from "./TaskDetailPanel";
 import { AddManualCleanModal } from "./AddManualCleanModal";
+import { shortenName } from "@/lib/shortenName";
 
 interface Props {
   initialDate?: Date;
@@ -38,8 +39,12 @@ export function MatrixView({ initialDate }: Props) {
   const [showCompleted, setShowCompleted] = useState(true);
   const [activeDragTaskId, setActiveDragTaskId] = useState<string | null>(null);
 
+  // Derive weekStart locally from weekAnchor so the header label is always in sync
+  // with the navigation buttons (independent of any caching inside the data hook).
+  const weekStart = useMemo(() => startOfWeek(weekAnchor, { weekStartsOn: 1 }), [weekAnchor]);
+
   const {
-    weekStart, days, groupedListings, listings,
+    days, groupedListings, listings,
     cleaners, tasks, reservations, isLoading,
     reassignTask, completeTask, removeTask, updateNotes, addManualClean,
   } = useMatrixSchedule(weekAnchor);
@@ -97,14 +102,6 @@ export function MatrixView({ initialDate }: Props) {
     [weekStart]
   );
 
-  // Shorten long Hostaway titles for the matrix left column.
-  // Strategy: take first segment before · or |, then truncate to 30 chars.
-  const shortenName = useCallback((name: string): string => {
-    if (!name) return "";
-    const firstSegment = name.split(/[·|]/)[0].trim();
-    const base = firstSegment || name;
-    return base.length > 30 ? base.slice(0, 29).trimEnd() + "…" : base;
-  }, []);
 
   // DnD
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
