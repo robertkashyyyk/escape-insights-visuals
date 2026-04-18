@@ -38,7 +38,7 @@ export default function Dashboard() {
         <KpiCard
           title="Total Revenue"
           value={isLoading ? "..." : `£${(kpis?.totalRevenue ?? 0).toLocaleString()}`}
-          subtitle="All properties"
+          subtitle="Net revenue after channel fees"
           icon={PoundSterling}
           accentColor="primary"
           delay={0}
