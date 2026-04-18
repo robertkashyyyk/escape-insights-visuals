@@ -349,7 +349,7 @@ Deno.serve(async (req) => {
       if (tasks.length === 1) {
         const travel = travelMinutes(homeLat, homeLon, tasks[0].latitude, tasks[0].longitude);
         tasks[0].travel_time_from_previous_minutes = travel;
-        tasks[0].estimated_start_time = addMinutesToTime(DEFAULT_CHECKOUT, travel);
+        tasks[0].estimated_start_time = addMinutesToTime(tasks[0].checkout_time, travel);
         continue;
       }
 
@@ -431,12 +431,13 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Step E: Calculate travel times and estimated start times
+      // Step E: Calculate travel times and estimated start times.
+      // Each task can't start before its property's checkout time + travel from previous stop.
       const firstTravel = travelMinutes(homeLat, homeLon, ordered[0].latitude, ordered[0].longitude);
       ordered[0].travel_time_from_previous_minutes = firstTravel;
-      ordered[0].estimated_start_time = addMinutesToTime(DEFAULT_CHECKOUT, firstTravel);
+      ordered[0].estimated_start_time = addMinutesToTime(ordered[0].checkout_time, firstTravel);
 
-      let currentTime = addMinutesToTime(DEFAULT_CHECKOUT, firstTravel + ordered[0].cleaning_duration_minutes);
+      let currentTime = addMinutesToTime(ordered[0].estimated_start_time, ordered[0].cleaning_duration_minutes);
 
       for (let i = 1; i < ordered.length; i++) {
         const travel = travelMinutes(
@@ -444,8 +445,11 @@ Deno.serve(async (req) => {
           ordered[i].latitude, ordered[i].longitude
         );
         ordered[i].travel_time_from_previous_minutes = travel;
-        ordered[i].estimated_start_time = addMinutesToTime(currentTime, travel);
-        currentTime = addMinutesToTime(currentTime, travel + ordered[i].cleaning_duration_minutes);
+        const arrivalAfterTravel = addMinutesToTime(currentTime, travel);
+        // Don't start before property checkout time
+        const earliestStart = arrivalAfterTravel >= ordered[i].checkout_time ? arrivalAfterTravel : ordered[i].checkout_time;
+        ordered[i].estimated_start_time = earliestStart;
+        currentTime = addMinutesToTime(earliestStart, ordered[i].cleaning_duration_minutes);
       }
 
       cleanerBuckets[c.id] = ordered;
@@ -468,6 +472,9 @@ Deno.serve(async (req) => {
         estimated_start_time: t.estimated_start_time,
         cleaning_duration_minutes: t.cleaning_duration_minutes,
         travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
+        checkout_time: t.checkout_time,
+        checkin_time: t.checkin_time,
+        is_same_day_turnaround: t.is_same_day_turnaround,
       }));
 
       const { error: insertErr } = await supabase.from("clean_tasks").insert(rows);
