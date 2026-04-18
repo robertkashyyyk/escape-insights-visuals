@@ -61,6 +61,15 @@ export type PropertyKnowledge = {
   bin_collection_day: string | null;
   recycling_notes: string | null;
   cleaning_notes: string | null;
+  // TouchStay imported sections
+  local_area: string | null;
+  guest_info: string | null;
+  bins_recycling: string | null;
+  parking_info: string | null;
+  emergency_contacts: string | null;
+  checkout_instructions: string | null;
+  appliances_info: string | null;
+  wifi_info: string | null;
   completion_score: number;
   updated_at: string;
 };
@@ -271,9 +280,11 @@ export function usePropertyKnowledgeSearch(query: string) {
         "stopcock_location", "fusebox_location", "utility_notes",
         "heating_system_type", "thermostat_location", "heating_notes",
         "hot_tub_make_model", "hot_tub_chemical_schedule", "hot_tub_notes",
-        "wifi_ssid", "router_location", "wifi_notes",
+        "wifi_ssid", "router_location", "wifi_notes", "wifi_info",
         "cleaning_quirks", "cleaning_supplies_location", "linen_storage_location",
         "bin_location", "bin_collection_day", "cleaning_notes",
+        "local_area", "guest_info", "bins_recycling", "parking_info",
+        "emergency_contacts", "checkout_instructions", "appliances_info",
       ];
       const orFilter = fields.map((f) => `${f}.ilike.${q}`).join(",");
 
@@ -314,10 +325,14 @@ export function usePropertyKnowledgeSearch(query: string) {
         stopcock_location: "Utilities", fusebox_location: "Utilities", utility_notes: "Utilities",
         heating_system_type: "Heating", thermostat_location: "Heating", heating_notes: "Heating",
         hot_tub_make_model: "Hot Tub", hot_tub_chemical_schedule: "Hot Tub", hot_tub_notes: "Hot Tub",
-        wifi_ssid: "WiFi", router_location: "WiFi", wifi_notes: "WiFi",
+        wifi_ssid: "WiFi", router_location: "WiFi", wifi_notes: "WiFi", wifi_info: "WiFi",
         cleaning_quirks: "Cleaning", cleaning_supplies_location: "Cleaning",
         linen_storage_location: "Cleaning", bin_location: "Cleaning",
         bin_collection_day: "Cleaning", cleaning_notes: "Cleaning",
+        local_area: "Local Area", guest_info: "Guest Info",
+        bins_recycling: "Bins & Recycling", parking_info: "Parking",
+        emergency_contacts: "Emergency Contacts", checkout_instructions: "Checkout",
+        appliances_info: "Appliances",
       };
 
       (knowledgeRes.data || []).forEach((k: any) => {
