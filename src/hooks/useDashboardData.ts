@@ -93,11 +93,15 @@ export function useDashboardData(dateRange: DateRange, periodType: PeriodType) {
 
       if (error) throw error;
 
-      // Fetch total listings count for occupancy calc
+      // Fetch total guest-bookable listings count for occupancy calc.
+      // Exclude bundles (is_bundle=true) — they're virtual aggregates of other
+      // listings, so counting them would double-count available nights and
+      // artificially deflate occupancy.
       const { count: totalListings } = await supabase
         .from("listings")
         .select("id", { count: "exact", head: true })
-        .eq("status", "active");
+        .eq("status", "active")
+        .eq("is_bundle", false);
 
       const daysInRange = Math.max(1, differenceInDays(dateRange.to, dateRange.from) + 1);
       const listingCount = totalListings || 1;
