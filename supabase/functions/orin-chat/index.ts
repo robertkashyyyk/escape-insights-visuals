@@ -211,6 +211,7 @@ serve(async (req) => {
       total_occupancy_ytd: avgOcc,
       current_month: now.toLocaleString("en-GB", { month: "long", year: "numeric" }),
       current_page: current_page || "unknown",
+      cancellations,
     };
   } else {
     // Admin/super/senior scope — all data
