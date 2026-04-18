@@ -94,20 +94,33 @@ Deno.serve(async (req) => {
       const listings = body.result || [];
       if (listings.length === 0) break;
 
-      const rows = listings.map((l: any) => ({
-        hostaway_listing_id: l.id,
-        name: l.name || `Listing ${l.id}`,
-        address: l.address || null,
-        city: l.city || null,
-        country: l.countryCode || null,
-        property_type: l.propertyTypeId ? String(l.propertyTypeId) : null,
-        bedrooms: l.bedrooms || null,
-        bathrooms: l.bathrooms || null,
-        max_guests: l.maxGuests || l.personCapacity || null,
-        latitude: l.lat || null,
-        longitude: l.lng || null,
-        image_url: l.imageUrl || l.thumbnailUrl || null,
-      }));
+      const rows = listings.map((l: any) => {
+        // Hostaway: checkInTimeStart/checkOutTime are integers (hour 0-23)
+        const ciHour = l.checkInTimeStart ?? l.checkInTime;
+        const coHour = l.checkOutTime;
+        const fmtHour = (h: any) => {
+          if (h === null || h === undefined || h === "") return null;
+          const n = Number(h);
+          if (Number.isNaN(n) || n < 0 || n > 23) return null;
+          return `${String(n).padStart(2, "0")}:00:00`;
+        };
+        return {
+          hostaway_listing_id: l.id,
+          name: l.name || `Listing ${l.id}`,
+          address: l.address || null,
+          city: l.city || null,
+          country: l.countryCode || null,
+          property_type: l.propertyTypeId ? String(l.propertyTypeId) : null,
+          bedrooms: l.bedrooms || null,
+          bathrooms: l.bathrooms || null,
+          max_guests: l.maxGuests || l.personCapacity || null,
+          latitude: l.lat || null,
+          longitude: l.lng || null,
+          image_url: l.imageUrl || l.thumbnailUrl || null,
+          default_check_in_time: fmtHour(ciHour) ?? "15:00:00",
+          default_check_out_time: fmtHour(coHour) ?? "10:00:00",
+        };
+      });
 
       const { error } = await supabase.from("listings").upsert(rows, {
         onConflict: "hostaway_listing_id",
@@ -208,12 +221,31 @@ Deno.serve(async (req) => {
 
         const platform = r.channelName || r.source || "hostaway";
 
+        // Hostaway reservation arrival/departure times: integer hour (0-23) or "HH:MM"
+        const fmtResTime = (v: any) => {
+          if (v === null || v === undefined || v === "") return null;
+          if (typeof v === "string" && /^\d{1,2}:\d{2}/.test(v)) {
+            const [h, m] = v.split(":").map(Number);
+            if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+              return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00`;
+            }
+            return null;
+          }
+          const n = Number(v);
+          if (Number.isNaN(n) || n < 0 || n > 23) return null;
+          return `${String(n).padStart(2, "0")}:00:00`;
+        };
+        const checkInTime = fmtResTime(r.arrivalTime ?? r.checkInTime);
+        const checkOutTime = fmtResTime(r.departureTime ?? r.checkOutTime);
+
         rows.push({
           hostaway_reservation_id: r.id,
           listing_id: listingUuid,
           guest_name: guestName,
           check_in: checkIn,
           check_out: checkOut,
+          check_in_time: checkInTime,
+          check_out_time: checkOutTime,
           status,
           platform: platform.toLowerCase(),
           total_amount: r.totalPrice || r.basePrice || 0,

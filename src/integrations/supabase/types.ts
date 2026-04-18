@@ -228,6 +228,8 @@ export type Database = {
           cleaning_duration_minutes: number | null
           country: string | null
           created_at: string
+          default_check_in_time: string | null
+          default_check_out_time: string | null
           google_place_id: string | null
           hostaway_listing_id: number | null
           id: string
@@ -263,6 +265,8 @@ export type Database = {
           cleaning_duration_minutes?: number | null
           country?: string | null
           created_at?: string
+          default_check_in_time?: string | null
+          default_check_out_time?: string | null
           google_place_id?: string | null
           hostaway_listing_id?: number | null
           id?: string
@@ -298,6 +302,8 @@ export type Database = {
           cleaning_duration_minutes?: number | null
           country?: string | null
           created_at?: string
+          default_check_in_time?: string | null
+          default_check_out_time?: string | null
           google_place_id?: string | null
           hostaway_listing_id?: number | null
           id?: string
@@ -468,7 +474,9 @@ export type Database = {
         Row: {
           booking_lead_days: number | null
           check_in: string
+          check_in_time: string | null
           check_out: string
+          check_out_time: string | null
           created_at: string
           day_of_week: number | null
           guest_fees: number | null
@@ -489,7 +497,9 @@ export type Database = {
         Insert: {
           booking_lead_days?: number | null
           check_in: string
+          check_in_time?: string | null
           check_out: string
+          check_out_time?: string | null
           created_at?: string
           day_of_week?: number | null
           guest_fees?: number | null
@@ -510,7 +520,9 @@ export type Database = {
         Update: {
           booking_lead_days?: number | null
           check_in?: string
+          check_in_time?: string | null
           check_out?: string
+          check_out_time?: string | null
           created_at?: string
           day_of_week?: number | null
           guest_fees?: number | null

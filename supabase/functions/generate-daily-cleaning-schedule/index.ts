@@ -3,7 +3,16 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const AVG_SPEED_KMH = 40;
 const DEFAULT_CHECKOUT = "10:00";
+const DEFAULT_CHECKIN = "15:00";
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function normaliseTime(t: string | null | undefined, fallback: string): string {
+  if (!t) return fallback;
+  // Accept "HH:MM" or "HH:MM:SS"
+  const m = String(t).match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return fallback;
+  return `${m[1].padStart(2, "0")}:${m[2]}`;
+}
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
@@ -45,6 +54,9 @@ interface TaskInfo {
   status: string;
   estimated_start_time: string | null;
   travel_time_from_previous_minutes: number;
+  checkout_time: string;
+  checkin_time: string | null;
+  is_same_day_turnaround: boolean;
 }
 
 interface CleanerInfo {
@@ -87,6 +99,14 @@ Deno.serve(async (req) => {
       .eq("status", "confirmed");
     if (coErr) throw coErr;
 
+    // 1. Get checkouts for target date (with checkout time)
+    const { data: checkouts, error: coErr } = await supabase
+      .from("reservations")
+      .select("id, listing_id, check_in, check_out, status, check_out_time")
+      .eq("check_out", targetDate)
+      .eq("status", "confirmed");
+    if (coErr) throw coErr;
+
     // 2. Get listings (including bundles so we can expand components)
     const rawListingIds = [...new Set((checkouts || []).map((r: any) => r.listing_id))];
     if (rawListingIds.length === 0) {
@@ -100,7 +120,7 @@ Deno.serve(async (req) => {
 
     const { data: rawListings } = await supabase
       .from("listings")
-      .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, is_bundle, bundle_components")
+      .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, is_bundle, bundle_components, default_check_in_time, default_check_out_time")
       .in("id", rawListingIds);
 
     // Expand bundles → component listing IDs
@@ -120,7 +140,7 @@ Deno.serve(async (req) => {
     if (componentIdsFromBundles.length > 0) {
       const { data } = await supabase
         .from("listings")
-        .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, is_bundle")
+        .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, is_bundle, default_check_in_time, default_check_out_time")
         .in("id", componentIdsFromBundles)
         .eq("is_bundle", false);
       componentListings = data || [];
@@ -143,19 +163,19 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 3. Get next check-ins for priority detection
+    // 3. Get next check-ins for priority detection (with check-in time)
     const { data: nextCheckins } = await supabase
       .from("reservations")
-      .select("listing_id, check_in")
+      .select("listing_id, check_in, check_in_time")
       .in("listing_id", listingIds)
       .gte("check_in", targetDate)
       .eq("status", "confirmed")
       .order("check_in");
 
-    const nextCheckinMap = new Map<string, string>();
+    const nextCheckinMap = new Map<string, { date: string; time: string | null }>();
     for (const r of nextCheckins || []) {
       if (!nextCheckinMap.has(r.listing_id)) {
-        nextCheckinMap.set(r.listing_id, r.check_in);
+        nextCheckinMap.set(r.listing_id, { date: r.check_in, time: r.check_in_time });
       }
     }
 
@@ -226,8 +246,21 @@ Deno.serve(async (req) => {
         if (!listing) continue;
 
         const nextCI = nextCheckinMap.get(targetLid);
-        const isSameDay = nextCI === targetDate;
+        const isSameDay = nextCI?.date === targetDate;
         const priority = isSameDay ? "same_day_turnaround" : "standard";
+
+        // Resolve checkout time: reservation > listing default > 10:00
+        const checkoutTime = normaliseTime(
+          r.check_out_time,
+          normaliseTime(listing.default_check_out_time, DEFAULT_CHECKOUT)
+        );
+        // Next checkin time only matters when same-day; resolve from next reservation > listing default > 15:00
+        const checkinTime = isSameDay
+          ? normaliseTime(
+              nextCI?.time,
+              normaliseTime(listing.default_check_in_time, DEFAULT_CHECKIN)
+            )
+          : null;
 
         newTasks.push({
           listing_id: targetLid,
@@ -242,6 +275,9 @@ Deno.serve(async (req) => {
           status: "unassigned",
           estimated_start_time: null,
           travel_time_from_previous_minutes: 0,
+          checkout_time: checkoutTime,
+          checkin_time: checkinTime,
+          is_same_day_turnaround: isSameDay,
         });
       }
     }
@@ -313,7 +349,7 @@ Deno.serve(async (req) => {
       if (tasks.length === 1) {
         const travel = travelMinutes(homeLat, homeLon, tasks[0].latitude, tasks[0].longitude);
         tasks[0].travel_time_from_previous_minutes = travel;
-        tasks[0].estimated_start_time = addMinutesToTime(DEFAULT_CHECKOUT, travel);
+        tasks[0].estimated_start_time = addMinutesToTime(tasks[0].checkout_time, travel);
         continue;
       }
 
@@ -395,12 +431,13 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Step E: Calculate travel times and estimated start times
+      // Step E: Calculate travel times and estimated start times.
+      // Each task can't start before its property's checkout time + travel from previous stop.
       const firstTravel = travelMinutes(homeLat, homeLon, ordered[0].latitude, ordered[0].longitude);
       ordered[0].travel_time_from_previous_minutes = firstTravel;
-      ordered[0].estimated_start_time = addMinutesToTime(DEFAULT_CHECKOUT, firstTravel);
+      ordered[0].estimated_start_time = addMinutesToTime(ordered[0].checkout_time, firstTravel);
 
-      let currentTime = addMinutesToTime(DEFAULT_CHECKOUT, firstTravel + ordered[0].cleaning_duration_minutes);
+      let currentTime = addMinutesToTime(ordered[0].estimated_start_time, ordered[0].cleaning_duration_minutes);
 
       for (let i = 1; i < ordered.length; i++) {
         const travel = travelMinutes(
@@ -408,8 +445,11 @@ Deno.serve(async (req) => {
           ordered[i].latitude, ordered[i].longitude
         );
         ordered[i].travel_time_from_previous_minutes = travel;
-        ordered[i].estimated_start_time = addMinutesToTime(currentTime, travel);
-        currentTime = addMinutesToTime(currentTime, travel + ordered[i].cleaning_duration_minutes);
+        const arrivalAfterTravel = addMinutesToTime(currentTime, travel);
+        // Don't start before property checkout time
+        const earliestStart = arrivalAfterTravel >= ordered[i].checkout_time ? arrivalAfterTravel : ordered[i].checkout_time;
+        ordered[i].estimated_start_time = earliestStart;
+        currentTime = addMinutesToTime(earliestStart, ordered[i].cleaning_duration_minutes);
       }
 
       cleanerBuckets[c.id] = ordered;
@@ -432,6 +472,9 @@ Deno.serve(async (req) => {
         estimated_start_time: t.estimated_start_time,
         cleaning_duration_minutes: t.cleaning_duration_minutes,
         travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
+        checkout_time: t.checkout_time,
+        checkin_time: t.checkin_time,
+        is_same_day_turnaround: t.is_same_day_turnaround,
       }));
 
       const { error: insertErr } = await supabase.from("clean_tasks").insert(rows);

@@ -70,6 +70,8 @@ interface Listing {
   cleaning_duration_minutes: number | null;
   latitude: number | null;
   longitude: number | null;
+  default_check_in_time: string | null;
+  default_check_out_time: string | null;
 }
 
 interface Reservation {
@@ -79,6 +81,8 @@ interface Reservation {
   check_out: string;
   status: string;
   guest_name: string;
+  check_in_time: string | null;
+  check_out_time: string | null;
 }
 
 /* ── helpers ── */
@@ -86,6 +90,13 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DEFAULT_CHECKOUT = "10:00";
 const DEFAULT_CHECKIN = "15:00";
 const AVG_SPEED_KMH = 40;
+
+function normaliseTime(t: string | null | undefined, fallback: string): string {
+  if (!t) return fallback;
+  const m = String(t).match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return fallback;
+  return `${m[1].padStart(2, "0")}:${m[2]}`;
+}
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
@@ -146,7 +157,10 @@ export function useCleaningSchedule() {
   const { data: listings = [] } = useQuery({
     queryKey: ["listings-schedule"],
     queryFn: async () => {
-      const { data } = await supabase.from("listings").select("id, name, location_group, cleaning_duration_minutes, latitude, longitude").eq("status", "active");
+      const { data } = await supabase
+        .from("listings")
+        .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, default_check_in_time, default_check_out_time")
+        .eq("status", "active");
       return (data || []) as Listing[];
     },
   });
@@ -169,7 +183,7 @@ export function useCleaningSchedule() {
     queryFn: async () => {
       const { data } = await supabase
         .from("reservations")
-        .select("id, listing_id, check_in, check_out, status, guest_name")
+        .select("id, listing_id, check_in, check_out, status, guest_name, check_in_time, check_out_time")
         .gte("check_out", rangeStartStr)
         .lte("check_out", rangeEndStr)
         .eq("status", "confirmed")
@@ -183,7 +197,7 @@ export function useCleaningSchedule() {
     queryFn: async () => {
       const { data } = await supabase
         .from("reservations")
-        .select("id, listing_id, check_in, check_out, status, guest_name")
+        .select("id, listing_id, check_in, check_out, status, guest_name, check_in_time, check_out_time")
         .gte("check_in", rangeStartStr)
         .lte("check_in", lookAheadStr)
         .eq("status", "confirmed")
@@ -222,6 +236,19 @@ export function useCleaningSchedule() {
           .filter(nr => nr.listing_id === t.listing_id && nr.check_in >= ds && nr.id !== t.reservation_id)
           .sort((a, b) => a.check_in.localeCompare(b.check_in))[0];
 
+        // Resolve checkout time: stored on task > reservation > listing default > 10:00
+        const checkoutTime = normaliseTime(
+          t.checkout_time,
+          normaliseTime(checkout?.check_out_time, normaliseTime(listing?.default_check_out_time, DEFAULT_CHECKOUT))
+        );
+        const sameDay = nextCheckIn?.check_in === ds;
+        const checkinTime = sameDay
+          ? normaliseTime(
+              t.checkin_time,
+              normaliseTime(nextCheckIn?.check_in_time, normaliseTime(listing?.default_check_in_time, DEFAULT_CHECKIN))
+            )
+          : null;
+
         return {
           id: t.id,
           dbTaskId: t.id,
@@ -230,9 +257,9 @@ export function useCleaningSchedule() {
           propertyName: listing?.name ?? "Unknown Property",
           locationGroup: listing?.location_group ?? "Other",
           checkoutDate: ds,
-          checkoutTime: DEFAULT_CHECKOUT,
+          checkoutTime,
           nextCheckinDate: nextCheckIn?.check_in ?? null,
-          nextCheckinTime: nextCheckIn?.check_in === ds ? DEFAULT_CHECKIN : null,
+          nextCheckinTime: checkinTime,
           cleaningDuration: t.cleaning_duration_minutes ?? 90,
           assignedCleanerId: t.assigned_cleaner_id,
           assignedCleanerName: cleaner?.name ?? null,
@@ -273,11 +300,22 @@ export function useCleaningSchedule() {
         .filter(nr => nr.listing_id === r.listing_id && nr.check_in >= ds && nr.id !== r.id)
         .sort((a, b) => a.check_in.localeCompare(b.check_in))[0];
 
+      const checkoutTime = normaliseTime(
+        r.check_out_time,
+        normaliseTime(listing?.default_check_out_time, DEFAULT_CHECKOUT)
+      );
       const sameDay = nextCheckIn?.check_in === ds;
+      const checkinTime = sameDay
+        ? normaliseTime(
+            nextCheckIn?.check_in_time,
+            normaliseTime(listing?.default_check_in_time, DEFAULT_CHECKIN)
+          )
+        : null;
+
       let priority: Priority = "STANDARD";
-      if (sameDay) {
-        const [coH, coM] = DEFAULT_CHECKOUT.split(":").map(Number);
-        const [ciH, ciM] = DEFAULT_CHECKIN.split(":").map(Number);
+      if (sameDay && checkinTime) {
+        const [coH, coM] = checkoutTime.split(":").map(Number);
+        const [ciH, ciM] = checkinTime.split(":").map(Number);
         const gap = (ciH * 60 + ciM) - (coH * 60 + coM);
         priority = gap < 180 ? "TIGHT_WINDOW" : "SAME_DAY";
       }
@@ -289,9 +327,9 @@ export function useCleaningSchedule() {
         propertyName: listing?.name ?? "Unknown Property",
         locationGroup: listing?.location_group ?? "Other",
         checkoutDate: ds,
-        checkoutTime: DEFAULT_CHECKOUT,
+        checkoutTime,
         nextCheckinDate: nextCheckIn?.check_in ?? null,
-        nextCheckinTime: sameDay ? DEFAULT_CHECKIN : null,
+        nextCheckinTime: checkinTime,
         cleaningDuration: listing?.cleaning_duration_minutes ?? 90,
         assignedCleanerId: null,
         assignedCleanerName: null,
@@ -370,7 +408,7 @@ export function useCleaningSchedule() {
 
       if (cTasks.length === 1) {
         const homeTravel = travelMinutes(c.home_latitude, c.home_longitude, cTasks[0].latitude, cTasks[0].longitude);
-        cTasks[0].estimatedStart = addMinutesToTime(DEFAULT_CHECKOUT, homeTravel);
+        cTasks[0].estimatedStart = addMinutesToTime(cTasks[0].checkoutTime, homeTravel);
         cTasks[0].travelMinutes = homeTravel;
         return {
           id: c.id, name: c.name, dailyWorkingHours: c.daily_working_hours, totalScheduledMinutes: totalMins, tasks: cTasks,
@@ -408,16 +446,18 @@ export function useCleaningSchedule() {
       // Last task
       if (remaining.length === 1) ordered.push(remaining[0]);
 
-      // Calculate times from home
+      // Calculate times from home — first task can't start before its checkout time
       const homeToFirst = travelMinutes(c.home_latitude, c.home_longitude, ordered[0].latitude, ordered[0].longitude);
       ordered[0].travelMinutes = homeToFirst;
-      let currentTime = addMinutesToTime(DEFAULT_CHECKOUT, homeToFirst);
+      let currentTime = addMinutesToTime(ordered[0].checkoutTime, homeToFirst);
       ordered[0].estimatedStart = currentTime;
 
       for (let i = 1; i < ordered.length; i++) {
         const travel = travelMinutes(ordered[i - 1].latitude, ordered[i - 1].longitude, ordered[i].latitude, ordered[i].longitude);
         ordered[i].travelMinutes = travel;
-        currentTime = addMinutesToTime(currentTime, ordered[i - 1].cleaningDuration + travel);
+        const arrival = addMinutesToTime(currentTime, ordered[i - 1].cleaningDuration + travel);
+        // Don't start before this property's own checkout time
+        currentTime = arrival >= ordered[i].checkoutTime ? arrival : ordered[i].checkoutTime;
         ordered[i].estimatedStart = currentTime;
       }
 
