@@ -187,14 +187,23 @@ export default function OccupancyHeatmap() {
 }
 
 function HeatmapCell({ cell, propertyName, month, year }: { cell: MonthCell; propertyName: string; month: string; year: number }) {
+  const pct = cell?.occupancy ?? 0;
+  const band = getBand(pct);
+  const showText = pct > 0;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <div className="p-[2px]">
           <div
-            className="w-full rounded-[3px] transition-all duration-150 hover:scale-110 hover:z-10 cursor-default"
-            style={{ backgroundColor: getCellColor(cell?.occupancy ?? 0), minHeight: "32px" }}
-          />
+            className={`w-full rounded-[3px] transition-all duration-150 hover:scale-110 hover:z-10 cursor-default flex items-center justify-center ${band.text}`}
+            style={{ backgroundColor: band.bg, minHeight: "32px" }}
+          >
+            {showText && (
+              <span className="text-[10px] font-semibold tabular-nums leading-none">
+                {pct}%
+              </span>
+            )}
+          </div>
         </div>
       </TooltipTrigger>
       <TooltipContent side="top" className="bg-popover border-border/40 p-3 space-y-1">
@@ -203,9 +212,11 @@ function HeatmapCell({ cell, propertyName, month, year }: { cell: MonthCell; pro
         <div className="h-px bg-border/30 my-1" />
         <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px]">
           <span className="text-muted-foreground">Occupancy</span>
-          <span className="text-foreground font-medium text-right">{cell?.occupancy ?? 0}%</span>
+          <span className="text-foreground font-medium text-right">{pct}% <span className="text-muted-foreground">· {band.label}</span></span>
           <span className="text-muted-foreground">Nights</span>
           <span className="text-foreground font-medium text-right">{cell?.nightsBooked ?? 0} / {cell?.nightsAvailable ?? 0}</span>
+          <span className="text-muted-foreground">Bookings</span>
+          <span className="text-foreground font-medium text-right">{cell?.bookings ?? 0}</span>
           <span className="text-muted-foreground">Revenue</span>
           <span className="text-foreground font-medium text-right">£{(cell?.revenue ?? 0).toLocaleString()}</span>
         </div>
