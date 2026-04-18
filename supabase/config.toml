@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.orin-chat]
 verify_jwt = false
+
+[functions.notify-urgent-issue]
+verify_jwt = true
