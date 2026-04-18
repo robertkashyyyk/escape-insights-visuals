@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus, LayoutGrid, Table as TableIcon } from "lucide-react";
+import { YoYTable } from "@/components/yoy/YoYTable";
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const QUARTERS = ["Q1","Q2","Q3","Q4"];
@@ -135,6 +136,17 @@ export default function YoYPerformance() {
   const [periodValue, setPeriodValue] = useState<number>(getDefaultPeriodValue("month"));
   const [year, setYear] = useState(getDefaultYear("month"));
   const [likeForLike, setLikeForLike] = useState(false);
+  const [viewMode, setViewMode] = useState<"card" | "table">(() => {
+    try {
+      const stored = sessionStorage.getItem("yoy-view-mode");
+      return stored === "table" ? "table" : "card";
+    } catch { return "card"; }
+  });
+
+  const handleViewMode = (m: "card" | "table") => {
+    setViewMode(m);
+    try { sessionStorage.setItem("yoy-view-mode", m); } catch {}
+  };
 
   const { data, isLoading } = useYoYData(periodType, periodValue, year);
   const options = getPeriodOptions(periodType);
