@@ -281,15 +281,29 @@ serve(async (req) => {
 
     const { data: owners } = await admin.from("property_owners").select("id, name");
 
-    // Pull all confirmed reservations from start of prior year through next 90 days (single query)
-    const { data: reservations } = await admin
-      .from("reservations")
-      .select("id, listing_id, check_in, check_out, total_amount, host_payout, cleaning_fee, channel_commission, tax_amount, platform, status")
-      .eq("status", "confirmed")
-      .gte("check_in", priorYearStart)
-      .lte("check_in", next90);
-
-    const allRes = reservations || [];
+    // Pull all confirmed reservations from start of prior year through next 90 days.
+    // IMPORTANT: paginate — Supabase caps a single response at 1000 rows, and the
+    // portfolio easily exceeds that across 18+ months of bookings.
+    const allRes: any[] = [];
+    const PAGE = 1000;
+    for (let from = 0; ; from += PAGE) {
+      const { data: page, error: pageErr } = await admin
+        .from("reservations")
+        .select("id, listing_id, check_in, check_out, total_amount, host_payout, cleaning_fee, channel_commission, tax_amount, platform, status")
+        .eq("status", "confirmed")
+        .gte("check_in", priorYearStart)
+        .lte("check_in", next90)
+        .order("check_in", { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (pageErr) {
+        console.error("orin-chat: reservations page error", pageErr);
+        break;
+      }
+      if (!page || page.length === 0) break;
+      allRes.push(...page);
+      if (page.length < PAGE) break;
+    }
+    console.log(`orin-chat: loaded ${allRes.length} confirmed reservations`);
     const activeListings = (listings || []).filter((l: any) => !l.is_bundle);
     const activeListingIds = new Set(activeListings.map((l: any) => l.id));
     const activeListingCount = activeListings.length;
