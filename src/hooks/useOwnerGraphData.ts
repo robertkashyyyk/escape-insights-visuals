@@ -6,7 +6,7 @@ import {
   format, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   startOfQuarter, endOfQuarter, startOfYear, endOfYear,
   eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval,
-  eachQuarterOfInterval, addYears, isBefore, isAfter
+  eachQuarterOfInterval, addYears, isBefore, isAfter, endOfDay
 } from "date-fns";
 import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
