@@ -1,0 +1,242 @@
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { format, addDays, startOfWeek } from "date-fns";
+
+export interface MatrixListing {
+  id: string;
+  name: string;
+  location_group: string | null;
+  default_check_out_time: string | null;
+  default_check_in_time: string | null;
+}
+
+export interface MatrixCleaner {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
+export interface MatrixTask {
+  id: string;
+  listing_id: string;
+  scheduled_date: string;
+  status: string;            // 'unassigned' | 'scheduled' | 'in_progress' | 'completed'
+  assigned_cleaner_id: string | null;
+  reservation_id: string | null;
+  checkout_time: string | null;
+  checkin_time: string | null;
+  is_same_day_turnaround: boolean | null;
+  cleaning_duration_minutes: number;
+  source: string;            // 'hostaway' | 'manual'
+  task_type: string;         // 'clean' | 'interim' | 'maintenance'
+  notes: string | null;
+  priority: string;
+  completed_at: string | null;
+}
+
+export interface MatrixReservation {
+  id: string;
+  listing_id: string;
+  check_in: string;
+  check_out: string;
+  guest_name: string;
+  check_in_time: string | null;
+  check_out_time: string | null;
+}
+
+export function useMatrixSchedule(weekAnchor: Date) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+
+  const weekStart = useMemo(() => startOfWeek(weekAnchor, { weekStartsOn: 1 }), [weekAnchor]);
+  const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
+  const weekStartStr = format(weekStart, "yyyy-MM-dd");
+  const weekEndStr = format(weekEnd, "yyyy-MM-dd");
+
+  // Days of the week
+  const days = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
+    [weekStart]
+  );
+
+  // Listings
+  const { data: listings = [], isLoading: listingsLoading } = useQuery({
+    queryKey: ["matrix-listings"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("listings")
+        .select("id, name, location_group, default_check_in_time, default_check_out_time, status, is_bundle")
+        .eq("status", "active");
+      return ((data || []) as any[])
+        .filter(l => !l.is_bundle)
+        .map(l => ({
+          id: l.id,
+          name: l.name,
+          location_group: l.location_group,
+          default_check_in_time: l.default_check_in_time,
+          default_check_out_time: l.default_check_out_time,
+        })) as MatrixListing[];
+    },
+  });
+
+  // Cleaners
+  const { data: cleaners = [] } = useQuery({
+    queryKey: ["matrix-cleaners"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("cleaners" as any)
+        .select("id, name, active")
+        .eq("active", true)
+        .order("name");
+      return (data || []) as unknown as MatrixCleaner[];
+    },
+  });
+
+  // Tasks for the week
+  const { data: tasks = [], isLoading: tasksLoading } = useQuery({
+    queryKey: ["matrix-tasks", weekStartStr, weekEndStr],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("clean_tasks" as any)
+        .select("*")
+        .gte("scheduled_date", weekStartStr)
+        .lte("scheduled_date", weekEndStr);
+      return (data || []) as unknown as MatrixTask[];
+    },
+  });
+
+  // Reservations covering the week (for guest names + times)
+  const { data: reservations = [] } = useQuery({
+    queryKey: ["matrix-reservations", weekStartStr, weekEndStr],
+    queryFn: async () => {
+      // Pull anything with either checkout or checkin in the week (or spanning it)
+      const lookEnd = format(addDays(weekEnd, 7), "yyyy-MM-dd");
+      const { data } = await supabase
+        .from("reservations")
+        .select("id, listing_id, check_in, check_out, guest_name, check_in_time, check_out_time, status")
+        .eq("status", "confirmed")
+        .gte("check_out", weekStartStr)
+        .lte("check_in", lookEnd);
+      return (data || []) as MatrixReservation[];
+    },
+  });
+
+  // Realtime subscription — refresh tasks on any change
+  useEffect(() => {
+    const channel = supabase
+      .channel("matrix-clean-tasks")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "clean_tasks" },
+        () => {
+          qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [qc, weekStartStr, weekEndStr]);
+
+  // Mutations
+  const reassignTask = useCallback(async (taskId: string, cleanerId: string | null) => {
+    const newStatus = cleanerId ? "scheduled" : "unassigned";
+    const { error } = await (supabase.from("clean_tasks" as any) as any)
+      .update({ assigned_cleaner_id: cleanerId, status: newStatus })
+      .eq("id", taskId);
+    if (error) {
+      toast({ title: "Reassignment failed", description: error.message, variant: "destructive" });
+      return false;
+    }
+    qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
+    return true;
+  }, [qc, toast, weekStartStr, weekEndStr]);
+
+  const completeTask = useCallback(async (taskId: string, listingId: string) => {
+    const { error } = await (supabase.from("clean_tasks" as any) as any)
+      .update({ status: "completed", completed_at: new Date().toISOString() })
+      .eq("id", taskId);
+    if (error) {
+      toast({ title: "Failed", description: error.message, variant: "destructive" });
+      return false;
+    }
+    await supabase.from("listings").update({ is_clean: true } as any).eq("id", listingId);
+    qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
+    toast({ title: "Marked complete" });
+    return true;
+  }, [qc, toast, weekStartStr, weekEndStr]);
+
+  const removeTask = useCallback(async (taskId: string) => {
+    const { error } = await (supabase.from("clean_tasks" as any) as any)
+      .delete()
+      .eq("id", taskId);
+    if (error) {
+      toast({ title: "Failed to remove", description: error.message, variant: "destructive" });
+      return false;
+    }
+    qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
+    toast({ title: "Cleaning task removed" });
+    return true;
+  }, [qc, toast, weekStartStr, weekEndStr]);
+
+  const updateNotes = useCallback(async (taskId: string, notes: string) => {
+    const { error } = await (supabase.from("clean_tasks" as any) as any)
+      .update({ notes })
+      .eq("id", taskId);
+    if (error) {
+      toast({ title: "Failed to save note", description: error.message, variant: "destructive" });
+      return false;
+    }
+    qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
+    return true;
+  }, [qc, toast, weekStartStr, weekEndStr]);
+
+  const addManualClean = useCallback(async (input: {
+    listing_id: string;
+    scheduled_date: string;
+    task_type: "clean" | "interim" | "maintenance";
+    assigned_cleaner_id: string | null;
+    notes: string | null;
+  }) => {
+    const { error } = await (supabase.from("clean_tasks" as any) as any).insert({
+      listing_id: input.listing_id,
+      scheduled_date: input.scheduled_date,
+      task_type: input.task_type,
+      assigned_cleaner_id: input.assigned_cleaner_id,
+      status: input.assigned_cleaner_id ? "scheduled" : "unassigned",
+      notes: input.notes,
+      source: "manual",
+      priority: "standard",
+      cleaning_duration_minutes: 90,
+    });
+    if (error) {
+      toast({ title: "Failed to add", description: error.message, variant: "destructive" });
+      return false;
+    }
+    qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
+    toast({ title: "Manual clean added" });
+    return true;
+  }, [qc, toast, weekStartStr, weekEndStr]);
+
+  // Group listings by location_group, sorted
+  const groupedListings = useMemo(() => {
+    const map = new Map<string, MatrixListing[]>();
+    for (const l of listings) {
+      const g = l.location_group || "Other";
+      if (!map.has(g)) map.set(g, []);
+      map.get(g)!.push(l);
+    }
+    for (const arr of map.values()) arr.sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [listings]);
+
+  return {
+    weekStart, weekEnd, days,
+    listings, groupedListings,
+    cleaners, tasks, reservations,
+    isLoading: listingsLoading || tasksLoading,
+    reassignTask, completeTask, removeTask, updateNotes, addManualClean,
+  };
+}
