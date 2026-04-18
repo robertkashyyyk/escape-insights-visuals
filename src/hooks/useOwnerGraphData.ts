@@ -48,7 +48,7 @@ function getBuckets(from: Date, to: Date, zoom: ZoomLevel): { label: string; sta
   switch (zoom) {
     case "Day": {
       const days = eachDayOfInterval({ start: from, end: to });
-      days.forEach(d => buckets.push({ label: format(d, "d MMM"), start: d, end: d }));
+      days.forEach(d => buckets.push({ label: format(d, "d MMM"), start: d, end: endOfDay(d) }));
       break;
     }
     case "Week": {
