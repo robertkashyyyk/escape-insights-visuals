@@ -15,6 +15,7 @@ import Owners from "./pages/Owners";
 import Reservations from "./pages/Reservations";
 
 import SettingsPage from "./pages/SettingsPage";
+import TeamManagement from "./pages/TeamManagement";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import YoYPerformance from "./pages/YoYPerformance";
@@ -76,6 +77,7 @@ const App = () => (
             
             <Route path="/management" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ManagementRevenue /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute requiredRoles={["super"]}><SettingsPage /></ProtectedRoute>} />
+            <Route path="/settings/team" element={<ProtectedRoute requiredRoles={["super"]}><TeamManagement /></ProtectedRoute>} />
             <Route path="/sync-health" element={<ProtectedRoute requiredRoles={["super", "senior"]}><SyncHealth /></ProtectedRoute>} />
             <Route path="/operations/schedule" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><CleaningSchedule /></ProtectedRoute>} />
             <Route path="/operations/cleaning" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><CleaningSchedule /></ProtectedRoute>} />
