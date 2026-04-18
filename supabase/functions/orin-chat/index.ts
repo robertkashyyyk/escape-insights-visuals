@@ -19,6 +19,46 @@ function getNetRevenue(r: any): number {
   return total;
 }
 
+function buildCancellationContext(
+  cancelled: any[],
+  listings: any[],
+  confirmedCount: number,
+  periodStart: string
+) {
+  const listingMap = Object.fromEntries(listings.map((l: any) => [l.id, l.name]));
+  const totalLost = cancelled.reduce((s, r) => s + getNetRevenue(r), 0);
+  const byProp: Record<string, { name: string; count: number; revenue_lost: number }> = {};
+  let leadSum = 0;
+  let leadCount = 0;
+  for (const r of cancelled) {
+    const name = listingMap[r.listing_id] || "Unknown";
+    if (!byProp[name]) byProp[name] = { name, count: 0, revenue_lost: 0 };
+    byProp[name].count += 1;
+    byProp[name].revenue_lost += getNetRevenue(r);
+    if (r.reservation_date && r.check_in) {
+      const lead = (new Date(r.check_in).getTime() - new Date(r.reservation_date).getTime()) / 86400000;
+      if (!isNaN(lead) && lead >= 0) {
+        leadSum += lead;
+        leadCount += 1;
+      }
+    }
+  }
+  const totalBookings = confirmedCount + cancelled.length;
+  const rate = totalBookings > 0 ? Math.round((cancelled.length / totalBookings) * 1000) / 10 : 0;
+  return {
+    period: "last_30_days",
+    period_start: periodStart,
+    total_cancelled: cancelled.length,
+    revenue_lost: Math.round(totalLost),
+    by_property: Object.values(byProp)
+      .map(p => ({ ...p, revenue_lost: Math.round(p.revenue_lost) }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5),
+    avg_lead_time_days: leadCount > 0 ? Math.round(leadSum / leadCount) : null,
+    cancellation_rate_pct: rate,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
