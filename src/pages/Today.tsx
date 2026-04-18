@@ -91,6 +91,9 @@ export default function Today() {
               </div>
             </section>
 
+            {/* Open Issues (only renders when there are any) */}
+            <OpenIssuesSection />
+
             {/* 3. Orin's Morning Note */}
             <section className="rounded-xl border border-primary/20 bg-primary/5 p-5 relative overflow-hidden">
               <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-primary to-primary/60" />
