@@ -92,6 +92,19 @@ export function MatrixView({ initialDate }: Props) {
   const goPrev = () => setWeekAnchor(d => addDays(startOfWeek(d, { weekStartsOn: 1 }), -7));
   const goNext = () => setWeekAnchor(d => addDays(startOfWeek(d, { weekStartsOn: 1 }), 7));
   const goThisWeek = () => setWeekAnchor(new Date());
+  const isCurrentWeek = useMemo(
+    () => isSameDay(weekStart, startOfWeek(new Date(), { weekStartsOn: 1 })),
+    [weekStart]
+  );
+
+  // Shorten long Hostaway titles for the matrix left column.
+  // Strategy: take first segment before · or |, then truncate to 30 chars.
+  const shortenName = useCallback((name: string): string => {
+    if (!name) return "";
+    const firstSegment = name.split(/[·|]/)[0].trim();
+    const base = firstSegment || name;
+    return base.length > 30 ? base.slice(0, 29).trimEnd() + "…" : base;
+  }, []);
 
   // DnD
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -137,15 +150,29 @@ export function MatrixView({ initialDate }: Props) {
           <Button variant="outline" size="icon" onClick={goPrev} className="h-9 w-9">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={goThisWeek} className="h-9">
-            This Week
+          <Button
+            variant={isCurrentWeek ? "default" : "outline"}
+            size="sm"
+            onClick={goThisWeek}
+            className="h-9"
+            disabled={isCurrentWeek}
+          >
+            Current Week
           </Button>
           <Button variant="outline" size="icon" onClick={goNext} className="h-9 w-9">
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <span className="ml-2 text-sm font-medium text-foreground tabular-nums">
+          <span key={format(weekStart, "yyyy-MM-dd")} className="ml-2 text-sm font-medium text-foreground tabular-nums">
             {format(weekStart, "d MMM")} – {format(addDays(weekStart, 6), "d MMM yyyy")}
           </span>
+          {!isCurrentWeek && (
+            <button
+              onClick={goThisWeek}
+              className="ml-2 text-xs text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
+            >
+              Back to Current Week
+            </button>
+          )}
         </div>
       </div>
 
@@ -336,7 +363,12 @@ export function MatrixView({ initialDate }: Props) {
                       >
                         {/* Property name (sticky col) */}
                         <div className="px-3 py-2 border-r border-border/30 sticky left-0 bg-card/80 backdrop-blur-sm z-10 flex flex-col justify-center">
-                          <p className="text-xs font-medium text-foreground leading-tight">{listing.name}</p>
+                          <p
+                            className="text-xs font-medium text-foreground leading-tight truncate"
+                            title={listing.name}
+                          >
+                            {shortenName(listing.name)}
+                          </p>
                           {listing.location_group && (
                             <span className="text-[9px] text-muted-foreground/70 mt-0.5">{listing.location_group}</span>
                           )}
