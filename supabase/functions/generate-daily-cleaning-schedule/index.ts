@@ -3,7 +3,16 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const AVG_SPEED_KMH = 40;
 const DEFAULT_CHECKOUT = "10:00";
+const DEFAULT_CHECKIN = "15:00";
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function normaliseTime(t: string | null | undefined, fallback: string): string {
+  if (!t) return fallback;
+  // Accept "HH:MM" or "HH:MM:SS"
+  const m = String(t).match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return fallback;
+  return `${m[1].padStart(2, "0")}:${m[2]}`;
+}
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
@@ -45,6 +54,9 @@ interface TaskInfo {
   status: string;
   estimated_start_time: string | null;
   travel_time_from_previous_minutes: number;
+  checkout_time: string;
+  checkin_time: string | null;
+  is_same_day_turnaround: boolean;
 }
 
 interface CleanerInfo {
@@ -87,6 +99,14 @@ Deno.serve(async (req) => {
       .eq("status", "confirmed");
     if (coErr) throw coErr;
 
+    // 1. Get checkouts for target date (with checkout time)
+    const { data: checkouts, error: coErr } = await supabase
+      .from("reservations")
+      .select("id, listing_id, check_in, check_out, status, check_out_time")
+      .eq("check_out", targetDate)
+      .eq("status", "confirmed");
+    if (coErr) throw coErr;
+
     // 2. Get listings (including bundles so we can expand components)
     const rawListingIds = [...new Set((checkouts || []).map((r: any) => r.listing_id))];
     if (rawListingIds.length === 0) {
@@ -100,7 +120,7 @@ Deno.serve(async (req) => {
 
     const { data: rawListings } = await supabase
       .from("listings")
-      .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, is_bundle, bundle_components")
+      .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, is_bundle, bundle_components, default_check_in_time, default_check_out_time")
       .in("id", rawListingIds);
 
     // Expand bundles → component listing IDs
@@ -120,7 +140,7 @@ Deno.serve(async (req) => {
     if (componentIdsFromBundles.length > 0) {
       const { data } = await supabase
         .from("listings")
-        .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, is_bundle")
+        .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, is_bundle, default_check_in_time, default_check_out_time")
         .in("id", componentIdsFromBundles)
         .eq("is_bundle", false);
       componentListings = data || [];
@@ -143,19 +163,19 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 3. Get next check-ins for priority detection
+    // 3. Get next check-ins for priority detection (with check-in time)
     const { data: nextCheckins } = await supabase
       .from("reservations")
-      .select("listing_id, check_in")
+      .select("listing_id, check_in, check_in_time")
       .in("listing_id", listingIds)
       .gte("check_in", targetDate)
       .eq("status", "confirmed")
       .order("check_in");
 
-    const nextCheckinMap = new Map<string, string>();
+    const nextCheckinMap = new Map<string, { date: string; time: string | null }>();
     for (const r of nextCheckins || []) {
       if (!nextCheckinMap.has(r.listing_id)) {
-        nextCheckinMap.set(r.listing_id, r.check_in);
+        nextCheckinMap.set(r.listing_id, { date: r.check_in, time: r.check_in_time });
       }
     }
 
