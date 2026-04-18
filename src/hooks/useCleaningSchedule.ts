@@ -123,7 +123,7 @@ export function useCleaningSchedule() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(() => new Date());
-  const [viewMode, setViewMode] = useState<"day" | "week">("day");
+  const [viewMode, setViewMode] = useState<"day" | "week" | "matrix">("day");
   const [filterCleaner, setFilterCleaner] = useState<string>("all");
   const [filterLocation, setFilterLocation] = useState<string>("all");
   const [isRegenerating, setIsRegenerating] = useState(false);
