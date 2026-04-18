@@ -91,14 +91,6 @@ Deno.serve(async (req) => {
 
     const targetDayOfWeek = DAY_NAMES[new Date(targetDate + "T12:00:00Z").getDay()];
 
-    // 1. Get checkouts for target date
-    const { data: checkouts, error: coErr } = await supabase
-      .from("reservations")
-      .select("id, listing_id, check_in, check_out, status")
-      .eq("check_out", targetDate)
-      .eq("status", "confirmed");
-    if (coErr) throw coErr;
-
     // 1. Get checkouts for target date (with checkout time)
     const { data: checkouts, error: coErr } = await supabase
       .from("reservations")
