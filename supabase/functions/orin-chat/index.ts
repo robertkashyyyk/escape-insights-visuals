@@ -358,6 +358,13 @@ STRICT RULES:
 7. Use £ for currency. Format numbers with commas (e.g. £14,200).
 8. The user is currently viewing: ${current_page || "unknown page"}. Use this for contextual awareness.
 
+CANCELLATION DATA: You have access to a separate cancellations context block. Use this data when:
+- The user asks about cancellations, lost revenue, or booking reliability
+- The cancellation rate is notably high (above 5%) — proactively mention it
+- A specific property has a disproportionate share of cancellations
+- The average cancellation lead time is very short (under 7 days) — flag as a risk
+Do NOT include cancellation data in revenue or occupancy figures. Keep them strictly separate. When reporting cancellations, always frame them as "revenue at risk" or "bookings lost" — not as part of confirmed performance.
+
 Context data:
 ${JSON.stringify(dataContext, null, 2)}`;
 
