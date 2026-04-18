@@ -149,7 +149,14 @@ export default function CleaningSchedule() {
             >
               Week
             </button>
+            <button
+              onClick={() => setViewMode("matrix" as any)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${(viewMode as any) === "matrix" ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Matrix
+            </button>
           </div>
+
 
           <Select value={filterCleaner} onValueChange={setFilterCleaner}>
             <SelectTrigger className="w-40 h-9 text-xs bg-secondary/50 border-border/30">
