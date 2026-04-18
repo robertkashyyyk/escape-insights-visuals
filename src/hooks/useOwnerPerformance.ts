@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { differenceInDays, parseISO } from "date-fns";
+import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
 export type DateMode = "check_in" | "created";
 
@@ -40,7 +41,7 @@ export function useOwnerPerformance(year: number, dateMode: DateMode = "check_in
         supabase.from("listings").select("id, owner_id, status, location_group"),
         supabase
           .from("reservations")
-          .select("listing_id, check_in, check_out, total_amount, status, reservation_date")
+          .select(`listing_id, check_in, check_out, status, reservation_date, ${REVENUE_FIELDS}`)
           .gte(dateCol, yearStart)
           .lte(dateCol, yearEnd)
           .eq("status", "confirmed"),
@@ -64,7 +65,7 @@ export function useOwnerPerformance(year: number, dateMode: DateMode = "check_in
         if (!ownerId) continue;
         if (!ownerAgg[ownerId]) ownerAgg[ownerId] = { revenue: 0, nights: 0, bookings: 0, monthly: new Array(12).fill(0) };
         const nights = Math.max(1, differenceInDays(parseISO(r.check_out), parseISO(r.check_in)));
-        const rev = r.total_amount ?? 0;
+        const rev = getNetRevenue(r as any);
         ownerAgg[ownerId].revenue += rev;
         ownerAgg[ownerId].nights += nights;
         ownerAgg[ownerId].bookings += 1;

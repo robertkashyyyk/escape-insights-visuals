@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, differenceInDays, addMonths, addDays, startOfMonth, endOfMonth, parseISO, startOfISOWeek } from "date-fns";
+import { getNetRevenue } from "@/lib/revenue";
 
 type PeriodWindow = 30 | 60 | 90 | 180;
 
@@ -146,7 +147,7 @@ export function useOTBData(window: PeriodWindow = 180) {
       const upcoming: UpcomingReservation[] = [];
 
       for (const r of rows) {
-        const amount = r.total_amount ?? 0;
+        const amount = getNetRevenue(r as any);
         const checkIn = parseISO(r.check_in);
         const checkOut = parseISO(r.check_out);
         const nights = Math.max(1, differenceInDays(checkOut, checkIn));

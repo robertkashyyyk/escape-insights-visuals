@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { differenceInDays, startOfDay, format, startOfWeek, startOfMonth, startOfQuarter } from "date-fns";
+import { getNetRevenue } from "@/lib/revenue";
 
 export type PeriodType = "Year" | "Quarter" | "Month" | "Week" | "Custom";
 
@@ -107,7 +108,7 @@ export function useDashboardData(dateRange: DateRange, periodType: PeriodType) {
       const bucketRevMap = new Map<string, number>();
 
       for (const r of reservations || []) {
-        const amount = r.total_amount || 0;
+        const amount = getNetRevenue(r as any);
         const nights = Math.max(1, differenceInDays(new Date(r.check_out), new Date(r.check_in)));
         totalRevenue += amount;
         nightsBooked += nights;

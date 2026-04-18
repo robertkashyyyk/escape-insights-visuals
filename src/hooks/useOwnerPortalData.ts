@@ -8,6 +8,7 @@ import {
   subYears, addWeeks, addMonths, addQuarters, addYears,
   format, isFuture, min as dateMin
 } from "date-fns";
+import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
 export type OwnerPeriodType = "Week" | "Month" | "Quarter" | "Year";
 export type OwnerDateMode = "check_in" | "created";
@@ -136,7 +137,7 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
       if (listingIds.length > 0) {
         const { data } = await supabase
           .from("reservations")
-          .select("listing_id, check_in, check_out, total_amount, year, month, status, reservation_date")
+          .select(`listing_id, check_in, check_out, year, month, status, reservation_date, ${REVENUE_FIELDS}`)
           .in("listing_id", listingIds)
           .eq("status", "confirmed");
         reservations = data || [];
@@ -159,11 +160,11 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
         const thisPeriodRes = propRes.filter((r) => inPeriod(r, periodStartStr, effectiveEndStr));
         const prevPeriodRes = propRes.filter((r) => inPeriod(r, prevStartStr, prevEffectiveEndStr));
 
-        const revenueThisYear = thisPeriodRes.reduce((s, r) => s + (r.total_amount || 0), 0);
-        const revenuePrevYear = prevPeriodRes.reduce((s, r) => s + (r.total_amount || 0), 0);
+        const revenueThisYear = thisPeriodRes.reduce((s, r) => s + getNetRevenue(r), 0);
+        const revenuePrevYear = prevPeriodRes.reduce((s, r) => s + getNetRevenue(r), 0);
 
         const monthlyRevenue = Array.from({ length: 12 }, (_, m) =>
-          propRes.filter((r) => r.year === currentYear && r.month === m + 1).reduce((s, r) => s + (r.total_amount || 0), 0)
+          propRes.filter((r) => r.year === currentYear && r.month === m + 1).reduce((s, r) => s + getNetRevenue(r), 0)
         );
 
         // Nights calculation
@@ -209,8 +210,8 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
       const allThisPeriod = reservations.filter((r) => r.status !== "cancelled" && inPeriod(r, periodStartStr, effectiveEndStr));
       const allPrevPeriod = reservations.filter((r) => r.status !== "cancelled" && inPeriod(r, prevStartStr, prevEffectiveEndStr));
 
-      const totalRevenue = allThisPeriod.reduce((s, r) => s + (r.total_amount || 0), 0);
-      const prevYearRevenue = allPrevPeriod.reduce((s, r) => s + (r.total_amount || 0), 0);
+      const totalRevenue = allThisPeriod.reduce((s, r) => s + getNetRevenue(r), 0);
+      const prevYearRevenue = allPrevPeriod.reduce((s, r) => s + getNetRevenue(r), 0);
 
       // Aggregate occupancy using non-bundle count
       let totalNightsBooked = 0;

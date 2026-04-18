@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfMonth, addMonths, format, subYears, differenceInDays } from "date-fns";
+import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
 interface ForecastMonth {
   month: string;
@@ -34,7 +35,7 @@ export function useRevenueForecaster() {
       // Fetch current reservations for next 3 months
       const { data: currentRes } = await supabase
         .from("reservations")
-        .select("listing_id, check_in, total_amount")
+        .select(`listing_id, check_in, ${REVENUE_FIELDS}`)
         .gte("check_in", currentStart)
         .lt("check_in", currentEnd)
         .eq("status", "confirmed");
@@ -42,7 +43,7 @@ export function useRevenueForecaster() {
       // Fetch last year's reservations for same 3 months
       const { data: lastYearRes } = await supabase
         .from("reservations")
-        .select("listing_id, check_in, total_amount, reservation_date")
+        .select(`listing_id, check_in, reservation_date, ${REVENUE_FIELDS}`)
         .gte("check_in", lastYearStart)
         .lt("check_in", lastYearEnd)
         .eq("status", "confirmed");

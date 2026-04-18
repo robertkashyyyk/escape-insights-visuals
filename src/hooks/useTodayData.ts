@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfDay, addDays, startOfMonth, endOfMonth } from "date-fns";
+import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
 interface Movement {
   propertyName: string;
@@ -49,7 +50,7 @@ export function useTodayData() {
 
       const { data: mtdRes } = await supabase
         .from("reservations")
-        .select("total_amount")
+        .select(REVENUE_FIELDS)
         .gte("check_in", monthStart)
         .lte("check_in", monthEnd)
         .eq("status", "confirmed");
@@ -116,7 +117,7 @@ export function useTodayData() {
         weekStrip.push({ date: d, label: format(d, "EEE"), checkouts, checkins });
       }
 
-      const revenueMTD = (mtdRes || []).reduce((sum, r) => sum + (r.total_amount || 0), 0);
+      const revenueMTD = (mtdRes || []).reduce((sum, r) => sum + getNetRevenue(r as any), 0);
 
       const listingCount = totalListings || 1;
       let bookedDays = 0;
