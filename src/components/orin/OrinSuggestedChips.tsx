@@ -2,9 +2,9 @@ import { Sparkles } from "lucide-react";
 
 const ADMIN_CHIPS = [
   "How is revenue pacing vs last year?",
-  "Which properties have the lowest occupancy this month?",
-  "What is the busiest week coming up for cleaning?",
-  "Which owner portfolio is performing best this quarter?",
+  "Which location group is performing best this month?",
+  "What does the next 30 days of pipeline look like?",
+  "Which properties have the lowest occupancy this year?",
 ];
 
 const OWNER_CHIPS = [
