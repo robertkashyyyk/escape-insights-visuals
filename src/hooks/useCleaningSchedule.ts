@@ -70,6 +70,8 @@ interface Listing {
   cleaning_duration_minutes: number | null;
   latitude: number | null;
   longitude: number | null;
+  default_check_in_time: string | null;
+  default_check_out_time: string | null;
 }
 
 interface Reservation {
@@ -79,6 +81,8 @@ interface Reservation {
   check_out: string;
   status: string;
   guest_name: string;
+  check_in_time: string | null;
+  check_out_time: string | null;
 }
 
 /* ── helpers ── */
@@ -86,6 +90,13 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DEFAULT_CHECKOUT = "10:00";
 const DEFAULT_CHECKIN = "15:00";
 const AVG_SPEED_KMH = 40;
+
+function normaliseTime(t: string | null | undefined, fallback: string): string {
+  if (!t) return fallback;
+  const m = String(t).match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return fallback;
+  return `${m[1].padStart(2, "0")}:${m[2]}`;
+}
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
@@ -146,7 +157,10 @@ export function useCleaningSchedule() {
   const { data: listings = [] } = useQuery({
     queryKey: ["listings-schedule"],
     queryFn: async () => {
-      const { data } = await supabase.from("listings").select("id, name, location_group, cleaning_duration_minutes, latitude, longitude").eq("status", "active");
+      const { data } = await supabase
+        .from("listings")
+        .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, default_check_in_time, default_check_out_time")
+        .eq("status", "active");
       return (data || []) as Listing[];
     },
   });
@@ -169,7 +183,7 @@ export function useCleaningSchedule() {
     queryFn: async () => {
       const { data } = await supabase
         .from("reservations")
-        .select("id, listing_id, check_in, check_out, status, guest_name")
+        .select("id, listing_id, check_in, check_out, status, guest_name, check_in_time, check_out_time")
         .gte("check_out", rangeStartStr)
         .lte("check_out", rangeEndStr)
         .eq("status", "confirmed")
@@ -183,7 +197,7 @@ export function useCleaningSchedule() {
     queryFn: async () => {
       const { data } = await supabase
         .from("reservations")
-        .select("id, listing_id, check_in, check_out, status, guest_name")
+        .select("id, listing_id, check_in, check_out, status, guest_name, check_in_time, check_out_time")
         .gte("check_in", rangeStartStr)
         .lte("check_in", lookAheadStr)
         .eq("status", "confirmed")
