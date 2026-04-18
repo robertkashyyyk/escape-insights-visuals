@@ -128,19 +128,22 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
           .select("listing_id, check_in, check_out, total_amount, status")
           .in("listing_id", listingIds)
           .lte("check_in", endStr)
-          .gte("check_out", startStr),
+          .gte("check_out", startStr)
+          .eq("status", "confirmed"),
         supabase
           .from("reservations")
           .select("listing_id, check_in, check_out, total_amount, status")
           .in("listing_id", listingIds)
           .lte("check_in", prevEndStr)
-          .gte("check_out", prevStartStr),
+          .gte("check_out", prevStartStr)
+          .eq("status", "confirmed"),
         supabase
           .from("reservations")
           .select("listing_id, check_in, check_out, total_amount, status")
           .in("listing_id", listingIds)
           .gte("check_in", trendStartStr)
-          .lte("check_in", endStr),
+          .lte("check_in", endStr)
+          .eq("status", "confirmed"),
         showForward
           ? supabase
               .from("reservations")
@@ -148,11 +151,11 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
               .in("listing_id", listingIds)
               .gte("check_in", todayStr)
               .lte("check_in", forward3Str)
+              .eq("status", "confirmed")
           : Promise.resolve({ data: [] }),
       ]);
 
-      const filter = (rows: any[]) =>
-        (rows ?? []).filter((r: any) => r.status !== "cancelled" && r.status !== "declined");
+      const filter = (rows: any[]) => rows ?? [];
 
       const currentRows = filter(currentRes.data);
       const prevRows = filter(prevRes.data);

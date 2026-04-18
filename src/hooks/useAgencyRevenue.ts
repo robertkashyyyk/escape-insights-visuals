@@ -39,7 +39,8 @@ export function useAgencyRevenue() {
           .from("reservations")
           .select("total_amount, check_in, listing_id, listings(name, city, location_group, owner_id)")
           .gte("check_in", startOfYear)
-          .lte("check_in", endOfYear),
+          .lte("check_in", endOfYear)
+          .eq("status", "confirmed"),
         supabase.from("property_owners").select("id, name, company, management_rate_pct, vat_inclusive" as any),
       ]);
 

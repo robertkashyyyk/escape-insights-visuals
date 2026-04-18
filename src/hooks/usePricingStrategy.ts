@@ -61,7 +61,8 @@ export function usePricingStrategy(locationGroup: string | null) {
         const { data: res, error: re } = await supabase
           .from("reservations")
           .select("check_in, check_out, total_amount, listing_id")
-          .in("listing_id", batch);
+          .in("listing_id", batch)
+          .eq("status", "confirmed");
         if (re) throw re;
         if (res) allReservations = allReservations.concat(res);
       }

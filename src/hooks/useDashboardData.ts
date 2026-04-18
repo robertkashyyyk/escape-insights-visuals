@@ -87,7 +87,8 @@ export function useDashboardData(dateRange: DateRange, periodType: PeriodType) {
         .select("*, listings(name, city, location_group, bedrooms, owner_id)")
         .or(`check_in.lte.${toStr},check_out.gte.${fromStr}`)
         .gte("check_in", fromStr)
-        .lte("check_in", toStr);
+        .lte("check_in", toStr)
+        .eq("status", "confirmed");
 
       if (error) throw error;
 

@@ -137,7 +137,8 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
         const { data } = await supabase
           .from("reservations")
           .select("listing_id, check_in, check_out, total_amount, year, month, status, reservation_date")
-          .in("listing_id", listingIds);
+          .in("listing_id", listingIds)
+          .eq("status", "confirmed");
         reservations = data || [];
       }
 

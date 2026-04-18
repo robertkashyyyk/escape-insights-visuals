@@ -72,12 +72,14 @@ export function useYoYData(periodType: PeriodType, periodValue: number, year: nu
             .from("reservations")
             .select("listing_id, total_amount, check_in, check_out")
             .gte("check_in", fmt(current.start))
-            .lte("check_in", fmt(current.end)),
+            .lte("check_in", fmt(current.end))
+            .eq("status", "confirmed"),
           supabase
             .from("reservations")
             .select("listing_id, total_amount, check_in, check_out")
             .gte("check_in", fmt(previous.start))
-            .lte("check_in", fmt(previous.end)),
+            .lte("check_in", fmt(previous.end))
+            .eq("status", "confirmed"),
           supabase.from("listings").select("id, name, city"),
         ]);
 

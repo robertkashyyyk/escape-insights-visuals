@@ -67,7 +67,7 @@ serve(async (req) => {
         .select("*, listing:listings(name, city, location_group, owner_id, bedrooms)")
         .gte("check_in", period_start)
         .lt("check_in", period_end)
-        .in("status", ["confirmed", "completed", "new"]);
+        .eq("status", "confirmed");
 
       if (!reservations || reservations.length === 0) {
         await admin.from("orin_briefs").update({ status: "failed", content: { error: "No reservation data for this period" } })
@@ -89,7 +89,7 @@ serve(async (req) => {
         .select("*, listing:listings(name, city, location_group, owner_id)")
         .gte("check_in", lyStart.toISOString().slice(0, 10))
         .lt("check_in", lyEnd.toISOString().slice(0, 10))
-        .in("status", ["confirmed", "completed", "new"]);
+        .eq("status", "confirmed");
 
       // Fetch owners
       const { data: owners } = await admin.from("property_owners").select("id, name");
