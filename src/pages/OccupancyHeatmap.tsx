@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useOccupancyHeatmap, type ListingOccupancy, type MonthCell } from "@/hooks/useOccupancyHeatmap";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { shortenName } from "@/lib/shortenName";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -152,8 +153,9 @@ export default function OccupancyHeatmap() {
                                 <span
                                   className="text-xs text-foreground/80 truncate block max-w-[11rem]"
                                   style={{ fontFamily: "'Space Grotesk', sans-serif" }}
+                                  title={listing.name}
                                 >
-                                  {listing.name}
+                                  {shortenName(listing.name)}
                                 </span>
                               </div>
                             </TooltipTrigger>
