@@ -153,24 +153,19 @@ Deno.serve(async (req) => {
 async function processDate(supabase: any, targetDate: string): Promise<{ created: number; unassigned: number }> {
   const targetDayOfWeek = DAY_NAMES[new Date(targetDate + "T12:00:00Z").getDay()];
 
-    // 1. Get checkouts for target date (with checkout time)
-    const { data: checkouts, error: coErr } = await supabase
-      .from("reservations")
-      .select("id, listing_id, check_in, check_out, status, check_out_time")
-      .eq("check_out", targetDate)
-      .eq("status", "confirmed");
-    if (coErr) throw coErr;
+  // 1. Get checkouts for target date (with checkout time)
+  const { data: checkouts, error: coErr } = await supabase
+    .from("reservations")
+    .select("id, listing_id, check_in, check_out, status, check_out_time")
+    .eq("check_out", targetDate)
+    .eq("status", "confirmed");
+  if (coErr) throw coErr;
 
-    // 2. Get listings (including bundles so we can expand components)
-    const rawListingIds = [...new Set((checkouts || []).map((r: any) => r.listing_id))];
-    if (rawListingIds.length === 0) {
-      await supabase.from("automation_logs").insert({
-        tasks_created: 0, tasks_unassigned: 0, status: "success", triggered_by: "edge_function",
-      });
-      return new Response(JSON.stringify({ tasks_created: 0, tasks_unassigned: 0 }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+  // 2. Get listings (including bundles so we can expand components)
+  const rawListingIds = [...new Set((checkouts || []).map((r: any) => r.listing_id))];
+  if (rawListingIds.length === 0) {
+    return { created: 0, unassigned: 0 };
+  }
 
     const { data: rawListings } = await supabase
       .from("listings")
