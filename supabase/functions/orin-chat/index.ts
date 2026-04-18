@@ -19,6 +19,46 @@ function getNetRevenue(r: any): number {
   return total;
 }
 
+function buildCancellationContext(
+  cancelled: any[],
+  listings: any[],
+  confirmedCount: number,
+  periodStart: string
+) {
+  const listingMap = Object.fromEntries(listings.map((l: any) => [l.id, l.name]));
+  const totalLost = cancelled.reduce((s, r) => s + getNetRevenue(r), 0);
+  const byProp: Record<string, { name: string; count: number; revenue_lost: number }> = {};
+  let leadSum = 0;
+  let leadCount = 0;
+  for (const r of cancelled) {
+    const name = listingMap[r.listing_id] || "Unknown";
+    if (!byProp[name]) byProp[name] = { name, count: 0, revenue_lost: 0 };
+    byProp[name].count += 1;
+    byProp[name].revenue_lost += getNetRevenue(r);
+    if (r.reservation_date && r.check_in) {
+      const lead = (new Date(r.check_in).getTime() - new Date(r.reservation_date).getTime()) / 86400000;
+      if (!isNaN(lead) && lead >= 0) {
+        leadSum += lead;
+        leadCount += 1;
+      }
+    }
+  }
+  const totalBookings = confirmedCount + cancelled.length;
+  const rate = totalBookings > 0 ? Math.round((cancelled.length / totalBookings) * 1000) / 10 : 0;
+  return {
+    period: "last_30_days",
+    period_start: periodStart,
+    total_cancelled: cancelled.length,
+    revenue_lost: Math.round(totalLost),
+    by_property: Object.values(byProp)
+      .map(p => ({ ...p, revenue_lost: Math.round(p.revenue_lost) }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5),
+    avg_lead_time_days: leadCount > 0 ? Math.round(leadSum / leadCount) : null,
+    cancellation_rate_pct: rate,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -154,6 +194,18 @@ serve(async (req) => {
     const allRes = reservations || [];
     const ytdRes = allRes.filter((r: any) => r.check_in >= yearStart && r.check_in <= todayStr);
 
+    // Cancellations (last 30 days) — owner scope
+    const thirtyAgo = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10);
+    const { data: cancelledRes } = listingIds.length
+      ? await admin
+          .from("reservations")
+          .select("listing_id, check_in, total_amount, host_payout, cleaning_fee, channel_commission, tax_amount, reservation_date")
+          .in("listing_id", listingIds)
+          .eq("status", "cancelled")
+          .gte("check_in", thirtyAgo)
+      : { data: [] };
+    const cancellations = buildCancellationContext(cancelledRes || [], listings || [], allRes.length, thirtyAgo);
+
     const propertyStats = (listings || []).map((l: any) => {
       const propRes = ytdRes.filter((r: any) => r.listing_id === l.id);
       const revenue = propRes.reduce((s: number, r: any) => s + getNetRevenue(r), 0);
@@ -199,6 +251,7 @@ serve(async (req) => {
       total_occupancy_ytd: avgOcc,
       current_month: now.toLocaleString("en-GB", { month: "long", year: "numeric" }),
       current_page: current_page || "unknown",
+      cancellations,
     };
   } else {
     // Admin/super/senior scope — all data
@@ -216,6 +269,15 @@ serve(async (req) => {
     const allRes = reservations || [];
     const ytdRes = allRes.filter((r: any) => r.check_in >= yearStart && r.check_in <= todayStr);
     const totalRevYtd = ytdRes.reduce((s: number, r: any) => s + getNetRevenue(r), 0);
+
+    // Cancellations (last 30 days) — admin scope
+    const thirtyAgo = new Date(now.getTime() - 30 * 86400000).toISOString().slice(0, 10);
+    const { data: cancelledRes } = await admin
+      .from("reservations")
+      .select("listing_id, check_in, total_amount, host_payout, cleaning_fee, channel_commission, tax_amount, reservation_date")
+      .eq("status", "cancelled")
+      .gte("check_in", thirtyAgo);
+    const cancellations = buildCancellationContext(cancelledRes || [], listings || [], allRes.length, thirtyAgo);
 
     const totalNights = ytdRes.reduce((s: number, r: any) => {
       const ci = new Date(r.check_in);
@@ -263,6 +325,7 @@ serve(async (req) => {
       })),
       current_month: now.toLocaleString("en-GB", { month: "long", year: "numeric" }),
       current_page: current_page || "unknown",
+      cancellations,
     };
   }
 
@@ -294,6 +357,13 @@ STRICT RULES:
 6. Tone: Senior analyst. Crisp. Insightful. Not chatty.
 7. Use £ for currency. Format numbers with commas (e.g. £14,200).
 8. The user is currently viewing: ${current_page || "unknown page"}. Use this for contextual awareness.
+
+CANCELLATION DATA: You have access to a separate cancellations context block. Use this data when:
+- The user asks about cancellations, lost revenue, or booking reliability
+- The cancellation rate is notably high (above 5%) — proactively mention it
+- A specific property has a disproportionate share of cancellations
+- The average cancellation lead time is very short (under 7 days) — flag as a risk
+Do NOT include cancellation data in revenue or occupancy figures. Keep them strictly separate. When reporting cancellations, always frame them as "revenue at risk" or "bookings lost" — not as part of confirmed performance.
 
 Context data:
 ${JSON.stringify(dataContext, null, 2)}`;

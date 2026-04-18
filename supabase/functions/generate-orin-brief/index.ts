@@ -91,6 +91,14 @@ serve(async (req) => {
         .lt("check_in", lyEnd.toISOString().slice(0, 10))
         .eq("status", "confirmed");
 
+      // Fetch cancellations for the same period (separate from confirmed metrics)
+      const { data: cancelledRes } = await admin
+        .from("reservations")
+        .select("listing_id, check_in, total_amount, host_payout, cleaning_fee, channel_commission, tax_amount, reservation_date, listing:listings(name)")
+        .gte("check_in", period_start)
+        .lt("check_in", period_end)
+        .eq("status", "cancelled");
+
       // Fetch owners
       const { data: owners } = await admin.from("property_owners").select("id, name");
       const ownerMap = Object.fromEntries((owners || []).map(o => [o.id, o.name]));
@@ -101,9 +109,10 @@ serve(async (req) => {
       // Aggregate data
       const stats = aggregateData(reservations, ownerMap);
       const lyStats = lyReservations && lyReservations.length > 0 ? aggregateData(lyReservations, ownerMap) : null;
+      const cancellations = buildCancellationStats(cancelledRes || [], reservations.length);
 
       // Build prompt
-      const prompt = buildPrompt(period_type, period_label, period_start, period_end, stats, lyStats, listings?.length || 0);
+      const prompt = buildPrompt(period_type, period_label, period_start, period_end, stats, lyStats, listings?.length || 0, cancellations);
 
       // Call AI
       const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -117,7 +126,16 @@ serve(async (req) => {
           messages: [
             {
               role: "system",
-              content: `You are Orin, a sharp short-term rental revenue analyst. You write portfolio intelligence briefs. Your tone is analytical, direct, and specific. You sound like a senior revenue manager, not a chatbot. No corporate fluff. Use specific numbers. Be opinionated. Return your response as a JSON object with the structure specified in the user prompt.`,
+              content: `You are Orin, a sharp short-term rental revenue analyst. You write portfolio intelligence briefs. Your tone is analytical, direct, and specific. You sound like a senior revenue manager, not a chatbot. No corporate fluff. Use specific numbers. Be opinionated.
+
+CANCELLATION DATA: You have access to a separate cancellations context block. Use this when:
+- The user asks about cancellations, lost revenue, or booking reliability
+- The cancellation rate is notably high (above 5%) — proactively mention it
+- A specific property has a disproportionate share of cancellations
+- The average cancellation lead time is very short (under 7 days) — flag as a risk
+Do NOT include cancellation data in revenue or occupancy figures. Keep them strictly separate. Frame cancellations as "revenue at risk" or "bookings lost" — never part of confirmed performance.
+
+Return your response as a JSON object with the structure specified in the user prompt.`,
             },
             { role: "user", content: prompt },
           ],
@@ -254,6 +272,35 @@ function aggregateData(reservations: any[], ownerMap: Record<string, string>) {
   };
 }
 
+function buildCancellationStats(cancelled: any[], confirmedCount: number) {
+  const totalLost = cancelled.reduce((s, r) => s + getNetRevenue(r), 0);
+  const byProp: Record<string, { name: string; count: number; revenue_lost: number }> = {};
+  let leadSum = 0;
+  let leadCount = 0;
+  for (const r of cancelled) {
+    const name = r.listing?.name || "Unknown";
+    if (!byProp[name]) byProp[name] = { name, count: 0, revenue_lost: 0 };
+    byProp[name].count += 1;
+    byProp[name].revenue_lost += getNetRevenue(r);
+    if (r.reservation_date && r.check_in) {
+      const lead = (new Date(r.check_in).getTime() - new Date(r.reservation_date).getTime()) / 86400000;
+      if (!isNaN(lead) && lead >= 0) { leadSum += lead; leadCount += 1; }
+    }
+  }
+  const totalBookings = confirmedCount + cancelled.length;
+  const rate = totalBookings > 0 ? Math.round((cancelled.length / totalBookings) * 1000) / 10 : 0;
+  return {
+    total_cancelled: cancelled.length,
+    revenue_lost: Math.round(totalLost),
+    by_property: Object.values(byProp)
+      .map(p => ({ ...p, revenue_lost: Math.round(p.revenue_lost) }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5),
+    avg_lead_time_days: leadCount > 0 ? Math.round(leadSum / leadCount) : null,
+    cancellation_rate_pct: rate,
+  };
+}
+
 function buildPrompt(
   periodType: string,
   periodLabel: string,
@@ -261,7 +308,8 @@ function buildPrompt(
   periodEnd: string,
   stats: any,
   lyStats: any | null,
-  activePropertyCount: number
+  activePropertyCount: number,
+  cancellations: any
 ) {
   const lyComparison = lyStats
     ? `\n\nSame period last year comparison:\n- Revenue: £${lyStats.totalRevenue.toLocaleString()}\n- Bookings: ${lyStats.totalBookings}\n- ADR: £${lyStats.adr}\n- Total nights: ${lyStats.totalNights}`
@@ -269,7 +317,7 @@ function buildPrompt(
 
   const base = `Generate a ${periodType} portfolio intelligence brief for ${periodLabel} (${periodStart} to ${periodEnd}).
 
-Here is the actual data for this period:
+Here is the actual data for this period (CONFIRMED bookings only):
 - Total Revenue: £${stats.totalRevenue.toLocaleString()}
 - Total Bookings: ${stats.totalBookings}
 - Total Nights Sold: ${stats.totalNights}
@@ -288,7 +336,10 @@ Top 3 Owners by Revenue: ${JSON.stringify(stats.topOwners)}
 
 Location Group Performance: ${JSON.stringify(stats.locationBreakdown)}
 
-Monthly Revenue Trend: ${JSON.stringify(stats.monthlyRevenue)}`;
+Monthly Revenue Trend: ${JSON.stringify(stats.monthlyRevenue)}
+
+CANCELLATIONS (separate context — DO NOT mix into revenue/occupancy figures above):
+${JSON.stringify(cancellations)}`;
 
   if (periodType === "monthly") {
     return `${base}
@@ -301,9 +352,27 @@ Return a JSON object with this exact structure:
   "watch_list": [{ "name": "...", "issue": "..." }],
   "platform_breakdown": { "airbnb": "X%", "booking_com": "X%", "direct": "X%", "other": "X%" },
   "avg_lead_time": "X days",
+  "cancellations": { "summary": "[X] bookings cancelled this month, representing £[Y] in lost revenue ([Z]% cancellation rate).", "notable": "If a property accounts for a disproportionate share, name it. If rate is healthy (<5%), say so. Otherwise null.", "rate_pct": X, "total_cancelled": X, "revenue_lost": "£X" },
   "commentary": "One paragraph of sharp, analytical narrative. No fluff. Be specific with numbers and property names."
 }`;
   }
+
+  return `${base}
+
+Return a JSON object with this exact structure:
+{
+  "headline": "One sentence summary of the quarter",
+  "snapshot": { "total_revenue": "£X", "adr": "£X", "occupancy_note": "text", "vs_last_year": "text" },
+  "monthly_trend": [{ "month": "...", "revenue": "£X" }],
+  "top_properties": [{ "name": "...", "revenue": "£X", "note": "..." }],
+  "watch_list": [{ "name": "...", "issue": "..." }],
+  "owner_rankings": [{ "name": "...", "revenue": "£X" }],
+  "location_performance": [{ "group": "...", "revenue": "£X", "bookings": X, "avg_night_revenue": "£X" }],
+  "platform_breakdown": { "airbnb": "X%", "booking_com": "X%", "direct": "X%", "other": "X%" },
+  "cancellations": { "trend": "improving | stable | worsening", "rate_pct": X, "total_cancelled": X, "revenue_lost": "£X", "high_risk_properties": ["names of properties with above-average cancellation rates, or empty array"], "summary": "One-sentence narrative on cancellation health for the quarter." },
+  "seasonal_commentary": "How this quarter compared to the same quarter last year. Specific patterns and shifts.",
+  "forward_outlook": "Based on the data, what should the team focus on next quarter. Be opinionated and specific.",
+  "commentary": "One paragraph narrative tying it all together. Sharp and direct."
 
   return `${base}
 
