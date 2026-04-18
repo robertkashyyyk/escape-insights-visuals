@@ -91,6 +91,14 @@ serve(async (req) => {
         .lt("check_in", lyEnd.toISOString().slice(0, 10))
         .eq("status", "confirmed");
 
+      // Fetch cancellations for the same period (separate from confirmed metrics)
+      const { data: cancelledRes } = await admin
+        .from("reservations")
+        .select("listing_id, check_in, total_amount, host_payout, cleaning_fee, channel_commission, tax_amount, reservation_date, listing:listings(name)")
+        .gte("check_in", period_start)
+        .lt("check_in", period_end)
+        .eq("status", "cancelled");
+
       // Fetch owners
       const { data: owners } = await admin.from("property_owners").select("id, name");
       const ownerMap = Object.fromEntries((owners || []).map(o => [o.id, o.name]));
