@@ -33,7 +33,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { InviteUserForm } from "@/components/settings/InviteUserForm";
-import { Loader2, Trash2, Users, Search, RefreshCw, ShieldCheck } from "lucide-react";
+import { Loader2, Trash2, Users, Search, RefreshCw, ShieldCheck, KeyRound } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { formatDistanceToNow } from "date-fns";
 
 type AppRole = "super" | "senior" | "admin" | "client" | "cleaner";
@@ -67,6 +76,29 @@ export default function TeamManagement() {
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ManagedUser | null>(null);
+  const [resetTarget, setResetTarget] = useState<ManagedUser | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [resetting, setResetting] = useState(false);
+
+  const handleResetPassword = async () => {
+    if (!resetTarget) return;
+    if (newPassword.length < 8) {
+      toast({ title: "Password too short", description: "Must be at least 8 characters.", variant: "destructive" });
+      return;
+    }
+    setResetting(true);
+    const { data, error } = await supabase.functions.invoke("manage-users", {
+      body: { action: "reset_password", user_id: resetTarget.id, password: newPassword },
+    });
+    setResetting(false);
+    if (error || data?.error) {
+      toast({ title: "Reset failed", description: error?.message || data?.error, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Password reset", description: `${resetTarget.email} can now sign in with the new password` });
+    setResetTarget(null);
+    setNewPassword("");
+  };
 
   const load = async () => {
     setLoading(true);
@@ -286,19 +318,32 @@ export default function TeamManagement() {
                                   : "Never"}
                               </TableCell>
                               <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                  disabled={isSelf || updatingId === u.id}
-                                  onClick={() => setDeleteTarget(u)}
-                                >
-                                  {updatingId === u.id ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="h-4 w-4" />
-                                  )}
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                    disabled={updatingId === u.id}
+                                    onClick={() => { setResetTarget(u); setNewPassword(""); }}
+                                    title="Reset password"
+                                  >
+                                    <KeyRound className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    disabled={isSelf || updatingId === u.id}
+                                    onClick={() => setDeleteTarget(u)}
+                                    title="Delete user"
+                                  >
+                                    {updatingId === u.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </div>
                               </TableCell>
                             </TableRow>
                           );
@@ -350,6 +395,39 @@ export default function TeamManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!resetTarget} onOpenChange={(o) => { if (!o) { setResetTarget(null); setNewPassword(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-4 w-4 text-primary" />
+              Reset password
+            </DialogTitle>
+            <DialogDescription>
+              Set a new password for <span className="text-foreground font-medium">{resetTarget?.email}</span>.
+              They'll be able to sign in immediately with this password. Share it securely.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label className="text-xs text-muted-foreground">New password (min 8 characters)</Label>
+            <Input
+              type="text"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Enter new password"
+              autoFocus
+              className="bg-secondary/50 border-border/40 font-mono"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setResetTarget(null); setNewPassword(""); }}>Cancel</Button>
+            <Button onClick={handleResetPassword} disabled={resetting || newPassword.length < 8}>
+              {resetting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Set password
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

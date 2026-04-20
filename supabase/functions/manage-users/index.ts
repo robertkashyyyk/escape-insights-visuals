@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-type Action = "list" | "update_role" | "delete";
+type Action = "list" | "update_role" | "delete" | "reset_password";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -97,6 +97,17 @@ Deno.serve(async (req) => {
       // Upsert: delete existing, insert new (table has unique on (user_id, role) but a user may only have one role here)
       await admin.from("user_roles").delete().eq("user_id", user_id);
       const { error } = await admin.from("user_roles").insert({ user_id, role });
+      if (error) return json({ error: error.message }, 500);
+      return json({ success: true });
+    }
+
+    if (action === "reset_password") {
+      const { user_id, password } = body;
+      if (!user_id || !password) return json({ error: "user_id and password required" }, 400);
+      if (typeof password !== "string" || password.length < 8) {
+        return json({ error: "Password must be at least 8 characters" }, 400);
+      }
+      const { error } = await admin.auth.admin.updateUserById(user_id, { password });
       if (error) return json({ error: error.message }, 500);
       return json({ success: true });
     }
