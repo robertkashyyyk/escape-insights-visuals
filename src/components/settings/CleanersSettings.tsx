@@ -9,7 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, SprayCan, AlertTriangle, Loader2, UserCheck, KeyRound } from "lucide-react";
+import { Plus, Pencil, Trash2, SprayCan, AlertTriangle, Loader2, UserCheck, KeyRound, X } from "lucide-react";
+import { CLEANER_COLOR_SWATCHES, getCleanerColor } from "@/lib/cleanerColors";
 
 const LOCATION_GROUPS = ["Castle Hume", "Belfast", "Enniskillen", "North Coast", "Portstewart Coast", "Larne", "Kesh", "Other"];
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -32,6 +33,7 @@ interface Cleaner {
   home_latitude: number | null;
   home_longitude: number | null;
   user_id: string | null;
+  color: string | null;
 }
 
 type CleanerForm = Omit<Cleaner, "id" | "region" | "user_id">;
@@ -42,6 +44,7 @@ const empty: CleanerForm = {
   non_working_days: [], daily_working_hours: 8, rate_per_clean: 0, active: true,
   notify_email: false, notify_whatsapp: false,
   home_postcode: "", home_latitude: null, home_longitude: null,
+  color: null,
 };
 
 /** Get sum of workload_share for a group across all cleaners, excluding one cleaner by id */
@@ -98,6 +101,7 @@ export function CleanersSettings() {
       home_postcode: c.home_postcode || "",
       home_latitude: c.home_latitude,
       home_longitude: c.home_longitude,
+      color: c.color ?? null,
     });
     setGeocodeResult(c.home_latitude ? "📍 Coordinates loaded" : null);
     setOpen(true);
@@ -155,6 +159,7 @@ export function CleanersSettings() {
       home_postcode: form.home_postcode || null,
       home_latitude: form.home_latitude,
       home_longitude: form.home_longitude,
+      color: form.color,
     };
     if (editing) {
       await (supabase.from("cleaners" as any) as any).update(payload).eq("id", editing.id);
@@ -261,6 +266,11 @@ export function CleanersSettings() {
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
+                    <span
+                      className="h-3 w-3 rounded-full border border-border/30 shrink-0"
+                      style={{ backgroundColor: getCleanerColor(c.id, c.name, c.color).hex }}
+                      title={c.color ? "Custom colour" : "Auto colour"}
+                    />
                     <h4 className="font-semibold text-foreground" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{c.name}</h4>
                     {c.user_id && (
                       <Badge variant="outline" className="text-[10px] border-success/30 text-success px-1.5 py-0">
@@ -363,7 +373,43 @@ export function CleanersSettings() {
               </div>
             </div>
 
-            {/* Location Groups multi-select */}
+            {/* Schedule colour swatch picker */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Schedule Colour</Label>
+                {form.color && (
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, color: null })}
+                    className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                  >
+                    <X className="h-2.5 w-2.5" /> Reset to auto
+                  </button>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                {form.color ? "Tasks for this cleaner will use this colour on the schedule." : "Auto-assigned from a hash of the cleaner's ID."}
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {CLEANER_COLOR_SWATCHES.map(hex => {
+                  const selected = form.color === hex;
+                  return (
+                    <button
+                      key={hex}
+                      type="button"
+                      onClick={() => setForm({ ...form, color: hex })}
+                      className={`h-7 w-7 rounded-md transition-all ${
+                        selected ? "ring-2 ring-offset-2 ring-offset-card ring-foreground scale-110" : "hover:scale-105"
+                      }`}
+                      style={{ backgroundColor: hex }}
+                      title={hex}
+                      aria-label={`Pick colour ${hex}`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="space-y-1.5">
               <Label className="text-xs">Location Groups</Label>
               <div className="flex flex-wrap gap-1.5">

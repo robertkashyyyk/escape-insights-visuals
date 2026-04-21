@@ -66,11 +66,42 @@ function hashString(s: string): number {
   return Math.abs(h);
 }
 
-export function getCleanerColor(cleanerId: string | null | undefined, name?: string | null): CleanerColor {
+// Convert a hex like "#0d9488" into a full CleanerColor with translucent bg/border + lighter text.
+function colorFromHex(hex: string): CleanerColor {
+  const clean = hex.replace("#", "");
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  // Lighter tint for text — mix toward white
+  const lighten = (c: number) => Math.round(c + (255 - c) * 0.55);
+  const textHex = `#${[lighten(r), lighten(g), lighten(b)].map(c => c.toString(16).padStart(2, "0")).join("")}`;
+  return {
+    hex,
+    bg: `rgba(${r},${g},${b},0.18)`,
+    border: `rgba(${r},${g},${b},0.45)`,
+    text: textHex,
+    initialBg: hex,
+  };
+}
+
+export function getCleanerColor(
+  cleanerId: string | null | undefined,
+  name?: string | null,
+  customHex?: string | null,
+): CleanerColor {
   if (!cleanerId) return UNASSIGNED_COLOR;
+  // Custom colour set on the cleaner record wins
+  if (customHex && /^#[0-9a-fA-F]{6}$/.test(customHex)) return colorFromHex(customHex);
   if (name) {
     const first = name.trim().split(/\s+/)[0]?.toLowerCase();
     if (first && NAME_OVERRIDES[first] != null) return PALETTE[NAME_OVERRIDES[first]];
   }
   return PALETTE[hashString(cleanerId) % PALETTE.length];
 }
+
+// Curated palette of hex values for the cleaner colour picker.
+export const CLEANER_COLOR_SWATCHES = [
+  "#0d9488", "#3b82f6", "#8b5cf6", "#ec4899", "#10b981",
+  "#6366f1", "#f97316", "#06b6d4", "#84cc16", "#e11d48",
+  "#f59e0b", "#a855f7", "#14b8a6", "#ef4444", "#64748b",
+];

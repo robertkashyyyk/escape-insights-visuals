@@ -76,7 +76,7 @@ export function TaskDetailPanel({
   const assignedCleaner = task.assigned_cleaner_id
     ? cleaners.find(c => c.id === task.assigned_cleaner_id)
     : null;
-  const color = getCleanerColor(task.assigned_cleaner_id, assignedCleaner?.name);
+  const color = getCleanerColor(task.assigned_cleaner_id, assignedCleaner?.name, assignedCleaner?.color);
 
   const statusBadge = (() => {
     if (task.status === "completed") return { label: "Completed", className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" };

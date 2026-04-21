@@ -1,0 +1,1 @@
+ALTER TABLE public.cleaners ADD COLUMN IF NOT EXISTS color text;
