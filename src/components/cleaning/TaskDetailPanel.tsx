@@ -254,7 +254,11 @@ export function TaskDetailPanel({
           <AlertDialogHeader>
             <AlertDialogTitle>Remove cleaning task?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will not cancel the reservation. The cleaning task will be deleted and can be regenerated from the schedule if needed.
+              {task.status === "completed"
+                ? "This permanently deletes the completed task. To restore it as scheduled instead, use 'Undo complete'. If this clean came from a reservation, removing will auto-regenerate it from the source."
+                : task.source === "manual"
+                ? "This deletes the manual cleaning task. It cannot be auto-regenerated — you'll need to add it again from the + button."
+                : "This deletes the cleaning task and will auto-regenerate it from the source reservation."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
