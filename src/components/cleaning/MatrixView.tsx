@@ -426,6 +426,7 @@ export function MatrixView({ initialDate }: Props) {
         reservations={reservations}
         onReassign={reassignTask}
         onComplete={completeTask}
+        onUndoComplete={undoComplete}
         onRemove={removeTask}
         onSaveNotes={updateNotes}
       />
