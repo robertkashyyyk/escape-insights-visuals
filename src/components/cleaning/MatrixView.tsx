@@ -572,7 +572,7 @@ function DraggableCellInner({
   task, cleaners, onClick,
 }: {
   task: MatrixTask;
-  cleaners: { id: string; name: string }[];
+  cleaners: { id: string; name: string; color?: string | null }[];
   onClick: () => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id });
