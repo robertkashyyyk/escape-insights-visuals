@@ -538,10 +538,16 @@ export function useCleaningSchedule() {
           title: "Nothing to generate",
           description: `No checkouts found for ${dateStr}. If you just removed a manual clean, it cannot be auto-regenerated — add it again from the matrix.`,
         });
+      } else if (created === 0 && unassigned > 0) {
+        toast({
+          title: "Tasks remain unassigned",
+          description: `${unassigned} task${unassigned === 1 ? "" : "s"} for ${dateStr} could not be assigned — no cleaner covers that location group, or all eligible cleaners are at capacity. Add the location to a cleaner in Settings → Cleaners, or drag manually in the matrix.`,
+          variant: "destructive",
+        });
       } else {
         toast({
           title: "Schedule generated",
-          description: `${created} task${created === 1 ? "" : "s"} created, ${unassigned} unassigned.`,
+          description: `${created} task${created === 1 ? "" : "s"} created${unassigned > 0 ? `, ${unassigned} still unassigned (no eligible cleaner)` : ""}.`,
         });
       }
       // Refresh all queries

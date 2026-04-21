@@ -43,7 +43,7 @@ function addMinutesToTime(time: string, mins: number): string {
 
 interface TaskInfo {
   listing_id: string;
-  reservation_id: string;
+  reservation_id: string | null;
   scheduled_date: string;
   priority: string;
   cleaning_duration_minutes: number;
@@ -57,6 +57,8 @@ interface TaskInfo {
   checkout_time: string;
   checkin_time: string | null;
   is_same_day_turnaround: boolean;
+  existing_task_id?: string | null; // present if this is a pre-existing unassigned row to UPDATE rather than INSERT
+  source?: string;
 }
 
 interface CleanerInfo {
@@ -163,9 +165,21 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     .eq("status", "confirmed");
   if (coErr) throw coErr;
 
+  // 1b. Get any pre-existing unassigned tasks for this date — these need re-assignment too
+  const { data: orphanUnassigned } = await supabase
+    .from("clean_tasks")
+    .select("id, listing_id, reservation_id, scheduled_date, priority, cleaning_duration_minutes, checkout_time, checkin_time, is_same_day_turnaround, source")
+    .eq("scheduled_date", targetDate)
+    .eq("status", "unassigned");
+
+  const orphanListingIds = (orphanUnassigned || []).map((t: any) => String(t.listing_id));
+
   // 2. Get listings (including bundles so we can expand components)
-  const rawListingIds: string[] = Array.from(new Set((checkouts || []).map((r: any) => String(r.listing_id))));
-  if (rawListingIds.length === 0) {
+  const rawListingIds: string[] = Array.from(new Set([
+    ...((checkouts || []).map((r: any) => String(r.listing_id))),
+    ...orphanListingIds,
+  ]));
+  if (rawListingIds.length === 0 && (orphanUnassigned || []).length === 0) {
     return { created: 0, unassigned: 0 };
   }
 
@@ -331,6 +345,31 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
         is_same_day_turnaround: isSameDay,
       });
     }
+  }
+
+  // 7b. Add pre-existing unassigned tasks into the allocation pool so they get re-evaluated
+  for (const orphan of orphanUnassigned || []) {
+    const listing = listingMap.get(String(orphan.listing_id));
+    if (!listing) continue;
+    newTasks.push({
+      listing_id: String(orphan.listing_id),
+      reservation_id: orphan.reservation_id ?? null,
+      scheduled_date: orphan.scheduled_date,
+      priority: orphan.priority || "standard",
+      cleaning_duration_minutes: orphan.cleaning_duration_minutes || listing.cleaning_duration_minutes || 90,
+      latitude: listing.latitude,
+      longitude: listing.longitude,
+      location_group: listing.location_group || "Other",
+      assigned_cleaner_id: null,
+      status: "unassigned",
+      estimated_start_time: null,
+      travel_time_from_previous_minutes: 0,
+      checkout_time: normaliseTime(orphan.checkout_time, normaliseTime(listing.default_check_out_time, DEFAULT_CHECKOUT)),
+      checkin_time: orphan.checkin_time ? normaliseTime(orphan.checkin_time, DEFAULT_CHECKIN) : null,
+      is_same_day_turnaround: !!orphan.is_same_day_turnaround,
+      existing_task_id: orphan.id,
+      source: orphan.source || "hostaway",
+    });
   }
 
   // Sort: same-day turnarounds first
@@ -506,14 +545,18 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     cleanerBuckets[c.id] = ordered;
   }
 
-  // 10. Insert tasks
+  // 10. Insert new tasks / update existing orphan unassigned tasks
   const allOrderedTasks = Object.values(cleanerBuckets).flat();
-  // Also include unassigned tasks
   const unassignedTasks = newTasks.filter(t => t.status === "unassigned");
   const allTasks = [...allOrderedTasks, ...unassignedTasks];
 
-  if (allTasks.length > 0) {
-    const rows = allTasks.map((t) => ({
+  // Split: rows with existing_task_id → UPDATE, others → INSERT
+  const toInsert = allTasks.filter(t => !t.existing_task_id);
+  const toUpdate = allTasks.filter(t => !!t.existing_task_id);
+  let createdCount = 0;
+
+  if (toInsert.length > 0) {
+    const rows = toInsert.map((t) => ({
       listing_id: t.listing_id,
       reservation_id: t.reservation_id,
       scheduled_date: t.scheduled_date,
@@ -527,9 +570,24 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       checkin_time: t.checkin_time,
       is_same_day_turnaround: t.is_same_day_turnaround,
     }));
-
     const { error: insertErr } = await supabase.from("clean_tasks").insert(rows);
     if (insertErr) throw insertErr;
+    createdCount = rows.length;
+  }
+
+  for (const t of toUpdate) {
+    const { error: updErr } = await supabase
+      .from("clean_tasks")
+      .update({
+        assigned_cleaner_id: t.assigned_cleaner_id,
+        status: t.status,
+        priority: t.priority,
+        estimated_start_time: t.estimated_start_time,
+        travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
+        checkout_time: t.checkout_time,
+      })
+      .eq("id", t.existing_task_id!);
+    if (updErr) throw updErr;
   }
 
   // 11. Set is_clean = false for component listings (not bundles)
@@ -543,7 +601,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     if (updateErr) throw updateErr;
   }
 
-  return { created: allTasks.length, unassigned: unassignedCount };
+  return { created: createdCount, unassigned: unassignedCount };
 }
 
 function todayLondon(): string {

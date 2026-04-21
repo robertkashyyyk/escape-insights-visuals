@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Loader2 } from "lucide-react";
 import { useMatrixSchedule, type MatrixListing, type MatrixTask } from "@/hooks/useMatrixSchedule";
 import {
@@ -481,7 +482,7 @@ function MatrixCell({
   date: Date;
   listing: MatrixListing;
   task: MatrixTask | undefined;
-  cleaners: { id: string; name: string }[];
+  cleaners: { id: string; name: string; location_groups?: string[] }[];
   isToday: boolean;
   dimmed: boolean;
   onTaskClick: (id: string) => void;
@@ -503,11 +504,39 @@ function MatrixCell({
     );
   }
 
-  return (
+  // For unassigned tasks, compute the "why" tooltip
+  const isUnassigned = !task.assigned_cleaner_id || task.status === "unassigned";
+  let unassignedReason: string | null = null;
+  if (isUnassigned) {
+    const group = listing.location_group || "Other";
+    const eligible = cleaners.filter(c => (c.location_groups || []).includes(group));
+    if (eligible.length === 0) {
+      unassignedReason = `No active cleaner covers "${group}". Add it to a cleaner's coverage in Settings → Cleaners, or drag this task onto a cleaner above.`;
+    } else {
+      unassignedReason = `Eligible cleaners (${eligible.map(c => c.name).join(", ")}) appear to be at capacity for this day. Drag this task onto a cleaner above to assign manually.`;
+    }
+  }
+
+  const cell = (
     <div className={`${baseBorder} ${todayTint} ${dimClass} p-1`}>
       <DraggableCellInner task={task} cleaners={cleaners} onClick={() => onTaskClick(task.id)} />
     </div>
   );
+
+  if (unassignedReason) {
+    return (
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>{cell}</TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs text-xs">
+            {unassignedReason}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  return cell;
 }
 
 function DraggableCellInner({
