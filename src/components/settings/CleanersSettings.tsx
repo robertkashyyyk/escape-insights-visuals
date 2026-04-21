@@ -9,7 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, SprayCan, AlertTriangle, Loader2, UserCheck, KeyRound } from "lucide-react";
+import { Plus, Pencil, Trash2, SprayCan, AlertTriangle, Loader2, UserCheck, KeyRound, X } from "lucide-react";
+import { CLEANER_COLOR_SWATCHES, getCleanerColor } from "@/lib/cleanerColors";
 
 const LOCATION_GROUPS = ["Castle Hume", "Belfast", "Enniskillen", "North Coast", "Portstewart Coast", "Larne", "Kesh", "Other"];
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -32,6 +33,7 @@ interface Cleaner {
   home_latitude: number | null;
   home_longitude: number | null;
   user_id: string | null;
+  color: string | null;
 }
 
 type CleanerForm = Omit<Cleaner, "id" | "region" | "user_id">;
@@ -42,6 +44,7 @@ const empty: CleanerForm = {
   non_working_days: [], daily_working_hours: 8, rate_per_clean: 0, active: true,
   notify_email: false, notify_whatsapp: false,
   home_postcode: "", home_latitude: null, home_longitude: null,
+  color: null,
 };
 
 /** Get sum of workload_share for a group across all cleaners, excluding one cleaner by id */
@@ -98,6 +101,7 @@ export function CleanersSettings() {
       home_postcode: c.home_postcode || "",
       home_latitude: c.home_latitude,
       home_longitude: c.home_longitude,
+      color: c.color ?? null,
     });
     setGeocodeResult(c.home_latitude ? "📍 Coordinates loaded" : null);
     setOpen(true);
@@ -155,6 +159,7 @@ export function CleanersSettings() {
       home_postcode: form.home_postcode || null,
       home_latitude: form.home_latitude,
       home_longitude: form.home_longitude,
+      color: form.color,
     };
     if (editing) {
       await (supabase.from("cleaners" as any) as any).update(payload).eq("id", editing.id);
