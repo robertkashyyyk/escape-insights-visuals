@@ -7,6 +7,14 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Load app guide once at cold start
+let APP_GUIDE = "";
+try {
+  APP_GUIDE = await Deno.readTextFile(new URL("./app-guide.md", import.meta.url));
+} catch (e) {
+  console.error("Failed to load app-guide.md", e);
+}
+
 // Net (management) revenue: prefer hostPayout, else totalPrice minus fees
 function getNetRevenue(r: any): number {
   if (!r) return 0;
@@ -645,7 +653,8 @@ You are answering a question for: ${roleDesc}.
 ${ownerGuardrail}${adminDataGuide}
 
 STRICT RULES:
-1. You can ONLY reference data provided in the context JSON below. Do not invent figures.
+1. For data/metrics questions, ONLY reference data provided in the context JSON below. Do not invent figures.
+   You MAY ALSO answer product help / "how do I…" questions using the App Guide section below. When you do, cite the route (e.g. \`/operations/schedule\`) and give concrete click-by-click steps. If the guide doesn't cover it, say "I don't have docs on that yet" rather than guessing. Only suggest features available to the user's role (${role}).
 2. Be concise, analytical, and direct. No filler phrases like "Great question!" or "Certainly!"
 3. Format responses clearly — use bullet points or short paragraphs. Never use tables (they do not render well in chat).
 4. If a specific number is genuinely missing from the context, say so plainly. Do not guess.
@@ -654,6 +663,9 @@ STRICT RULES:
 7. The user is currently viewing: ${current_page || "unknown page"}. Use this for contextual awareness.
 
 CANCELLATION DATA: Use the separate cancellations block when the user asks about cancellations, lost revenue, or booking reliability. Proactively flag if cancellation_rate_pct > 5% or avg_lead_time_days < 7. Never roll cancellations into confirmed revenue/occupancy — frame as "revenue at risk" or "bookings lost".
+
+## App Guide (use this to answer "how do I…" questions)
+${APP_GUIDE || "(app guide unavailable)"}
 
 Context data:
 ${JSON.stringify(dataContext, null, 2)}`;

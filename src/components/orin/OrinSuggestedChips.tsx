@@ -5,6 +5,8 @@ const ADMIN_CHIPS = [
   "Which location group is performing best this month?",
   "What does the next 30 days of pipeline look like?",
   "Which properties have the lowest occupancy this year?",
+  "How do I regenerate the cleaning schedule?",
+  "How do I add a new cleaner?",
 ];
 
 const OWNER_CHIPS = [
@@ -12,6 +14,7 @@ const OWNER_CHIPS = [
   "What is my occupancy rate this year?",
   "Which of my properties has the highest ADR?",
   "What bookings do I have coming up?",
+  "How do I view my monthly statement?",
 ];
 
 interface OrinSuggestedChipsProps {
