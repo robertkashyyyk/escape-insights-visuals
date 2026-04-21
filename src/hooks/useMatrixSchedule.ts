@@ -311,6 +311,6 @@ export function useMatrixSchedule(weekAnchor: Date) {
     listings, groupedListings,
     cleaners, tasks, reservations,
     isLoading: listingsLoading || tasksLoading,
-    reassignTask, completeTask, removeTask, updateNotes, addManualClean,
+    reassignTask, completeTask, undoComplete, removeTask, updateNotes, addManualClean,
   };
 }
