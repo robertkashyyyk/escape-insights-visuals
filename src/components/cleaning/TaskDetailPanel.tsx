@@ -97,6 +97,13 @@ export function TaskDetailPanel({
     if (ok) onOpenChange(false);
   };
 
+  const handleUndoComplete = async () => {
+    setBusy(true);
+    const ok = await onUndoComplete(task.id, task.listing_id);
+    setBusy(false);
+    if (ok) onOpenChange(false);
+  };
+
   const handleRemove = async () => {
     setBusy(true);
     const ok = await onRemove(task.id);
