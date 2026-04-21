@@ -29,10 +29,19 @@ import { shortenName } from "@/lib/shortenName";
 
 interface Props {
   initialDate?: Date;
+  weekAnchor?: Date;
+  onWeekAnchorChange?: (d: Date) => void;
+  hideWeekNav?: boolean;
 }
 
-export function MatrixView({ initialDate }: Props) {
-  const [weekAnchor, setWeekAnchor] = useState<Date>(() => initialDate ?? new Date());
+export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnchorChange, hideWeekNav }: Props) {
+  const [weekAnchorInternal, setWeekAnchorInternal] = useState<Date>(() => initialDate ?? new Date());
+  const weekAnchor = weekAnchorProp ?? weekAnchorInternal;
+  const setWeekAnchor = (updater: Date | ((d: Date) => Date)) => {
+    const next = typeof updater === "function" ? (updater as (d: Date) => Date)(weekAnchor) : updater;
+    if (onWeekAnchorChange) onWeekAnchorChange(next);
+    else setWeekAnchorInternal(next);
+  };
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [addCleanCell, setAddCleanCell] = useState<{ listing: MatrixListing; date: Date } | null>(null);
   const [filterGroups, setFilterGroups] = useState<Set<string>>(new Set());
@@ -61,11 +70,6 @@ export function MatrixView({ initialDate }: Props) {
   const todayStr = format(today, "yyyy-MM-dd");
 
   // Filtering
-  const visibleGroups = useMemo(() => {
-    if (filterGroups.size === 0) return groupedListings;
-    return groupedListings.filter(([g]) => filterGroups.has(g));
-  }, [groupedListings, filterGroups]);
-
   const isTaskVisible = useCallback((t: MatrixTask | undefined): boolean => {
     if (!t) return true; // empty cells always visible
     if (!showCompleted && t.status === "completed") return false;
@@ -74,6 +78,28 @@ export function MatrixView({ initialDate }: Props) {
     if (t.assigned_cleaner_id && filterCleaners.has(t.assigned_cleaner_id)) return true;
     return false;
   }, [showCompleted, filterCleaners]);
+
+  // When a cleaner filter is active, hide property rows that have no
+  // matching tasks at all this week (so the matrix collapses instead of
+  // showing a sea of empty rows).
+  const cleanerFilterActive = filterCleaners.size > 0;
+  const listingsWithVisibleTask = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tasks) {
+      if (isTaskVisible(t)) set.add(t.listing_id);
+    }
+    return set;
+  }, [tasks, isTaskVisible]);
+
+  const visibleGroups = useMemo(() => {
+    let groups = filterGroups.size === 0 ? groupedListings : groupedListings.filter(([g]) => filterGroups.has(g));
+    if (cleanerFilterActive) {
+      groups = groups
+        .map(([g, ls]) => [g, ls.filter(l => listingsWithVisibleTask.has(l.id))] as [string, MatrixListing[]])
+        .filter(([, ls]) => ls.length > 0);
+    }
+    return groups;
+  }, [groupedListings, filterGroups, cleanerFilterActive, listingsWithVisibleTask]);
 
   // Summary
   const summary = useMemo(() => {
@@ -142,37 +168,39 @@ export function MatrixView({ initialDate }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Week navigation */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={goPrev} className="h-9 w-9">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={isCurrentWeek ? "default" : "outline"}
-            size="sm"
-            onClick={goThisWeek}
-            className="h-9"
-            disabled={isCurrentWeek}
-          >
-            Current Week
-          </Button>
-          <Button variant="outline" size="icon" onClick={goNext} className="h-9 w-9">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <span key={format(weekStart, "yyyy-MM-dd")} className="ml-2 text-sm font-medium text-foreground tabular-nums">
-            {format(weekStart, "d MMM")} – {format(addDays(weekStart, 6), "d MMM yyyy")}
-          </span>
-          {!isCurrentWeek && (
-            <button
+      {/* Week navigation (can be hidden when parent renders it inline with view-mode toggle) */}
+      {!hideWeekNav && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={goPrev} className="h-9 w-9">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={isCurrentWeek ? "default" : "outline"}
+              size="sm"
               onClick={goThisWeek}
-              className="ml-2 text-xs text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
+              className="h-9"
+              disabled={isCurrentWeek}
             >
-              Back to Current Week
-            </button>
-          )}
+              Current Week
+            </Button>
+            <Button variant="outline" size="icon" onClick={goNext} className="h-9 w-9">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <span key={format(weekStart, "yyyy-MM-dd")} className="ml-2 text-sm font-medium text-foreground tabular-nums">
+              {format(weekStart, "d MMM")} – {format(addDays(weekStart, 6), "d MMM yyyy")}
+            </span>
+            {!isCurrentWeek && (
+              <button
+                onClick={goThisWeek}
+                className="ml-2 text-xs text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
+              >
+                Back to Current Week
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Filters */}
       <div className="space-y-2">

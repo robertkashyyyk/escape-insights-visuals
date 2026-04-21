@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { format, addDays, startOfWeek } from "date-fns";
+import { format, addDays, startOfWeek, isSameDay } from "date-fns";
 import {
   ChevronLeft, ChevronRight, RefreshCw, Calendar, CheckCircle2,
   Clock, MapPin, AlertTriangle, ChevronDown, User, Loader2,
@@ -42,6 +42,21 @@ export default function CleaningSchedule() {
   }, [isManager, defaulted, setViewMode]);
 
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
+
+  // Week anchor for the Matrix view (lifted up so the week nav can render
+  // inline next to the Day/Week/Matrix toggle).
+  const [matrixWeekAnchor, setMatrixWeekAnchor] = useState<Date>(() => new Date());
+  const matrixWeekStart = useMemo(
+    () => startOfWeek(matrixWeekAnchor, { weekStartsOn: 1 }),
+    [matrixWeekAnchor]
+  );
+  const matrixIsCurrentWeek = useMemo(
+    () => isSameDay(matrixWeekStart, startOfWeek(new Date(), { weekStartsOn: 1 })),
+    [matrixWeekStart]
+  );
+  const matrixGoPrev = () => setMatrixWeekAnchor(d => addDays(startOfWeek(d, { weekStartsOn: 1 }), -7));
+  const matrixGoNext = () => setMatrixWeekAnchor(d => addDays(startOfWeek(d, { weekStartsOn: 1 }), 7));
+  const matrixGoThisWeek = () => setMatrixWeekAnchor(new Date());
 
   // Week-at-a-glance stats
   const weekStats = useMemo(() => {
@@ -169,6 +184,29 @@ export default function CleaningSchedule() {
             </button>
           </div>
 
+          {/* Matrix-view-only inline week navigation, sits to the right of the toggle */}
+          {(viewMode as any) === "matrix" && (
+            <div className="flex items-center gap-2 ml-auto">
+              <Button variant="outline" size="icon" onClick={matrixGoPrev} className="h-9 w-9">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={matrixIsCurrentWeek ? "default" : "outline"}
+                size="sm"
+                onClick={matrixGoThisWeek}
+                className="h-9"
+                disabled={matrixIsCurrentWeek}
+              >
+                Current Week
+              </Button>
+              <Button variant="outline" size="icon" onClick={matrixGoNext} className="h-9 w-9">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <span key={format(matrixWeekStart, "yyyy-MM-dd")} className="ml-1 text-sm font-medium text-foreground tabular-nums">
+                {format(matrixWeekStart, "d MMM")} – {format(addDays(matrixWeekStart, 6), "d MMM yyyy")}
+              </span>
+            </div>
+          )}
 
           {/* Day-view-only filters (Matrix view has its own colour-coded chip filters) */}
           {viewMode === "day" && (
@@ -200,7 +238,12 @@ export default function CleaningSchedule() {
 
         {/* Matrix View */}
         {(viewMode as any) === "matrix" && (
-          <MatrixView initialDate={selectedDate} />
+          <MatrixView
+            initialDate={selectedDate}
+            weekAnchor={matrixWeekAnchor}
+            onWeekAnchorChange={setMatrixWeekAnchor}
+            hideWeekNav
+          />
         )}
 
         {/* Week View */}
