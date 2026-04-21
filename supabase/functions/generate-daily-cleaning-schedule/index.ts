@@ -601,7 +601,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     if (updateErr) throw updateErr;
   }
 
-  return { created: allTasks.length, unassigned: unassignedCount };
+  return { created: createdCount, unassigned: unassignedCount };
 }
 
 function todayLondon(): string {
