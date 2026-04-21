@@ -266,6 +266,11 @@ export function CleanersSettings() {
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
+                    <span
+                      className="h-3 w-3 rounded-full border border-border/30 shrink-0"
+                      style={{ backgroundColor: getCleanerColor(c.id, c.name, c.color).hex }}
+                      title={c.color ? "Custom colour" : "Auto colour"}
+                    />
                     <h4 className="font-semibold text-foreground" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{c.name}</h4>
                     {c.user_id && (
                       <Badge variant="outline" className="text-[10px] border-success/30 text-success px-1.5 py-0">
