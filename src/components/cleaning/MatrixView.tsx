@@ -29,10 +29,19 @@ import { shortenName } from "@/lib/shortenName";
 
 interface Props {
   initialDate?: Date;
+  weekAnchor?: Date;
+  onWeekAnchorChange?: (d: Date) => void;
+  hideWeekNav?: boolean;
 }
 
-export function MatrixView({ initialDate }: Props) {
-  const [weekAnchor, setWeekAnchor] = useState<Date>(() => initialDate ?? new Date());
+export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnchorChange, hideWeekNav }: Props) {
+  const [weekAnchorInternal, setWeekAnchorInternal] = useState<Date>(() => initialDate ?? new Date());
+  const weekAnchor = weekAnchorProp ?? weekAnchorInternal;
+  const setWeekAnchor = (updater: Date | ((d: Date) => Date)) => {
+    const next = typeof updater === "function" ? (updater as (d: Date) => Date)(weekAnchor) : updater;
+    if (onWeekAnchorChange) onWeekAnchorChange(next);
+    else setWeekAnchorInternal(next);
+  };
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [addCleanCell, setAddCleanCell] = useState<{ listing: MatrixListing; date: Date } | null>(null);
   const [filterGroups, setFilterGroups] = useState<Set<string>>(new Set());
