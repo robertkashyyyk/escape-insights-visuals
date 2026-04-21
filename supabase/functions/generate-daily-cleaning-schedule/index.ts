@@ -163,9 +163,21 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     .eq("status", "confirmed");
   if (coErr) throw coErr;
 
+  // 1b. Get any pre-existing unassigned tasks for this date — these need re-assignment too
+  const { data: orphanUnassigned } = await supabase
+    .from("clean_tasks")
+    .select("id, listing_id, reservation_id, scheduled_date, priority, cleaning_duration_minutes, checkout_time, checkin_time, is_same_day_turnaround, source")
+    .eq("scheduled_date", targetDate)
+    .eq("status", "unassigned");
+
+  const orphanListingIds = (orphanUnassigned || []).map((t: any) => String(t.listing_id));
+
   // 2. Get listings (including bundles so we can expand components)
-  const rawListingIds: string[] = Array.from(new Set((checkouts || []).map((r: any) => String(r.listing_id))));
-  if (rawListingIds.length === 0) {
+  const rawListingIds: string[] = Array.from(new Set([
+    ...((checkouts || []).map((r: any) => String(r.listing_id))),
+    ...orphanListingIds,
+  ]));
+  if (rawListingIds.length === 0 && (orphanUnassigned || []).length === 0) {
     return { created: 0, unassigned: 0 };
   }
 
