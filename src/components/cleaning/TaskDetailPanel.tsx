@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { CheckCircle2, Clock, Trash2, Save } from "lucide-react";
+import { CheckCircle2, Clock, Trash2, Save, Undo2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { getCleanerColor } from "@/lib/cleanerColors";
 import type { MatrixCleaner, MatrixListing, MatrixReservation, MatrixTask } from "@/hooks/useMatrixSchedule";
@@ -20,6 +20,7 @@ interface Props {
   reservations: MatrixReservation[];
   onReassign: (taskId: string, cleanerId: string | null) => Promise<boolean>;
   onComplete: (taskId: string, listingId: string) => Promise<boolean>;
+  onUndoComplete: (taskId: string, listingId: string) => Promise<boolean>;
   onRemove: (taskId: string) => Promise<boolean>;
   onSaveNotes: (taskId: string, notes: string) => Promise<boolean>;
 }
