@@ -368,7 +368,43 @@ export function CleanersSettings() {
               </div>
             </div>
 
-            {/* Location Groups multi-select */}
+            {/* Schedule colour swatch picker */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Schedule Colour</Label>
+                {form.color && (
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, color: null })}
+                    className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                  >
+                    <X className="h-2.5 w-2.5" /> Reset to auto
+                  </button>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                {form.color ? "Tasks for this cleaner will use this colour on the schedule." : "Auto-assigned from a hash of the cleaner's ID."}
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {CLEANER_COLOR_SWATCHES.map(hex => {
+                  const selected = form.color === hex;
+                  return (
+                    <button
+                      key={hex}
+                      type="button"
+                      onClick={() => setForm({ ...form, color: hex })}
+                      className={`h-7 w-7 rounded-md transition-all ${
+                        selected ? "ring-2 ring-offset-2 ring-offset-card ring-foreground scale-110" : "hover:scale-105"
+                      }`}
+                      style={{ backgroundColor: hex }}
+                      title={hex}
+                      aria-label={`Pick colour ${hex}`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="space-y-1.5">
               <Label className="text-xs">Location Groups</Label>
               <div className="flex flex-wrap gap-1.5">
