@@ -244,7 +244,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
             All
           </button>
           {cleaners.map(c => {
-            const color = getCleanerColor(c.id, c.name);
+            const color = getCleanerColor(c.id, c.name, c.color);
             const active = filterCleaners.has(c.id);
             return (
               <button
@@ -296,7 +296,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                 id={`cleaner:${c.id}`}
                 name={c.name}
                 count={summary.byCleaner[c.id] || 0}
-                color={getCleanerColor(c.id, c.name)}
+                color={getCleanerColor(c.id, c.name, c.color)}
                 isDragging={!!activeDragTaskId}
               />
             ))}
@@ -436,9 +436,9 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
             <div
               className="rounded-md px-2 py-1.5 text-[11px] font-medium border shadow-lg"
               style={{
-                backgroundColor: getCleanerColor(dragTask.assigned_cleaner_id, cleaners.find(c => c.id === dragTask.assigned_cleaner_id)?.name).bg,
-                borderColor: getCleanerColor(dragTask.assigned_cleaner_id, cleaners.find(c => c.id === dragTask.assigned_cleaner_id)?.name).border,
-                color: getCleanerColor(dragTask.assigned_cleaner_id, cleaners.find(c => c.id === dragTask.assigned_cleaner_id)?.name).text,
+                backgroundColor: getCleanerColor(dragTask.assigned_cleaner_id, cleaners.find(c => c.id === dragTask.assigned_cleaner_id)?.name, cleaners.find(c => c.id === dragTask.assigned_cleaner_id)?.color).bg,
+                borderColor: getCleanerColor(dragTask.assigned_cleaner_id, cleaners.find(c => c.id === dragTask.assigned_cleaner_id)?.name, cleaners.find(c => c.id === dragTask.assigned_cleaner_id)?.color).border,
+                color: getCleanerColor(dragTask.assigned_cleaner_id, cleaners.find(c => c.id === dragTask.assigned_cleaner_id)?.name, cleaners.find(c => c.id === dragTask.assigned_cleaner_id)?.color).text,
               }}
             >
               {listings.find(l => l.id === dragTask.listing_id)?.name ?? "Task"}
@@ -588,7 +588,7 @@ function DraggableCellInner({
     ? UNASSIGNED_COLOR
     : isManual
     ? MANUAL_CLEAN_COLOR
-    : getCleanerColor(task.assigned_cleaner_id, cleaner?.name);
+    : getCleanerColor(task.assigned_cleaner_id, cleaner?.name, cleaner?.color);
 
   const checkout = task.checkout_time ? task.checkout_time.slice(0, 5) : null;
   const initial = cleaner?.name?.charAt(0).toUpperCase() ?? "?";
