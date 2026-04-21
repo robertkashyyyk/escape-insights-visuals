@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { format, addDays, startOfWeek } from "date-fns";
+import { format, addDays, startOfWeek, isSameDay } from "date-fns";
 import {
   ChevronLeft, ChevronRight, RefreshCw, Calendar, CheckCircle2,
   Clock, MapPin, AlertTriangle, ChevronDown, User, Loader2,
