@@ -310,6 +310,7 @@ export type Database = {
       cleaners: {
         Row: {
           active: boolean
+          color: string | null
           created_at: string
           daily_working_hours: number
           email: string | null
@@ -331,6 +332,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          color?: string | null
           created_at?: string
           daily_working_hours?: number
           email?: string | null
@@ -352,6 +354,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          color?: string | null
           created_at?: string
           daily_working_hours?: number
           email?: string | null
