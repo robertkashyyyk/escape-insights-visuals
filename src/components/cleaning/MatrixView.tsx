@@ -374,10 +374,11 @@ export function MatrixView({ initialDate }: Props) {
 
                         {days.map(d => {
                           const ds = format(d, "yyyy-MM-dd");
-                          const task = taskGrid.get(`${listing.id}|${ds}`);
+                          const rawTask = taskGrid.get(`${listing.id}|${ds}`);
                           const isTodayCol = isSameDay(d, today);
-                          const visible = isTaskVisible(task);
-                          const dimmed = !visible && task != null;
+                          const visible = isTaskVisible(rawTask);
+                          // Hide filtered-out tasks entirely (render as empty cell)
+                          const task = visible ? rawTask : undefined;
 
                           return (
                             <MatrixCell
@@ -387,7 +388,7 @@ export function MatrixView({ initialDate }: Props) {
                               task={task}
                               cleaners={cleaners}
                               isToday={isTodayCol}
-                              dimmed={dimmed}
+                              dimmed={false}
                               onTaskClick={(id) => setSelectedTaskId(id)}
                               onAddClick={() => setAddCleanCell({ listing, date: d })}
                             />
