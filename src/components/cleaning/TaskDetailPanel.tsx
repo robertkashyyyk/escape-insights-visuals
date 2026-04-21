@@ -227,9 +227,13 @@ export function TaskDetailPanel({
 
             {/* Actions */}
             <div className="flex flex-col gap-2 pt-2 border-t border-border/30">
-              {task.status !== "completed" && (
+              {task.status !== "completed" ? (
                 <Button onClick={handleComplete} disabled={busy} className="w-full">
                   <CheckCircle2 className="h-4 w-4 mr-1.5" /> Mark complete
+                </Button>
+              ) : (
+                <Button onClick={handleUndoComplete} disabled={busy} variant="secondary" className="w-full">
+                  <Undo2 className="h-4 w-4 mr-1.5" /> Undo complete
                 </Button>
               )}
               <Button
