@@ -522,13 +522,20 @@ export function useCleaningSchedule() {
     return u;
   }, [daySchedule.unassigned, filterLocation]);
 
-  // Regenerate calls the edge function
-  const regenerate = useCallback(async () => {
+  // Regenerate calls the edge function. `days` > 1 processes a date range
+  // starting at `selectedDate`. Default = single day (back-compat).
+  const regenerateRange = useCallback(async (days: number = 1) => {
     setIsRegenerating(true);
     try {
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const startDate = days > 1 ? startOfWeek(selectedDate, { weekStartsOn: 1 }) : selectedDate;
+      const startStr = format(startDate, "yyyy-MM-dd");
+      const endStr = format(addDays(startDate, Math.max(0, days - 1)), "yyyy-MM-dd");
+      const rangeLabel = days > 1
+        ? `the week of ${format(startDate, "d MMM")} – ${format(addDays(startDate, days - 1), "d MMM")}`
+        : startStr;
+
       const { data, error } = await supabase.functions.invoke("generate-daily-cleaning-schedule", {
-        body: { date: dateStr },
+        body: days > 1 ? { date: startStr, days_ahead: days } : { date: startStr },
       });
       if (error) throw error;
       const created = data?.tasks_created ?? 0;
@@ -536,22 +543,25 @@ export function useCleaningSchedule() {
       if (created === 0 && unassigned === 0) {
         toast({
           title: "Nothing to generate",
-          description: `No checkouts found for ${dateStr}. If you just removed a manual clean, it cannot be auto-regenerated — add it again from the matrix.`,
+          description: days > 1
+            ? `No checkouts found for ${rangeLabel}. Nothing to generate.`
+            : `No checkouts found for ${rangeLabel}. If you just removed a manual clean, it cannot be auto-regenerated — add it again from the matrix.`,
         });
       } else if (created === 0 && unassigned > 0) {
         toast({
           title: "Tasks remain unassigned",
-          description: `${unassigned} task${unassigned === 1 ? "" : "s"} for ${dateStr} could not be assigned — no cleaner covers that location group, or all eligible cleaners are at capacity. Add the location to a cleaner in Settings → Cleaners, or drag manually in the matrix.`,
+          description: `${unassigned} task${unassigned === 1 ? "" : "s"} for ${rangeLabel} could not be assigned — no cleaner covers that location group, or all eligible cleaners are at capacity. Add the location to a cleaner in Settings → Cleaners, or drag manually in the matrix.`,
           variant: "destructive",
         });
       } else {
         toast({
           title: "Schedule generated",
-          description: `${created} task${created === 1 ? "" : "s"} created${unassigned > 0 ? `, ${unassigned} still unassigned (no eligible cleaner)` : ""}.`,
+          description: `${created} task${created === 1 ? "" : "s"} created across ${rangeLabel}${unassigned > 0 ? `, ${unassigned} still unassigned (no eligible cleaner)` : ""}.`,
         });
       }
       // Refresh all queries
       queryClient.invalidateQueries({ queryKey: ["clean-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["matrix-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["reservations-checkouts"] });
       queryClient.invalidateQueries({ queryKey: ["reservations-checkins"] });
       queryClient.invalidateQueries({ queryKey: ["cleaners-schedule"] });
@@ -562,6 +572,8 @@ export function useCleaningSchedule() {
       setIsRegenerating(false);
     }
   }, [selectedDate, queryClient, toast]);
+
+  const regenerate = useCallback(() => regenerateRange(1), [regenerateRange]);
 
   // Complete a task
   const completeTask = useCallback(async (taskId: string, listingId: string) => {
@@ -597,7 +609,7 @@ export function useCleaningSchedule() {
     cleanerDays: filteredCleanerDays, unassigned: filteredUnassigned,
     weekSummary, monthlyInvoice, cleaners, locationGroups,
     totalTasks: daySchedule.tasks.length,
-    regenerate, completeTask, goBack, goForward, isToday, isRegenerating,
+    regenerate, regenerateRange, completeTask, goBack, goForward, isToday, isRegenerating,
     buildDaySchedule,
   };
 }
