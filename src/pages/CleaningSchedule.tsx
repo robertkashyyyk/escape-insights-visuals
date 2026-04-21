@@ -170,27 +170,32 @@ export default function CleaningSchedule() {
           </div>
 
 
-          <Select value={filterCleaner} onValueChange={setFilterCleaner}>
-            <SelectTrigger className="w-40 h-9 text-xs bg-secondary/50 border-border/30">
-              <User className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-              <SelectValue placeholder="All Cleaners" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Cleaners</SelectItem>
-              {cleaners.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {/* Day-view-only filters (Matrix view has its own colour-coded chip filters) */}
+          {viewMode === "day" && (
+            <>
+              <Select value={filterCleaner} onValueChange={setFilterCleaner}>
+                <SelectTrigger className="w-40 h-9 text-xs bg-secondary/50 border-border/30">
+                  <User className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                  <SelectValue placeholder="All Cleaners" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Cleaners</SelectItem>
+                  {cleaners.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
 
-          <Select value={filterLocation} onValueChange={setFilterLocation}>
-            <SelectTrigger className="w-44 h-9 text-xs bg-secondary/50 border-border/30">
-              <MapPin className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-              <SelectValue placeholder="All Locations" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Locations</SelectItem>
-              {locationGroups.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-            </SelectContent>
-          </Select>
+              <Select value={filterLocation} onValueChange={setFilterLocation}>
+                <SelectTrigger className="w-44 h-9 text-xs bg-secondary/50 border-border/30">
+                  <MapPin className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                  <SelectValue placeholder="All Locations" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Locations</SelectItem>
+                  {locationGroups.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </>
+          )}
         </div>
 
         {/* Matrix View */}
