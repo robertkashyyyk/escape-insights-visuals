@@ -154,3 +154,6 @@ This guide describes how to use the Escape Grids platform. Use it to answer "how
 
 **Force a fresh Hostaway sync:**
 - `/sync-health` → "Sync Now". Wait for the run to complete (status turns green).
+
+**Change a cleaner's colour on the schedule:**
+- There is no UI for this yet. Cleaner colours are auto-assigned from a fixed palette in `src/lib/cleanerColors.ts` based on a hash of the cleaner's ID, with hardcoded overrides for specific names (currently Kirstie = teal, Andreas = blue). To change a colour, a developer needs to edit `NAME_OVERRIDES` in that file — ask the dev team.
