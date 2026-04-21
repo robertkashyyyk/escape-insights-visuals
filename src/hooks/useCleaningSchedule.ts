@@ -531,10 +531,19 @@ export function useCleaningSchedule() {
         body: { date: dateStr },
       });
       if (error) throw error;
-      toast({
-        title: "Schedule generated",
-        description: `${data?.tasks_created ?? 0} tasks created, ${data?.tasks_unassigned ?? 0} unassigned.`,
-      });
+      const created = data?.tasks_created ?? 0;
+      const unassigned = data?.tasks_unassigned ?? 0;
+      if (created === 0 && unassigned === 0) {
+        toast({
+          title: "Nothing to generate",
+          description: `No checkouts found for ${dateStr}. If you just removed a manual clean, it cannot be auto-regenerated — add it again from the matrix.`,
+        });
+      } else {
+        toast({
+          title: "Schedule generated",
+          description: `${created} task${created === 1 ? "" : "s"} created, ${unassigned} unassigned.`,
+        });
+      }
       // Refresh all queries
       queryClient.invalidateQueries({ queryKey: ["clean-tasks"] });
       queryClient.invalidateQueries({ queryKey: ["reservations-checkouts"] });
