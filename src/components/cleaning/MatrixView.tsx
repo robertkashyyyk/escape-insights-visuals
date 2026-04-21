@@ -46,7 +46,7 @@ export function MatrixView({ initialDate }: Props) {
   const {
     days, groupedListings, listings,
     cleaners, tasks, reservations, isLoading,
-    reassignTask, completeTask, removeTask, updateNotes, addManualClean,
+    reassignTask, completeTask, undoComplete, removeTask, updateNotes, addManualClean,
   } = useMatrixSchedule(weekAnchor);
 
   // Index tasks by listing+date
@@ -426,6 +426,7 @@ export function MatrixView({ initialDate }: Props) {
         reservations={reservations}
         onReassign={reassignTask}
         onComplete={completeTask}
+        onUndoComplete={undoComplete}
         onRemove={removeTask}
         onSaveNotes={updateNotes}
       />

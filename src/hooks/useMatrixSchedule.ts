@@ -179,7 +179,30 @@ export function useMatrixSchedule(weekAnchor: Date) {
     return true;
   }, [qc, toast, weekStartStr, weekEndStr]);
 
+  const undoComplete = useCallback(async (taskId: string, listingId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    const newStatus = task?.assigned_cleaner_id ? "scheduled" : "unassigned";
+    const { error } = await (supabase.from("clean_tasks" as any) as any)
+      .update({ status: newStatus, completed_at: null })
+      .eq("id", taskId);
+    if (error) {
+      toast({ title: "Undo failed", description: error.message, variant: "destructive" });
+      return false;
+    }
+    await supabase.from("listings").update({ is_clean: false } as any).eq("id", listingId);
+    qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
+    toast({ title: "Undone", description: "Clean restored as scheduled." });
+    return true;
+  }, [qc, toast, tasks, weekStartStr, weekEndStr]);
+
   const removeTask = useCallback(async (taskId: string) => {
+    // Capture metadata before delete so we can self-heal
+    const task = tasks.find(t => t.id === taskId);
+    const scheduledDate = task?.scheduled_date;
+    const reservationId = task?.reservation_id;
+    const source = task?.source;
+    const listingId = task?.listing_id;
+
     const { error } = await (supabase.from("clean_tasks" as any) as any)
       .delete()
       .eq("id", taskId);
@@ -187,10 +210,50 @@ export function useMatrixSchedule(weekAnchor: Date) {
       toast({ title: "Failed to remove", description: error.message, variant: "destructive" });
       return false;
     }
+    // Reset is_clean so the property is no longer marked clean
+    if (listingId) {
+      await supabase.from("listings").update({ is_clean: false } as any).eq("id", listingId);
+    }
     qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
-    toast({ title: "Cleaning task removed" });
+
+    // Self-heal: regenerate from source reservation if applicable
+    if (source === "manual") {
+      toast({
+        title: "Manual clean removed",
+        description: "Add another from the + button if needed.",
+      });
+    } else if (reservationId && scheduledDate) {
+      try {
+        const { data, error: fnErr } = await supabase.functions.invoke(
+          "generate-daily-cleaning-schedule",
+          { body: { date: scheduledDate } }
+        );
+        if (fnErr) throw fnErr;
+        const created = data?.tasks_created ?? 0;
+        if (created > 0) {
+          toast({
+            title: "Cleaning task removed",
+            description: `Auto-regenerated ${created} task${created === 1 ? "" : "s"} for ${scheduledDate}.`,
+          });
+        } else {
+          toast({
+            title: "Cleaning task removed",
+            description: `Could not auto-regenerate — the source reservation may have been cancelled.`,
+          });
+        }
+        qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
+      } catch (err: any) {
+        toast({
+          title: "Cleaning task removed",
+          description: `Regenerate failed: ${err.message}`,
+          variant: "destructive",
+        });
+      }
+    } else {
+      toast({ title: "Cleaning task removed" });
+    }
     return true;
-  }, [qc, toast, weekStartStr, weekEndStr]);
+  }, [qc, toast, tasks, weekStartStr, weekEndStr]);
 
   const updateNotes = useCallback(async (taskId: string, notes: string) => {
     const { error } = await (supabase.from("clean_tasks" as any) as any)
@@ -248,6 +311,6 @@ export function useMatrixSchedule(weekAnchor: Date) {
     listings, groupedListings,
     cleaners, tasks, reservations,
     isLoading: listingsLoading || tasksLoading,
-    reassignTask, completeTask, removeTask, updateNotes, addManualClean,
+    reassignTask, completeTask, undoComplete, removeTask, updateNotes, addManualClean,
   };
 }

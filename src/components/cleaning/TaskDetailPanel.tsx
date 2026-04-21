@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { CheckCircle2, Clock, Trash2, Save } from "lucide-react";
+import { CheckCircle2, Clock, Trash2, Save, Undo2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { getCleanerColor } from "@/lib/cleanerColors";
 import type { MatrixCleaner, MatrixListing, MatrixReservation, MatrixTask } from "@/hooks/useMatrixSchedule";
@@ -20,6 +20,7 @@ interface Props {
   reservations: MatrixReservation[];
   onReassign: (taskId: string, cleanerId: string | null) => Promise<boolean>;
   onComplete: (taskId: string, listingId: string) => Promise<boolean>;
+  onUndoComplete: (taskId: string, listingId: string) => Promise<boolean>;
   onRemove: (taskId: string) => Promise<boolean>;
   onSaveNotes: (taskId: string, notes: string) => Promise<boolean>;
 }
@@ -39,7 +40,7 @@ function timeDiffMinutes(start: string, end: string): number | null {
 
 export function TaskDetailPanel({
   open, onOpenChange, task, listing, cleaners, reservations,
-  onReassign, onComplete, onRemove, onSaveNotes,
+  onReassign, onComplete, onUndoComplete, onRemove, onSaveNotes,
 }: Props) {
   const [notes, setNotes] = useState("");
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
@@ -92,6 +93,13 @@ export function TaskDetailPanel({
   const handleComplete = async () => {
     setBusy(true);
     const ok = await onComplete(task.id, task.listing_id);
+    setBusy(false);
+    if (ok) onOpenChange(false);
+  };
+
+  const handleUndoComplete = async () => {
+    setBusy(true);
+    const ok = await onUndoComplete(task.id, task.listing_id);
     setBusy(false);
     if (ok) onOpenChange(false);
   };
@@ -219,9 +227,13 @@ export function TaskDetailPanel({
 
             {/* Actions */}
             <div className="flex flex-col gap-2 pt-2 border-t border-border/30">
-              {task.status !== "completed" && (
+              {task.status !== "completed" ? (
                 <Button onClick={handleComplete} disabled={busy} className="w-full">
                   <CheckCircle2 className="h-4 w-4 mr-1.5" /> Mark complete
+                </Button>
+              ) : (
+                <Button onClick={handleUndoComplete} disabled={busy} variant="secondary" className="w-full">
+                  <Undo2 className="h-4 w-4 mr-1.5" /> Undo complete
                 </Button>
               )}
               <Button
@@ -242,7 +254,11 @@ export function TaskDetailPanel({
           <AlertDialogHeader>
             <AlertDialogTitle>Remove cleaning task?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will not cancel the reservation. The cleaning task will be deleted and can be regenerated from the schedule if needed.
+              {task.status === "completed"
+                ? "This permanently deletes the completed task. To restore it as scheduled instead, use 'Undo complete'. If this clean came from a reservation, removing will auto-regenerate it from the source."
+                : task.source === "manual"
+                ? "This deletes the manual cleaning task. It cannot be auto-regenerated — you'll need to add it again from the + button."
+                : "This deletes the cleaning task and will auto-regenerate it from the source reservation."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
