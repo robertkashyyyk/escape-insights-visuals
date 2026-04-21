@@ -43,7 +43,7 @@ function addMinutesToTime(time: string, mins: number): string {
 
 interface TaskInfo {
   listing_id: string;
-  reservation_id: string;
+  reservation_id: string | null;
   scheduled_date: string;
   priority: string;
   cleaning_duration_minutes: number;
@@ -57,6 +57,8 @@ interface TaskInfo {
   checkout_time: string;
   checkin_time: string | null;
   is_same_day_turnaround: boolean;
+  existing_task_id?: string | null; // present if this is a pre-existing unassigned row to UPDATE rather than INSERT
+  source?: string;
 }
 
 interface CleanerInfo {
