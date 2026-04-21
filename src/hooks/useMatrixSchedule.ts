@@ -16,6 +16,7 @@ export interface MatrixCleaner {
   id: string;
   name: string;
   active: boolean;
+  location_groups?: string[];
 }
 
 export interface MatrixTask {
