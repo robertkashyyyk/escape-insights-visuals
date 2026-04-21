@@ -40,7 +40,7 @@ function timeDiffMinutes(start: string, end: string): number | null {
 
 export function TaskDetailPanel({
   open, onOpenChange, task, listing, cleaners, reservations,
-  onReassign, onComplete, onRemove, onSaveNotes,
+  onReassign, onComplete, onUndoComplete, onRemove, onSaveNotes,
 }: Props) {
   const [notes, setNotes] = useState("");
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
