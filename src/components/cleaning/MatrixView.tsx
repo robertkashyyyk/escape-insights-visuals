@@ -70,11 +70,6 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
   const todayStr = format(today, "yyyy-MM-dd");
 
   // Filtering
-  const visibleGroups = useMemo(() => {
-    if (filterGroups.size === 0) return groupedListings;
-    return groupedListings.filter(([g]) => filterGroups.has(g));
-  }, [groupedListings, filterGroups]);
-
   const isTaskVisible = useCallback((t: MatrixTask | undefined): boolean => {
     if (!t) return true; // empty cells always visible
     if (!showCompleted && t.status === "completed") return false;
@@ -83,6 +78,28 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
     if (t.assigned_cleaner_id && filterCleaners.has(t.assigned_cleaner_id)) return true;
     return false;
   }, [showCompleted, filterCleaners]);
+
+  // When a cleaner filter is active, hide property rows that have no
+  // matching tasks at all this week (so the matrix collapses instead of
+  // showing a sea of empty rows).
+  const cleanerFilterActive = filterCleaners.size > 0;
+  const listingsWithVisibleTask = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of tasks) {
+      if (isTaskVisible(t)) set.add(t.listing_id);
+    }
+    return set;
+  }, [tasks, isTaskVisible]);
+
+  const visibleGroups = useMemo(() => {
+    let groups = filterGroups.size === 0 ? groupedListings : groupedListings.filter(([g]) => filterGroups.has(g));
+    if (cleanerFilterActive) {
+      groups = groups
+        .map(([g, ls]) => [g, ls.filter(l => listingsWithVisibleTask.has(l.id))] as [string, MatrixListing[]])
+        .filter(([, ls]) => ls.length > 0);
+    }
+    return groups;
+  }, [groupedListings, filterGroups, cleanerFilterActive, listingsWithVisibleTask]);
 
   // Summary
   const summary = useMemo(() => {
