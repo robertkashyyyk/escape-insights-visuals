@@ -88,7 +88,7 @@ export function useMatrixSchedule(weekAnchor: Date) {
     queryFn: async () => {
       const { data } = await supabase
         .from("cleaners" as any)
-        .select("id, name, active")
+        .select("id, name, active, location_groups")
         .eq("active", true)
         .order("name");
       return (data || []) as unknown as MatrixCleaner[];
