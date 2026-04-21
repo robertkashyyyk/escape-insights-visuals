@@ -1,61 +1,40 @@
 
 
-# Why Belfast cleans aren't being assigned on Apr 24–26
+# Make "Regenerate" cover the visible week, not just one day
 
-## Root cause
+## What's happening
+The Regenerate button on `/operations/schedule` only sends a **single date** (whatever `selectedDate` is) to the edge function. So when you click it, it processes one day, finds no checkouts on that day, and shows "No checkouts found for {date}". The other 6 days of the week you're looking at are ignored.
 
-Odette is the **only** cleaner with `Belfast` in her `location_groups`, so she's the only eligible cleaner for these properties. The tasks ARE being created (I confirmed: `1 Malone Place` 25th, `University Road 1 & 2` 24th, `University Road 1` 26th all exist as `unassigned`). They just never get assigned to her.
+The edge function itself already supports a date range — it accepts a `days_ahead` parameter and will process up to 30 days. The frontend just isn't using it.
 
-Two problems in `generate-daily-cleaning-schedule/index.ts`:
+## What we'll change
 
-### Problem 1 — Capacity gate (the main one)
-At line 355, every candidate is filtered by:
-```
-projected = cleanerScheduledMinutes + duration + 15  ≤  daily_working_hours * 60
-```
+### Matrix view (`/operations/schedule`) — regenerate the whole visible week
+The matrix view shows a 7-day week. Regenerate should process **all 7 days of that week**.
 
-`cleanerScheduledMinutes` is built (line 261-280) from **all existing tasks for that date, including the unassigned ones being re-evaluated**. Wait — actually that part filters by `assigned_cleaner_id`, so unassigned don't count. The real issue: on Apr 24 there are **3 Belfast checkouts** (Escape Ordinary No.2 + Uni Road 1 + Uni Road 2). If `Escape Ordinary No.2` already got assigned to Odette in a previous run, her `cleanerScheduledMinutes` starts at 105 (90 + 15 travel). Adding Uni Road 1 → 210, Uni Road 2 → 315 — all well under 480 min (8 hr), so capacity isn't the blocker here.
+- Pass `{ date: weekStart, days_ahead: 7 }` to the edge function instead of a single date.
+- Update the toast to summarise the whole range:
+  - `"12 tasks created across this week, 2 still unassigned"` (success)
+  - `"No checkouts found for {weekStart} – {weekEnd}. Nothing to generate."` (empty)
+  - `"3 tasks remain unassigned for this week — no cleaner covers Belfast, or eligible cleaners are at capacity."` (partial)
 
-The **actual** blocker is more subtle: `cleanerScheduledMinutes` only counts **already-existing tasks in the DB**. When the regenerator processes a date where tasks already exist as `unassigned` (which is exactly the user's situation), it skips them in the dedupe at line 240–242 (`existingSet`) — so they're **never re-evaluated**, and they stay unassigned forever.
+### Day view (`/operations/cleaning` if applicable) — keep single-day behaviour, add a secondary action
+The existing single-day Regenerate stays (it makes sense for a day-focused view), but we add a small **"Regenerate next 7 days"** option in a dropdown next to the button so users have the wider option without losing the targeted one.
 
-That's the bug. **The regenerator only assigns tasks it newly creates. Pre-existing unassigned tasks are skipped by the dedupe and never get a cleaner.**
-
-### Problem 2 — Empty `location_groups` for some Belfast cleaners
-Only Odette covers Belfast. If she's at capacity or off, there is no fallback cleaner. Not the immediate cause but worth flagging.
-
-## What we'll build
-
-### Fix 1 — Make regenerate also assign existing unassigned tasks
-Update `processDate()` in `supabase/functions/generate-daily-cleaning-schedule/index.ts`:
-- After the dedupe step, also fetch all existing **unassigned** tasks for `targetDate` and feed them into the same allocation pass as new tasks.
-- Treat them as `TaskInfo` objects (using their stored `listing_id`, `scheduled_date`, `cleaning_duration_minutes`, etc., re-derived from the listings table).
-- After allocation, **UPDATE** these existing rows with `assigned_cleaner_id`, `status='scheduled'`, `estimated_start_time`, `travel_time_from_previous_minutes` rather than INSERT.
-- Newly-created tasks continue to be inserted as today.
-
-This means clicking "Regenerate" will retry assignment for any orphaned `unassigned` tasks, which is what the user expects.
-
-### Fix 2 — Better toast for partial success
-Update `useCleaningSchedule.ts` regenerate toast: when tasks_created is 0 but `tasks_unassigned > 0`, say:
-> "No new tasks needed for {date}, but {n} tasks remain unassigned — no cleaner has {region} in their coverage areas, or all eligible cleaners are at capacity."
-
-### Fix 3 — Surface unassigned reason in the UI (small)
-In the matrix view, when a task is unassigned, show a tooltip on the empty cell: "No cleaner covers Belfast" or "All Belfast cleaners are at capacity for this day" — derived client-side from the cleaners list.
-
-## Immediate workaround for Andreas
-Either:
-1. Add `Belfast` to another cleaner's `location_groups` in Settings → Cleaners (e.g. Aneta who is currently `Other` only), OR
-2. Manually drag the unassigned tile in the matrix onto Odette — this works today.
+### Wording
+The current toast wording ("No checkouts found for {date}") is technically correct but misleading because users assume Regenerate is broader. The new wording will make the scope explicit in every toast: "for the week of Apr 21 – Apr 27" rather than just one date.
 
 ## Technical changes
 
 **Files to edit:**
-- `supabase/functions/generate-daily-cleaning-schedule/index.ts` — load existing unassigned tasks for the date alongside new ones; route them through the same eligibility + allocation logic; UPDATE existing rows instead of INSERT.
-- `src/hooks/useCleaningSchedule.ts` — improve regenerate toast wording for the "0 created, N still unassigned" case.
-- `src/components/cleaning/MatrixView.tsx` — add tooltip on unassigned cells explaining why (no eligible cleaner / capacity).
+- `src/hooks/useMatrixSchedule.ts` — add a `regenerateWeek()` callback that invokes the edge function with `{ date: weekStartStr, days_ahead: 7 }`, sums per-day results from the response, and shows a week-scoped toast. Invalidate the matrix-tasks query after.
+- `src/pages/CleaningSchedule.tsx` (or wherever the matrix Regenerate button lives) — wire the button to `regenerateWeek` instead of the single-day version.
+- `src/hooks/useCleaningSchedule.ts` — add an optional `regenerateRange(days)` variant alongside the existing single-day `regenerate`. Keep current behaviour as default.
+- Edge function: **no change needed** — it already returns `per_day_results` for ranges.
 
-No DB migration needed.
+No DB migration. No edge function redeploy strictly needed (already supports the param), but we'll redeploy to be safe.
 
 ## Out of scope
-- Auto-spreading Belfast coverage across other cleaners (manual config change in Settings).
-- Multi-day rebalancing.
+- Auto-regenerating on week navigation (still manual click).
+- Regenerating across multiple weeks at once from the UI.
 
