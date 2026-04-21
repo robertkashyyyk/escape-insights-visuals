@@ -168,37 +168,39 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
 
   return (
     <div className="space-y-4">
-      {/* Week navigation */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={goPrev} className="h-9 w-9">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={isCurrentWeek ? "default" : "outline"}
-            size="sm"
-            onClick={goThisWeek}
-            className="h-9"
-            disabled={isCurrentWeek}
-          >
-            Current Week
-          </Button>
-          <Button variant="outline" size="icon" onClick={goNext} className="h-9 w-9">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <span key={format(weekStart, "yyyy-MM-dd")} className="ml-2 text-sm font-medium text-foreground tabular-nums">
-            {format(weekStart, "d MMM")} – {format(addDays(weekStart, 6), "d MMM yyyy")}
-          </span>
-          {!isCurrentWeek && (
-            <button
+      {/* Week navigation (can be hidden when parent renders it inline with view-mode toggle) */}
+      {!hideWeekNav && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={goPrev} className="h-9 w-9">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={isCurrentWeek ? "default" : "outline"}
+              size="sm"
               onClick={goThisWeek}
-              className="ml-2 text-xs text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
+              className="h-9"
+              disabled={isCurrentWeek}
             >
-              Back to Current Week
-            </button>
-          )}
+              Current Week
+            </Button>
+            <Button variant="outline" size="icon" onClick={goNext} className="h-9 w-9">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <span key={format(weekStart, "yyyy-MM-dd")} className="ml-2 text-sm font-medium text-foreground tabular-nums">
+              {format(weekStart, "d MMM")} – {format(addDays(weekStart, 6), "d MMM yyyy")}
+            </span>
+            {!isCurrentWeek && (
+              <button
+                onClick={goThisWeek}
+                className="ml-2 text-xs text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
+              >
+                Back to Current Week
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Filters */}
       <div className="space-y-2">
