@@ -347,6 +347,31 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     }
   }
 
+  // 7b. Add pre-existing unassigned tasks into the allocation pool so they get re-evaluated
+  for (const orphan of orphanUnassigned || []) {
+    const listing = listingMap.get(String(orphan.listing_id));
+    if (!listing) continue;
+    newTasks.push({
+      listing_id: String(orphan.listing_id),
+      reservation_id: orphan.reservation_id ?? null,
+      scheduled_date: orphan.scheduled_date,
+      priority: orphan.priority || "standard",
+      cleaning_duration_minutes: orphan.cleaning_duration_minutes || listing.cleaning_duration_minutes || 90,
+      latitude: listing.latitude,
+      longitude: listing.longitude,
+      location_group: listing.location_group || "Other",
+      assigned_cleaner_id: null,
+      status: "unassigned",
+      estimated_start_time: null,
+      travel_time_from_previous_minutes: 0,
+      checkout_time: normaliseTime(orphan.checkout_time, normaliseTime(listing.default_check_out_time, DEFAULT_CHECKOUT)),
+      checkin_time: orphan.checkin_time ? normaliseTime(orphan.checkin_time, DEFAULT_CHECKIN) : null,
+      is_same_day_turnaround: !!orphan.is_same_day_turnaround,
+      existing_task_id: orphan.id,
+      source: orphan.source || "hostaway",
+    });
+  }
+
   // Sort: same-day turnarounds first
   newTasks.sort((a, b) => {
     if (a.priority === "same_day_turnaround" && b.priority !== "same_day_turnaround") return -1;
