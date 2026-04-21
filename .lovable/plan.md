@@ -1,115 +1,56 @@
 
+# Fix the "Undo clean → Regenerate doesn't work" flow
 
-## Plan: Local Amenities + TouchStay Import + 6 Add-Ons
+## What the user hit
+1. Marked a clean **complete** on a property.
+2. Tried to **undo** by clicking "Remove this clean" — the dialog said the clean would be deleted and could be regenerated.
+3. Clicked the global **Regenerate** button — got `0 tasks created, 0 unassigned`.
 
-Single build pass covering the original Amenities scope plus the 6 new requirements. Orin enrichment was already done in an earlier loop — I'll verify and extend; the chips are already updated.
+## Root causes
+Three real problems in the current flow:
 
-### 1. Database migration
+1. **Removal sets no flag to bring it back.** `removeTask` deletes the `clean_tasks` row but doesn't reset `listings.is_clean = false`. So the property still looks "clean" everywhere else.
+2. **The global Regenerate button is date-scoped to whatever day the user is viewing**, not the date of the clean they just deleted. If they removed a clean for, say, Apr 22 but were viewing Apr 18 when they clicked Regenerate, the edge function processes Apr 18 → 0 created.
+3. **The edge function only generates tasks from confirmed reservations** with `check_out = targetDate`. Manual cleans can never be "regenerated" by it. And there's no user-visible explanation of why 0 came back — the toast just says `0 tasks created`.
 
-Single migration creating:
+There's also no **one-click "undo"** — the user has to delete in one place, then navigate to another page and trust a global button. That's the real UX gap.
 
-- `amenity_category` enum (20 values per spec)
-- `amenities` table — name, category, address, postcode, lat/lng, phone, website, google_place_id, opening_hours, notes, price_range, rating, tags[], is_active, added_by, timestamps
-- `property_amenities` junction — listing_id (uuid), amenity_id (uuid), distance_km, drive_time_mins, walk_time_mins, directions_url, is_featured, display_order, staff_note, timestamps; unique (listing_id, amenity_id)
-- `v_property_amenities` view — joined for efficient reads
-- RLS:
-  - Staff (super/senior/admin) full manage on both
-  - Owners read amenities + property_amenities for their own listings (via `owner_owns_listing`)
-  - Cleaners read for assigned listings (via `cleaner_assigned_to_listing`)
-  - Public anon read on amenities + property_amenities filtered by listing — needed for the unauthenticated `/stay/:slug` Isla route
-- `tg_set_updated_at` triggers
-- A `slug` column on `listings` (text, unique, nullable) + backfill from `name` so `/stay/:slug` can resolve property cleanly
+## What we'll build
 
-### 2. Seed data + TouchStay import
+### 1. Replace "Remove this clean" with a real Undo
+In `TaskDetailPanel`, when the task's status is `completed`, show an **"Undo complete"** button (in addition to the existing remove option). Undo will:
+- Set `clean_tasks.status` back to `scheduled` (or `unassigned` if no cleaner) and clear `completed_at`.
+- Set `listings.is_clean = false`.
+- No deletion, no regeneration needed — instant, reliable.
 
-After migration, two data inserts (separate approval):
+This is the fix for the user's actual reported problem. 95% of "undo complete" cases will use this path and never touch the regenerator.
 
-- **Amenities seed**: run the uploaded `amenity_seed_data.sql` (70 real POIs across Fermanagh / North Coast / Belfast / Larne)
-- **TouchStay import**: rewritten UPDATE statements mapping parsed JSON to the *real* `property_knowledge` columns:
-  - `section_2_access_checkin` → `access_notes`
-  - `section_5_heating_hot_water` → `heating_notes`
-  - `section_7_wifi` → `wifi_notes`
-  - `section_8_bins_recycling` → `recycling_notes`
-  - `section_3_checkout` + `section_11_local_area` (flattened) → appended to `general_notes`
-  - Match by `name ILIKE` from parsed JSON
-  - Skip `section_12` generic welcome text
+### 2. Make the "Remove" path self-healing
+For genuine removals (not undo), after `removeTask` succeeds:
+- If the deleted task had a `reservation_id`, immediately call the edge function **scoped to that task's `scheduled_date`** (not the currently-viewed date) so the same clean is recreated from its source reservation.
+- If it was a `source='manual'` task, just remove it and tell the user "Manual clean removed — add another from the + button if needed" (no regeneration possible, and the toast will be honest about it).
 
-### 3. Amenities Management UI (`/amenities`)
+### 3. Improve the Regenerate toast
+When the edge function returns `tasks_created: 0`, show a clearer message:
+- If 0 created AND 0 unassigned: `"No checkouts found for {date}. Nothing to generate."`
+- If the user just removed a task and regen still returns 0 for that date: surface why (e.g. reservation was cancelled, or it was a manual clean).
 
-- `src/pages/Amenities.tsx` — table (Name, Category badge, Postcode, Rating, Active toggle, Edit), category filter dropdown, name search, "Add Amenity" button
-- `src/components/amenities/AmenityFormSheet.tsx` — slide-over with all fields per spec (tags as comma-separated)
-- `src/components/amenities/CategoryBadge.tsx` — icon + friendly label, colour grouped:
-  - **Amber** (food & drink): restaurant, bar_pub, fast_food, cafe
-  - **Green** (nature): walkway_trail, park, beach, golf_course
-  - **Blue** (services): grocery, supermarket, petrol_station, ev_charging, pharmacy, atm_bank
-  - **Purple** (historic/culture): castle_historic, tourist_attraction
-  - **Grey** (other): accommodation, hospital_medical, other, activity_centre
-- `src/lib/amenityCategories.ts` — single source of truth (label, Lucide icon, colour group)
-- `src/hooks/useAmenities.ts` — list/create/update/delete + link/unlink helpers, builds `directions_url` automatically as:
-  ```
-  https://www.google.com/maps/dir/?api=1&destination={lat},{lng}&travelmode=driving
-  ```
-  Falls back to `?api=1&query={name}+{postcode}` when lat/lng missing
-- Sidebar entry "Amenities" with `MapPin` icon under Property Knowledge group (super/senior/admin)
-- Route added to `App.tsx`
+### 4. Confirm dialog wording
+Update the remove confirmation copy on completed tasks to clarify the two paths:
+- "Undo complete" — restore as a scheduled task (recommended)
+- "Remove permanently" — deletes the task; will auto-regenerate from the source reservation if one exists
 
-### 4. Property Knowledge — Local Area tab (staff)
+## Technical changes
 
-- `src/components/amenities/PropertyAmenitiesTab.tsx` mounted inside `PropertyKnowledgeDetail.tsx`
-- Sortable table: ⭐ Featured, Name, Category badge, Distance ("2.3 km · 8 min drive"), Directions button (opens `directions_url` in new tab), Staff note (masked), Edit/Unlink
-- **Tap-to-reveal staff notes**: reuse the same pattern already used for WiFi password / key safe code (eye icon toggle). Masked by default.
-- "Link Amenity" → `LinkAmenityDialog.tsx` searchable combobox of existing amenities + form fields (distance_km, drive_time_mins, is_featured, staff_note)
-- Sort: featured first → display_order → distance_km
+**Files to edit:**
+- `src/hooks/useMatrixSchedule.ts` — add `undoComplete(taskId, listingId)` mutation; modify `removeTask` to capture the deleted row's `scheduled_date` + `reservation_id` + `source` and trigger a targeted regenerate when applicable; pipe new toast wording.
+- `src/components/cleaning/TaskDetailPanel.tsx` — add "Undo complete" button when `task.status === 'completed'`; update remove dialog copy; wire `onUndo` prop.
+- `src/components/cleaning/MatrixView.tsx` — pass new `undoComplete` handler through to the panel.
+- `src/hooks/useCleaningSchedule.ts` — same `undoComplete` for the day-list view; improve `regenerate` toast for the 0/0 case.
+- `supabase/functions/generate-daily-cleaning-schedule/index.ts` — no logic change needed; the existing dedupe already handles "row exists → skip", which is what we want when the row hasn't been deleted yet.
 
-### 5. Owner Portal — Local Area tab
+No DB migration needed.
 
-- Add "Local Area" tab to the existing owner property view (locate the per-property view inside `src/pages/owner/`)
-- Read-only version of the staff component: category badge, name, distance/drive time, Directions button
-- **No staff_note shown to owners** (operational only) — just public-facing info
-- Queries `v_property_amenities` filtered by listing_id, RLS scoped via `owner_owns_listing`
-
-### 6. Isla placeholder route `/stay/:slug`
-
-- `src/pages/GuestPortal.tsx` — no auth required
-- Reads `:slug` from URL → fetches `listings.name + image_url + location_group` by slug
-- Branded "Guest guide coming soon for {Property Name}" page (Escape Grids dark theme, amber accent, property image header)
-- Future hook-in points stubbed (commented): "The Area" section will read from `v_property_amenities`
-- Route added to `App.tsx` outside any `ProtectedRoute` wrapper
-
-### 7. Orin enrichment verification + chip refresh
-
-- Orin chips were already updated in an earlier loop — verify `OrinSuggestedChips.tsx` matches the four required strings
-- `orin-chat` Edge Function enrichment was applied earlier (current_year, prior_year_same_period, yoy_variance, revenue_pacing, pipeline, location_breakdown, top/bottom properties, cleaning_today, cancellations, pagination fix). I'll re-read the current file and add anything still missing (e.g., owner_breakdown if absent) and confirm the system prompt covers all blocks.
-
-### Files
-
-```text
-NEW   supabase/migrations/<ts>_amenities.sql
-NEW   src/pages/Amenities.tsx
-NEW   src/pages/GuestPortal.tsx
-NEW   src/components/amenities/AmenityFormSheet.tsx
-NEW   src/components/amenities/CategoryBadge.tsx
-NEW   src/components/amenities/LinkAmenityDialog.tsx
-NEW   src/components/amenities/PropertyAmenitiesTab.tsx
-NEW   src/components/amenities/OwnerLocalAreaTab.tsx
-NEW   src/hooks/useAmenities.ts
-NEW   src/lib/amenityCategories.ts
-EDIT  src/App.tsx                              (+/amenities, +/stay/:slug)
-EDIT  src/components/layout/AppSidebar.tsx     (Amenities nav entry)
-EDIT  src/pages/PropertyKnowledgeDetail.tsx    (mount Local Area tab)
-EDIT  src/pages/owner/<owner property view>    (mount Owner Local Area tab)
-EDIT  supabase/functions/orin-chat/index.ts    (only if gaps found vs spec)
-EDIT  src/components/orin/OrinSuggestedChips.tsx (verify only)
-```
-
-### Approvals you'll see
-
-1. **Migration**: enum, `amenities`, `property_amenities`, view, RLS, triggers, `listings.slug` + backfill
-2. **Data insert**: 70 amenity seed rows + TouchStay UPDATE statements against `property_knowledge`
-
-### Out of scope (explicit)
-
-- Distance recalc Edge Function (Google Maps Distance Matrix API)
-- Full Isla guest AI behind `/stay/:slug` (placeholder only)
-- Orin amenity awareness (can add `nearby_amenities_summary` block in a follow-up)
-
+## Out of scope
+- Restoring manual cleans (no source to regenerate from — the toast will say so).
+- Auto-undoing across pages other than `/cleaning-schedule` and `/cleaning-numbers`.
