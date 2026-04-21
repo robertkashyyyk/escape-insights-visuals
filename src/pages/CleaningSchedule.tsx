@@ -43,6 +43,21 @@ export default function CleaningSchedule() {
 
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
 
+  // Week anchor for the Matrix view (lifted up so the week nav can render
+  // inline next to the Day/Week/Matrix toggle).
+  const [matrixWeekAnchor, setMatrixWeekAnchor] = useState<Date>(() => new Date());
+  const matrixWeekStart = useMemo(
+    () => startOfWeek(matrixWeekAnchor, { weekStartsOn: 1 }),
+    [matrixWeekAnchor]
+  );
+  const matrixIsCurrentWeek = useMemo(
+    () => isSameDay(matrixWeekStart, startOfWeek(new Date(), { weekStartsOn: 1 })),
+    [matrixWeekStart]
+  );
+  const matrixGoPrev = () => setMatrixWeekAnchor(d => addDays(startOfWeek(d, { weekStartsOn: 1 }), -7));
+  const matrixGoNext = () => setMatrixWeekAnchor(d => addDays(startOfWeek(d, { weekStartsOn: 1 }), 7));
+  const matrixGoThisWeek = () => setMatrixWeekAnchor(new Date());
+
   // Week-at-a-glance stats
   const weekStats = useMemo(() => {
     if (viewMode !== "week" || weekSummary.length === 0) return null;
