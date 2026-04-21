@@ -545,14 +545,18 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     cleanerBuckets[c.id] = ordered;
   }
 
-  // 10. Insert tasks
+  // 10. Insert new tasks / update existing orphan unassigned tasks
   const allOrderedTasks = Object.values(cleanerBuckets).flat();
-  // Also include unassigned tasks
   const unassignedTasks = newTasks.filter(t => t.status === "unassigned");
   const allTasks = [...allOrderedTasks, ...unassignedTasks];
 
-  if (allTasks.length > 0) {
-    const rows = allTasks.map((t) => ({
+  // Split: rows with existing_task_id → UPDATE, others → INSERT
+  const toInsert = allTasks.filter(t => !t.existing_task_id);
+  const toUpdate = allTasks.filter(t => !!t.existing_task_id);
+  let createdCount = 0;
+
+  if (toInsert.length > 0) {
+    const rows = toInsert.map((t) => ({
       listing_id: t.listing_id,
       reservation_id: t.reservation_id,
       scheduled_date: t.scheduled_date,
@@ -566,9 +570,24 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       checkin_time: t.checkin_time,
       is_same_day_turnaround: t.is_same_day_turnaround,
     }));
-
     const { error: insertErr } = await supabase.from("clean_tasks").insert(rows);
     if (insertErr) throw insertErr;
+    createdCount = rows.length;
+  }
+
+  for (const t of toUpdate) {
+    const { error: updErr } = await supabase
+      .from("clean_tasks")
+      .update({
+        assigned_cleaner_id: t.assigned_cleaner_id,
+        status: t.status,
+        priority: t.priority,
+        estimated_start_time: t.estimated_start_time,
+        travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
+        checkout_time: t.checkout_time,
+      })
+      .eq("id", t.existing_task_id!);
+    if (updErr) throw updErr;
   }
 
   // 11. Set is_clean = false for component listings (not bundles)
