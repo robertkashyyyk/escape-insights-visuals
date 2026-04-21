@@ -184,6 +184,29 @@ export default function CleaningSchedule() {
             </button>
           </div>
 
+          {/* Matrix-view-only inline week navigation, sits to the right of the toggle */}
+          {(viewMode as any) === "matrix" && (
+            <div className="flex items-center gap-2 ml-auto">
+              <Button variant="outline" size="icon" onClick={matrixGoPrev} className="h-9 w-9">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={matrixIsCurrentWeek ? "default" : "outline"}
+                size="sm"
+                onClick={matrixGoThisWeek}
+                className="h-9"
+                disabled={matrixIsCurrentWeek}
+              >
+                Current Week
+              </Button>
+              <Button variant="outline" size="icon" onClick={matrixGoNext} className="h-9 w-9">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <span key={format(matrixWeekStart, "yyyy-MM-dd")} className="ml-1 text-sm font-medium text-foreground tabular-nums">
+                {format(matrixWeekStart, "d MMM")} – {format(addDays(matrixWeekStart, 6), "d MMM yyyy")}
+              </span>
+            </div>
+          )}
 
           {/* Day-view-only filters (Matrix view has its own colour-coded chip filters) */}
           {viewMode === "day" && (
@@ -215,7 +238,12 @@ export default function CleaningSchedule() {
 
         {/* Matrix View */}
         {(viewMode as any) === "matrix" && (
-          <MatrixView initialDate={selectedDate} />
+          <MatrixView
+            initialDate={selectedDate}
+            weekAnchor={matrixWeekAnchor}
+            onWeekAnchorChange={setMatrixWeekAnchor}
+            hideWeekNav
+          />
         )}
 
         {/* Week View */}
