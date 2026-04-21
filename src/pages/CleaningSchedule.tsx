@@ -29,7 +29,7 @@ export default function CleaningSchedule() {
     filterCleaner, setFilterCleaner, filterLocation, setFilterLocation,
     cleanerDays, unassigned, weekSummary,
     cleaners, locationGroups, totalTasks,
-    regenerate, completeTask, goBack, goForward, isToday, isRegenerating,
+    regenerate, regenerateRange, completeTask, goBack, goForward, isToday, isRegenerating,
     buildDaySchedule,
   } = useCleaningSchedule();
 
@@ -100,15 +100,27 @@ export default function CleaningSchedule() {
               {totalTasks} clean{totalTasks !== 1 ? "s" : ""} · {format(selectedDate, "EEEE d MMMM yyyy")}
             </p>
           </div>
-          <Button
-            size="sm" variant="outline"
-            onClick={regenerate}
-            disabled={isRegenerating}
-            className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
-          >
-            {isRegenerating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
-            {isRegenerating ? "Generating..." : "Regenerate"}
-          </Button>
+          {(() => {
+            const isWeekScope = viewMode === "week" || (viewMode as any) === "matrix";
+            const handleClick = () => isWeekScope ? regenerateRange(7) : regenerate();
+            const label = isRegenerating
+              ? "Generating..."
+              : isWeekScope
+                ? "Regenerate Week"
+                : "Regenerate";
+            return (
+              <Button
+                size="sm" variant="outline"
+                onClick={handleClick}
+                disabled={isRegenerating}
+                className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+                title={isWeekScope ? "Regenerate cleans across the visible 7-day week" : "Regenerate cleans for this day"}
+              >
+                {isRegenerating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+                {label}
+              </Button>
+            );
+          })()}
         </div>
 
         {/* Controls */}
