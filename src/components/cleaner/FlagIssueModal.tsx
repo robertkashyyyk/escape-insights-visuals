@@ -39,7 +39,7 @@ export function FlagIssueModal({ open, onClose, task, cleanerId, cleanerName }: 
   };
 
   const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const list = Array.from(e.target.files ?? []).slice(0, 5);
+    const list = Array.from(e.target.files ?? []).slice(0, 20);
     setFiles(list);
   };
 
@@ -170,7 +170,7 @@ export function FlagIssueModal({ open, onClose, task, cleanerId, cleanerName }: 
           </div>
 
           <div>
-            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2 block">Photos (optional, up to 5)</label>
+            <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2 block">Photos (optional, up to 20)</label>
             <label className="flex items-center justify-center gap-2 py-3 border border-dashed border-border/50 rounded-lg cursor-pointer hover:border-primary/50 text-sm text-muted-foreground">
               <Camera className="h-4 w-4" />
               {files.length > 0 ? `${files.length} photo${files.length > 1 ? "s" : ""} selected` : "Add photos"}
