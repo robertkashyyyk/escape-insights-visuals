@@ -194,8 +194,17 @@ export function useOwnerGraphData(
 
           if (isCheckin) {
             row[m] = calcValue(checkinPast);
-            // Pipeline: future confirmed check-ins (stacks on top)
-            row[`${m}_pipeline`] = calcValue(checkinFuture);
+            // Pipeline meaning depends on metric:
+            // - For additive metrics (revenue, bookings, nights), pipeline = future-only
+            //   so it can stack visually on top of the actual to show projected total.
+            // - For ratio metrics (occupancy, ADR), a future-only ratio is misleading
+            //   (small sample, high variance). Show the projected period value instead:
+            //   the ratio computed on past + future combined.
+            if (base === "adr" || base === "occupancy") {
+              row[`${m}_pipeline`] = calcValue([...checkinPast, ...checkinFuture]);
+            } else {
+              row[`${m}_pipeline`] = calcValue(checkinFuture);
+            }
           } else {
             row[m] = calcValue(isCreated ? createdRes : checkinPast);
           }
