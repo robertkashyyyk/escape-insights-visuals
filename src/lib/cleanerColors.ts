@@ -9,16 +9,15 @@ export interface CleanerColor {
   initialBg: string;   // avatar circle bg
 }
 
+// NOTE: Green hues are reserved for "completed" status — never assign green to a cleaner.
 const PALETTE: CleanerColor[] = [
   { hex: "#0d9488", bg: "rgba(13,148,136,0.18)",  border: "rgba(13,148,136,0.45)",  text: "#5eead4", initialBg: "#0d9488" },  // teal
   { hex: "#3b82f6", bg: "rgba(59,130,246,0.18)",  border: "rgba(59,130,246,0.45)",  text: "#93c5fd", initialBg: "#3b82f6" },  // blue
   { hex: "#8b5cf6", bg: "rgba(139,92,246,0.18)",  border: "rgba(139,92,246,0.45)",  text: "#c4b5fd", initialBg: "#8b5cf6" },  // purple
   { hex: "#ec4899", bg: "rgba(236,72,153,0.18)",  border: "rgba(236,72,153,0.45)",  text: "#f9a8d4", initialBg: "#ec4899" },  // pink
-  { hex: "#10b981", bg: "rgba(16,185,129,0.18)",  border: "rgba(16,185,129,0.45)",  text: "#6ee7b7", initialBg: "#10b981" },  // emerald
   { hex: "#6366f1", bg: "rgba(99,102,241,0.18)",  border: "rgba(99,102,241,0.45)",  text: "#a5b4fc", initialBg: "#6366f1" },  // indigo
   { hex: "#f97316", bg: "rgba(249,115,22,0.18)",  border: "rgba(249,115,22,0.45)",  text: "#fdba74", initialBg: "#f97316" },  // orange
   { hex: "#06b6d4", bg: "rgba(6,182,212,0.18)",   border: "rgba(6,182,212,0.45)",   text: "#67e8f9", initialBg: "#06b6d4" },  // cyan
-  { hex: "#84cc16", bg: "rgba(132,204,22,0.18)",  border: "rgba(132,204,22,0.45)",  text: "#bef264", initialBg: "#84cc16" },  // lime
   { hex: "#e11d48", bg: "rgba(225,29,72,0.18)",   border: "rgba(225,29,72,0.45)",   text: "#fda4af", initialBg: "#e11d48" },  // rose
 ];
 
@@ -100,8 +99,9 @@ export function getCleanerColor(
 }
 
 // Curated palette of hex values for the cleaner colour picker.
+// NOTE: Green hues (emerald, lime, teal-green) are reserved for "completed" — excluded here.
 export const CLEANER_COLOR_SWATCHES = [
-  "#0d9488", "#3b82f6", "#8b5cf6", "#ec4899", "#10b981",
-  "#6366f1", "#f97316", "#06b6d4", "#84cc16", "#e11d48",
-  "#f59e0b", "#a855f7", "#14b8a6", "#ef4444", "#64748b",
+  "#0d9488", "#3b82f6", "#8b5cf6", "#ec4899",
+  "#6366f1", "#f97316", "#06b6d4", "#e11d48",
+  "#f59e0b", "#a855f7", "#ef4444", "#64748b",
 ];
