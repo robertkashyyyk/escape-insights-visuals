@@ -593,18 +593,24 @@ function DraggableCellInner({
   const checkout = task.checkout_time ? task.checkout_time.slice(0, 5) : null;
   const initial = cleaner?.name?.charAt(0).toUpperCase() ?? "?";
 
+  const isSameDayTA = !!task.is_same_day_turnaround;
+
   return (
     <button
       ref={setNodeRef}
       onClick={onClick}
       {...listeners}
       {...attributes}
-      className={`w-full h-full min-h-[48px] rounded-md border p-1.5 text-left transition-all hover:shadow-sm ${
+      className={`w-full h-full min-h-[48px] rounded-md p-1.5 text-left transition-all hover:shadow-sm ${
         isDragging ? "opacity-30" : ""
-      } ${isCompleted ? "opacity-75" : ""}`}
+      } ${isCompleted ? "opacity-90" : ""} ${
+        isSameDayTA
+          ? "border-[2.5px] border-red-500 ring-1 ring-white shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
+          : "border"
+      }`}
       style={{
         backgroundColor: color.bg,
-        borderColor: color.border,
+        borderColor: isSameDayTA ? "#ef4444" : color.border,
         color: color.text,
       }}
     >
@@ -626,8 +632,13 @@ function DraggableCellInner({
             <span className="text-[10px] tabular-nums truncate">{checkout}</span>
           )}
         </div>
-        {task.is_same_day_turnaround && (
-          <span className="text-[10px] text-red-400" title="Same-day turnaround">↺</span>
+        {isSameDayTA && (
+          <span
+            className="text-[9px] font-bold px-1 rounded bg-red-500 text-white tracking-wide"
+            title="Same-day turnaround"
+          >
+            STO
+          </span>
         )}
       </div>
       {isUnassigned && (
