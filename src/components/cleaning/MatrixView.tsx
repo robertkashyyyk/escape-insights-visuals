@@ -761,16 +761,27 @@ function DraggableCellInner({
   const initial = cleaner?.name?.charAt(0).toUpperCase() ?? "?";
 
   const isSameDayTA = !!task.is_same_day_turnaround;
-  const isP0 = (task.priority_level ?? -1) === 0 || task.priority === "arrival_risk_orphan";
-  const isP3 = (task.priority_level ?? -1) === 3 || task.priority === "orphan_gap_fill";
+  const pLevel = task.priority_level ?? -1;
+  const isP0 = pLevel === 0 || task.priority === "arrival_risk_orphan";
+  const isP1 = pLevel === 1;
+  const isP2 = pLevel === 2;
+  const isP3 = pLevel === 3 || task.priority === "orphan_gap_fill";
+  const pBadge = isP0 ? "P0" : isP1 ? "P1" : isP2 ? "P2" : isP3 ? "P3" : null;
+  const pTitle = isP0
+    ? (task.warning_reason ?? "P0 — arrival-risk orphan carryover. Property is empty; clean can start before checkout.")
+    : isP1
+    ? "P1 — high priority"
+    : isP2
+    ? "P2 — standard priority"
+    : isP3
+    ? "P3 — orphan-gap fill. Opportunistic; safely deferred."
+    : "";
 
-  // P0 wins visually over STO border. P0 = strong copper/amber ring.
+  // Borders: STO = red, P0 = amber ring.
   const borderClass = isP0
     ? "border-[2.5px] border-amber-600 ring-1 ring-white shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
     : isSameDayTA
     ? "border-[2.5px] border-red-500 ring-1 ring-white shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
-    : isP3
-    ? "border border-dashed border-amber-500/70"
     : "border";
 
   return (
