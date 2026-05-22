@@ -264,7 +264,12 @@ export function useCleaningSchedule() {
           assignedCleanerId: t.assigned_cleaner_id,
           assignedCleanerName: cleaner?.name ?? null,
           status: (t.status === "completed" ? "complete" : t.status) as TaskStatus,
-          priority: t.priority === "same_day_turnaround" ? "SAME_DAY" as Priority : "STANDARD" as Priority,
+          priority: (
+            t.priority_level === 0 || t.priority === "arrival_risk_orphan" ? "ARRIVAL_RISK" :
+            t.priority_level === 1 || t.priority === "same_day_turnaround" ? "SAME_DAY" :
+            t.priority_level === 3 || t.priority === "orphan_gap_fill" ? "GAP_FILL" :
+            "STANDARD"
+          ) as Priority,
           latitude: listing?.latitude ?? null,
           longitude: listing?.longitude ?? null,
           estimatedStart: t.estimated_start_time ? t.estimated_start_time.slice(0, 5) : undefined,
