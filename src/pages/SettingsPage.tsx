@@ -1,6 +1,7 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GeneralSettings } from "@/components/settings/GeneralSettings";
+import { LocationGroupsSettings } from "@/components/settings/LocationGroupsSettings";
 import { IntegrationsSettings } from "@/components/settings/IntegrationsSettings";
 import { CleanersSettings } from "@/components/settings/CleanersSettings";
 import { FinanceSettings } from "@/components/settings/FinanceSettings";
@@ -36,7 +37,14 @@ export default function SettingsPage() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="general"><GeneralSettings /></TabsContent>
+          <TabsContent value="general">
+            <div className="space-y-6">
+              <GeneralSettings />
+              <div className="max-w-xl">
+                <LocationGroupsSettings />
+              </div>
+            </div>
+          </TabsContent>
           <TabsContent value="integrations"><IntegrationsSettings /></TabsContent>
           <TabsContent value="cleaners"><CleanersSettings /></TabsContent>
           <TabsContent value="finance"><FinanceSettings /></TabsContent>
