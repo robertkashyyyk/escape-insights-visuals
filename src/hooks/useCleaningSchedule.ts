@@ -528,11 +528,12 @@ export function useCleaningSchedule() {
   }, [daySchedule.unassigned, filterLocation]);
 
   // Regenerate calls the edge function. `days` > 1 processes a date range
-  // starting at `selectedDate`. Default = single day (back-compat).
-  const regenerateRange = useCallback(async (days: number = 1) => {
+  // starting at the supplied date, or selectedDate by default.
+  const regenerateRange = useCallback(async (days: number = 1, startOverride?: Date) => {
     setIsRegenerating(true);
     try {
-      const startDate = days > 1 ? startOfWeek(selectedDate, { weekStartsOn: 1 }) : selectedDate;
+      const anchorDate = startOverride ?? selectedDate;
+      const startDate = days > 1 ? startOfWeek(anchorDate, { weekStartsOn: 1 }) : anchorDate;
       const startStr = format(startDate, "yyyy-MM-dd");
       const endStr = format(addDays(startDate, Math.max(0, days - 1)), "yyyy-MM-dd");
       const rangeLabel = days > 1

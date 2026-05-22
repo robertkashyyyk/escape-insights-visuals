@@ -170,19 +170,24 @@ Deno.serve(async (req) => {
 async function processDate(supabase: any, targetDate: string): Promise<{ created: number; unassigned: number }> {
   const targetDayOfWeek = DAY_NAMES[new Date(targetDate + "T12:00:00Z").getDay()];
 
-  // 0. P0 PROMOTION: any prior incomplete cleans for listings with a check-in today
-  // get pulled forward to today as P0 (arrival-risk orphan carryover).
-  // Manual overrides are preserved.
-  const { data: arrivalsTodayRaw } = await supabase
-    .from("reservations")
-    .select("listing_id")
-    .eq("check_in", targetDate)
-    .eq("status", "confirmed");
-  const arrivalListingIds: string[] = Array.from(
-    new Set((arrivalsTodayRaw || []).map((r: any) => String(r.listing_id)))
-  );
+  // 0. P0 PROMOTION: only on the actual current day. Future week regeneration
+  // must keep cleans on checkout day; the early-morning refresh promotes them
+  // to P0 only if they are still incomplete on arrival day.
+  const isCurrentDayRefresh = targetDate === todayLondon();
+  let arrivalListingIds: string[] = [];
 
-  if (arrivalListingIds.length > 0) {
+  if (isCurrentDayRefresh) {
+    const { data: arrivalsTodayRaw } = await supabase
+      .from("reservations")
+      .select("listing_id")
+      .eq("check_in", targetDate)
+      .eq("status", "confirmed");
+    arrivalListingIds = Array.from(
+      new Set((arrivalsTodayRaw || []).map((r: any) => String(r.listing_id)))
+    );
+  }
+
+  if (isCurrentDayRefresh && arrivalListingIds.length > 0) {
     const { data: priorOpen } = await supabase
       .from("clean_tasks")
       .select("id, listing_id, scheduled_date, status, override_assignment, assigned_cleaner_id, notes")
@@ -205,6 +210,66 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
           overloaded: false,
         })
         .eq("id", t.id);
+    }
+  }
+
+  // Self-heal rows incorrectly promoted into a future P0 during an earlier
+  // manual week regeneration. Future arrivals must not steal checkout-day
+  // cleans; only the real current-day refresh may promote P0.
+  const { data: healCheckouts } = await supabase
+    .from("reservations")
+    .select("id, listing_id")
+    .eq("check_out", targetDate)
+    .eq("status", "confirmed");
+  const healReservationIds = (healCheckouts || []).map((r: any) => String(r.id));
+  if (!isCurrentDayRefresh && healReservationIds.length > 0) {
+    const { data: futureP0Rows } = await supabase
+      .from("clean_tasks")
+      .select("id, listing_id, reservation_id, scheduled_date")
+      .in("reservation_id", healReservationIds)
+      .gt("scheduled_date", targetDate)
+      .eq("priority_level", 0)
+      .not("status", "in", "(completed,done,cancelled)")
+      .eq("override_assignment", false);
+
+    const movedListingIds = Array.from(new Set((futureP0Rows || []).map((t: any) => String(t.listing_id))));
+    if (movedListingIds.length > 0) {
+      const { data: existingAtCheckout } = await supabase
+        .from("clean_tasks")
+        .select("listing_id")
+        .in("listing_id", movedListingIds)
+        .eq("scheduled_date", targetDate)
+        .neq("source", "manual");
+      const covered = new Set((existingAtCheckout || []).map((t: any) => String(t.listing_id)));
+
+      const { data: sameDayArrivals } = await supabase
+        .from("reservations")
+        .select("listing_id")
+        .in("listing_id", movedListingIds)
+        .eq("check_in", targetDate)
+        .eq("status", "confirmed");
+      const sameDayListings = new Set((sameDayArrivals || []).map((r: any) => String(r.listing_id)));
+
+      for (const t of futureP0Rows || []) {
+        const lid = String(t.listing_id);
+        if (covered.has(lid)) continue;
+        const isSto = sameDayListings.has(lid);
+        await supabase
+          .from("clean_tasks")
+          .update({
+            scheduled_date: targetDate,
+            priority: isSto ? "same_day_turnaround" : "standard",
+            priority_level: isSto ? 1 : 2,
+            assigned_cleaner_id: null,
+            status: "unassigned",
+            estimated_start_time: null,
+            travel_time_from_previous_minutes: 0,
+            warning_reason: null,
+            overloaded: false,
+          })
+          .eq("id", t.id);
+        covered.add(lid);
+      }
     }
   }
 
