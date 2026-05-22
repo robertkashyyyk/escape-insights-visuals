@@ -820,6 +820,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
         assigned_cleaner_id: t.assigned_cleaner_id,
         status: t.status,
         priority: t.priority,
+        priority_level: t.priority_level,
         estimated_start_time: t.estimated_start_time,
         travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
         checkout_time: t.checkout_time,
