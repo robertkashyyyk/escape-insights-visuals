@@ -26,6 +26,8 @@ import {
 import { TaskDetailPanel } from "./TaskDetailPanel";
 import { AddManualCleanModal } from "./AddManualCleanModal";
 import { shortenName } from "@/lib/shortenName";
+import { computeOrphanGapDates, orphanGapTooltip } from "@/lib/orphanGaps";
+import { Unlink2 } from "lucide-react";
 
 interface Props {
   initialDate?: Date;
