@@ -296,16 +296,24 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     }
   }
 
-  // 4. Check existing tasks to avoid duplicates
-  const reservationIds = (checkouts || []).map((r: any) => r.id);
+  // 4. Check existing tasks to avoid duplicates — dedupe by (listing_id, scheduled_date)
+  // because Hostaway often returns multiple sibling reservations sharing the same checkout date
+  // for the same listing (split stays, channel re-imports, modified bookings). One clean per
+  // property per day is the operational truth.
   const { data: existingTasks } = await supabase
     .from("clean_tasks")
-    .select("reservation_id, scheduled_date")
-    .in("reservation_id", reservationIds)
+    .select("listing_id, reservation_id, scheduled_date")
     .eq("scheduled_date", targetDate);
-  const existingSet = new Set(
-    (existingTasks || []).map((t: any) => `${t.reservation_id}_${t.scheduled_date}`)
+  const existingByListing = new Set(
+    (existingTasks || []).map((t: any) => `${t.listing_id}_${t.scheduled_date}`)
   );
+  const existingByReservation = new Set(
+    (existingTasks || [])
+      .filter((t: any) => t.reservation_id)
+      .map((t: any) => `${t.reservation_id}_${t.scheduled_date}`)
+  );
+  // Keep the historical name available for downstream code that referenced it.
+  const existingSet = existingByReservation;
 
   // 5. Get active cleaners (including home location)
   const { data: cleanersRaw } = await supabase
