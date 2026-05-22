@@ -46,6 +46,8 @@ interface TaskInfo {
   reservation_id: string | null;
   scheduled_date: string;
   priority: string;
+  /** 0=P0 arrival-risk orphan carryover, 1=P1 STO, 2=P2 standard checkout, 3=P3 orphan-gap fill */
+  priority_level: number;
   cleaning_duration_minutes: number;
   latitude: number | null;
   longitude: number | null;
@@ -64,6 +66,7 @@ interface TaskInfo {
   override_assignment?: boolean;
   warning_reason?: string | null;
 }
+
 
 interface CleanerInfo {
   id: string;
