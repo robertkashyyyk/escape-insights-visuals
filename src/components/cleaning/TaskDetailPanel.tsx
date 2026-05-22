@@ -9,7 +9,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { CheckCircle2, Clock, Trash2, Save, Undo2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { getCleanerColor } from "@/lib/cleanerColors";
-import type { MatrixCleaner, MatrixListing, MatrixReservation, MatrixTask } from "@/hooks/useMatrixSchedule";
+import type { MatrixCleaner, MatrixListing, MatrixReservation, MatrixTask, CleanerHolidayRow } from "@/hooks/useMatrixSchedule";
+import { getUnavailabilityReason } from "@/lib/cleanerAvailability";
 
 interface Props {
   open: boolean;
@@ -18,6 +19,7 @@ interface Props {
   listing: MatrixListing | null;
   cleaners: MatrixCleaner[];
   reservations: MatrixReservation[];
+  holidays?: CleanerHolidayRow[];
   onReassign: (taskId: string, cleanerId: string | null) => Promise<boolean>;
   onComplete: (taskId: string, listingId: string) => Promise<boolean>;
   onUndoComplete: (taskId: string, listingId: string) => Promise<boolean>;
