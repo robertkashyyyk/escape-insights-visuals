@@ -452,8 +452,9 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     return best;
   }
 
-  // 7. Build new tasks
+  // 7. Build new tasks — at most ONE per (listing_id, scheduled_date).
   const newTasks: TaskInfo[] = [];
+  const plannedListingDate = new Set<string>();
 
   for (const r of checkouts || []) {
     const key = `${r.id}_${targetDate}`;
@@ -468,6 +469,14 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     for (const targetLid of targetListingIds) {
       const listing = listingMap.get(targetLid);
       if (!listing) continue;
+
+      // Dedupe: skip if a task for this listing+date already exists in DB or was
+      // planned earlier in this run (handles Hostaway returning sibling reservations
+      // with the same listing+checkout date).
+      const ldKey = `${targetLid}_${targetDate}`;
+      if (existingByListing.has(ldKey)) continue;
+      if (plannedListingDate.has(ldKey)) continue;
+      plannedListingDate.add(ldKey);
 
       const nextCI = nextCheckinMap.get(targetLid);
       const isSameDay = nextCI?.date === targetDate;
