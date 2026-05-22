@@ -98,6 +98,13 @@ export default function OccupancyHeatmap() {
                 </span>
               </div>
             ))}
+            <div className="flex items-center gap-1.5 pl-2 border-l border-border/30">
+              <span className="h-3 w-3 rounded-sm orphan-gap" />
+              <span className="text-[11px] text-muted-foreground">
+                <span className="text-foreground/70">Orphan gap</span>
+                <span className="ml-1">(unbookable nights)</span>
+              </span>
+            </div>
           </div>
         </div>
 
