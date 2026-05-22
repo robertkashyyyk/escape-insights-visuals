@@ -345,7 +345,7 @@ export function useCleaningSchedule() {
       };
     });
 
-    const priorityOrder: Record<Priority, number> = { TIGHT_WINDOW: 0, SAME_DAY: 1, STANDARD: 2 };
+    const priorityOrder: Record<Priority, number> = { ARRIVAL_RISK: 0, TIGHT_WINDOW: 1, SAME_DAY: 2, STANDARD: 3, GAP_FILL: 4 };
     tasks.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
     // Auto-allocate (client-side preview only)
