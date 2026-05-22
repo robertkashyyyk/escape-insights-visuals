@@ -170,6 +170,44 @@ Deno.serve(async (req) => {
 async function processDate(supabase: any, targetDate: string): Promise<{ created: number; unassigned: number }> {
   const targetDayOfWeek = DAY_NAMES[new Date(targetDate + "T12:00:00Z").getDay()];
 
+  // 0. P0 PROMOTION: any prior incomplete cleans for listings with a check-in today
+  // get pulled forward to today as P0 (arrival-risk orphan carryover).
+  // Manual overrides are preserved.
+  const { data: arrivalsTodayRaw } = await supabase
+    .from("reservations")
+    .select("listing_id")
+    .eq("check_in", targetDate)
+    .eq("status", "confirmed");
+  const arrivalListingIds: string[] = Array.from(
+    new Set((arrivalsTodayRaw || []).map((r: any) => String(r.listing_id)))
+  );
+
+  if (arrivalListingIds.length > 0) {
+    const { data: priorOpen } = await supabase
+      .from("clean_tasks")
+      .select("id, listing_id, scheduled_date, status, override_assignment, assigned_cleaner_id, notes")
+      .in("listing_id", arrivalListingIds)
+      .lt("scheduled_date", targetDate)
+      .not("status", "in", "(completed,cancelled)");
+
+    for (const t of priorOpen || []) {
+      const keepCleaner = !!t.override_assignment;
+      await supabase
+        .from("clean_tasks")
+        .update({
+          scheduled_date: targetDate,
+          priority: "arrival_risk_orphan",
+          priority_level: 0,
+          status: keepCleaner ? "scheduled" : "unassigned",
+          assigned_cleaner_id: keepCleaner ? t.assigned_cleaner_id : null,
+          estimated_start_time: null,
+          warning_reason: "Promoted from prior orphan-gap day — guest arriving today",
+          overloaded: false,
+        })
+        .eq("id", t.id);
+    }
+  }
+
   // 1. Get checkouts for target date (with checkout time)
   const { data: checkouts, error: coErr } = await supabase
     .from("reservations")
@@ -181,7 +219,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
   // 1b. Get any pre-existing unassigned tasks for this date — these need re-assignment too
   const { data: orphanUnassigned } = await supabase
     .from("clean_tasks")
-    .select("id, listing_id, reservation_id, scheduled_date, priority, cleaning_duration_minutes, checkout_time, checkin_time, is_same_day_turnaround, source")
+    .select("id, listing_id, reservation_id, scheduled_date, priority, priority_level, cleaning_duration_minutes, checkout_time, checkin_time, is_same_day_turnaround, source, warning_reason")
     .eq("scheduled_date", targetDate)
     .eq("status", "unassigned");
 
@@ -195,6 +233,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
   if (rawListingIds.length === 0 && (orphanUnassigned || []).length === 0) {
     return { created: 0, unassigned: 0 };
   }
+
 
   const { data: rawListings } = await supabase
     .from("listings")
