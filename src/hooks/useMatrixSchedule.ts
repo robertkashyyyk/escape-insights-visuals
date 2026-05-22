@@ -214,7 +214,7 @@ export function useMatrixSchedule(weekAnchor: Date) {
         });
         if (error) throw error;
         recentSuccessRef.current.set(weekStartStr, Date.now());
-        const created = (data as any)?.tasksCreated ?? (data as any)?.created ?? null;
+        const created = (data as any)?.tasks_created ?? (data as any)?.tasksCreated ?? (data as any)?.created ?? null;
         if (created != null && created > 0) {
           toast({ title: "Week populated", description: `${created} clean${created === 1 ? "" : "s"} auto-scheduled` });
         }
