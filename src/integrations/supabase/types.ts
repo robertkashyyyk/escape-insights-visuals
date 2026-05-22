@@ -405,6 +405,7 @@ export type Database = {
           management_rate_override: number | null
           max_guests: number | null
           min_rate: number | null
+          min_stay_nights: number
           name: string
           nightly_rate: number | null
           operational_notes: string | null
@@ -448,6 +449,7 @@ export type Database = {
           management_rate_override?: number | null
           max_guests?: number | null
           min_rate?: number | null
+          min_stay_nights?: number
           name: string
           nightly_rate?: number | null
           operational_notes?: string | null
@@ -491,6 +493,7 @@ export type Database = {
           management_rate_override?: number | null
           max_guests?: number | null
           min_rate?: number | null
+          min_stay_nights?: number
           name?: string
           nightly_rate?: number | null
           operational_notes?: string | null
