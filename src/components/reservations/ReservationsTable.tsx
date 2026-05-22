@@ -29,6 +29,8 @@ function statusBadgeClass(s: string) {
 }
 
 export function ReservationsTable() {
+  const { data: locationGroupsData = [] } = useLocationGroups();
+  const LOCATION_GROUPS = locationGroupsData.map(g => g.name);
   const [search, setSearch] = useState("");
   const [timeFilter, setTimeFilter] = useState<"all" | "future" | "past">("all");
   const [yearFilter, setYearFilter] = useState("all");
