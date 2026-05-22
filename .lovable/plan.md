@@ -1,61 +1,83 @@
+# Cleaner Holidays + Smarter Allocation
 
+Two coordinated improvements. Both extend existing logic — no parallel systems.
 
-# Give Orin "How do I…" answers without building a RAG pipeline
+---
 
-## The idea
-Instead of writing/embedding a knowledge base, ship a **static, hand-curated app guide** as a plain Markdown file that gets injected into Orin's system prompt on every chat call. Small (a few KB), zero infra, zero maintenance overhead beyond editing one file when features change. Orin reads it, knows the app, and can answer "how do I X" with a real route + steps.
+## 1. Cleaner Holidays / Leave
 
-This is the same pattern Cursor/Claude use — a single `APP_GUIDE.md` is cheaper, simpler, and more accurate than RAG for an app this size (~30 routes).
+### Database
+New table `cleaner_holidays`:
+- `cleaner_id` (uuid), `start_date`, `end_date` (inclusive), `reason` (Holiday / Leave / Unavailable / Sick / Other), `notes`, `created_by`.
+- RLS: super/senior manage; admin read all; a cleaner can read their own.
 
-## How it works
+### Settings UI (`CleanersSettings.tsx`)
+- New "Holidays / Leave" section inside the cleaner edit dialog: list upcoming + add new (date range + reason + notes).
+- After saving a new holiday, query `clean_tasks` for that cleaner inside the date range.
+  - If any exist → dialog: *"This cleaner has N cleans assigned in this period. Reallocate them now?"* → Yes unassigns them and silently calls `generate-daily-cleaning-schedule` for those dates; No leaves them (with a warning badge later).
 
-1. **One source-of-truth file**: `supabase/functions/orin-chat/app-guide.md` — a structured Markdown doc covering every feature, route, role permissions, and common workflows. Roughly:
-   ```
-   ## Cleaning Schedule (/operations/schedule)
-   - Roles: super, senior, admin
-   - Views: Day, Week, Matrix
-   - To regenerate: click "Regenerate Week" (matrix/week) or "Regenerate" (day)
-   - To mark a clean complete: click the task tile → "Mark complete"
-   - To undo a clean: open task → "Remove this clean" → then Regenerate
-   - Filters: chips (matrix/week) hide non-matching; dropdowns (day) only
-   ...
-   ```
+### Scheduler UI
+- Matrix + planner cells: when the column's date falls in a holiday for that cleaner, show a small badge "On leave" + tooltip with the reason. Reuse non-working-day visual treatment.
+- Manual assignment (TaskDetailPanel reassign dropdown / AddManualCleanModal): if chosen cleaner is on holiday or non-working that date, show a non-blocking confirm — "X is marked unavailable (reason). Assign anyway?".
 
-2. **Inject into Orin's system prompt**: In `supabase/functions/orin-chat/index.ts`, read the file at function startup (Deno: `await Deno.readTextFile`) and prepend a new section to the system prompt:
-   ```
-   ## App Guide (use this to answer "how do I…" questions)
-   {APP_GUIDE_CONTENTS}
-   ```
+### Edge function (`generate-daily-cleaning-schedule`)
+- Load all `cleaner_holidays` overlapping the processed date window.
+- Add to the existing eligibility filter: skip cleaner if the target date falls inside any of their holiday ranges (additive to the existing `non_working_days` weekday check). No other change to the unavailable-day path.
 
-3. **Update Orin's rules**: Currently rule #1 says "only reference provided context data". We add an explicit allowance:
-   > You may also answer **product help / how-to** questions using the App Guide section below. When you do, cite the route (e.g. `/operations/schedule`) and give concrete click-by-click steps. If the guide doesn't cover it, say "I don't have docs on that yet" rather than guessing.
+---
 
-4. **Role-aware filtering**: The guide has clear role tags (`Roles: super, senior, admin` vs `Roles: client`). Orin already knows the user's role from context — it'll naturally filter what it suggests (no Owner asking about /operations).
+## 2. Allocation: Fair-Share Deficit + Nearby Property Clustering
 
-5. **Suggested chips**: Add 1-2 how-to chips per persona to `OrinSuggestedChips.tsx` so users discover the capability:
-   - Admin: "How do I regenerate the cleaning schedule?"
-   - Owner: "How do I view my monthly statement?"
+All changes inside `generate-daily-cleaning-schedule` `processDate()`. No schema change.
 
-## Why not auto-generate from code?
-Considered it. Two reasons against:
-- **Routes ≠ workflows**: Reading `App.tsx` tells Orin a route exists, not what to click or why. The interesting answers ("undo a clean → then click Regenerate") only live in human-written prose.
-- **Noise**: Auto-extracting from 200+ components produces a context bomb that degrades answer quality and burns tokens on every chat call.
+### Fair-share deficit (refined)
+Current code compares the cleaner's *same-day region count* against target share. Refine to use a rolling actual:
 
-A 4-6 KB hand-curated guide beats 100 KB of auto-extracted noise.
+```text
+window = last 28 days + current pass
+actual_pct  = cleaner_completed_in_region / total_in_region (window)
+target_pct  = workload_share[region]
+deficit     = target_pct - actual_pct
+```
 
-## Maintenance
-- One file. When you ship a feature, add 5 lines to `app-guide.md`. That's it.
-- Optional later: a lightweight check in CI that flags if a new route in `App.tsx` doesn't appear in the guide.
+Pick the eligible cleaner with the largest positive deficit. Tie-break = fewer minutes scheduled today.
 
-## Files to change
-- **New**: `supabase/functions/orin-chat/app-guide.md` — the guide itself, organised by area (Today, Cleaning, Properties, Owners, Reservations, Pricing, Settings, Owner Portal, Cleaner Portal). I'll draft an initial version covering all current routes based on what's in the codebase.
-- **Edit**: `supabase/functions/orin-chat/index.ts` — load the markdown file at startup, inject into system prompt, relax rule #1 to permit how-to answers from the guide.
-- **Edit**: `src/components/orin/OrinSuggestedChips.tsx` — add one how-to chip per persona.
+### Nearby-property clustering (new, before per-task assignment)
+For each `(date, location_group)`:
+1. Build geo-clusters: greedy — two listings join the same cluster if within ~5 miles (haversine ≤ 8 km).
+2. For each cluster:
+   - **1–3 properties** → try to assign the whole cluster to one cleaner (chosen by fair-share deficit among eligible cleaners with enough remaining capacity for the whole cluster).
+   - **4+ properties** → split: peel groups of ~3 and assign each group to the next best fair-share cleaner.
+   - If only one eligible cleaner exists for the cluster's region/date, assign all to that cleaner and tag the day with an `overloaded` flag (logged into `automation_logs.error_message` as a soft warning + surfaced as a cell badge via task `notes` like "⚠ Overloaded: only cleaner available").
+3. Within an assigned cluster, the existing route optimisation (nearest-next from previous stop) still runs.
 
-No DB migration. No new dependencies. No RAG, no embeddings, no vector store.
+### Compromise warnings surfaced
+- Overload tag → small "⚠ Overloaded" pill in MatrixView header for the affected cleaner/day, plus a tooltip "Only one cleaner available for N nearby properties".
+- Assignments forced onto holiday/non-working day (only possible via admin override) → red "Override" pill.
 
-## Out of scope
-- Auto-generating the guide from source code (rejected above).
-- Screenshots / video walkthroughs in answers.
-- Versioning the guide per-release.
+---
 
+## Out of scope (kept untouched)
+- Existing weekly `non_working_days` logic.
+- Hostaway sync and orphan-fill path (still drives task creation; only the allocation block changes).
+- Owner/Cleaner portal views.
+
+---
+
+## Files
+
+**New**
+- `supabase/migrations/<ts>_cleaner_holidays.sql`
+- `src/components/settings/CleanerHolidaysSection.tsx`
+- `src/lib/cleanerAvailability.ts` (shared client-side helper: `isCleanerUnavailable(cleaner, date, holidays)`)
+
+**Edited**
+- `supabase/functions/generate-daily-cleaning-schedule/index.ts` — holidays filter, deficit refactor, clustering pass, overload tagging.
+- `src/components/settings/CleanersSettings.tsx` — mount holidays section.
+- `src/components/cleaning/MatrixView.tsx` — leave/overload badges; reassign warning.
+- `src/components/cleaning/TaskDetailPanel.tsx` — warning before assigning unavailable cleaner.
+- `src/components/cleaning/AddManualCleanModal.tsx` — same warning.
+- `src/hooks/useMatrixSchedule.ts` — load holidays for the visible week.
+- `src/integrations/supabase/types.ts` — regenerated automatically after migration.
+
+Approve and I'll build it.
