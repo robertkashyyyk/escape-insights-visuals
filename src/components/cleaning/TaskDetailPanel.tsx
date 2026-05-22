@@ -107,7 +107,7 @@ export function TaskDetailPanel({
   const confirmReassign = async () => {
     if (!pendingCleanerId) return;
     setBusy(true);
-    await onReassign(task.id, pendingCleanerId);
+    await onReassign(task.id, pendingCleanerId, { reason: `Override: ${pendingUnavailReason ?? "cleaner unavailable"}` });
     setBusy(false);
     setPendingCleanerId(null);
     setPendingUnavailReason(null);
