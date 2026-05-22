@@ -182,37 +182,51 @@ export function useMatrixSchedule(weekAnchor: Date) {
     };
   }, [qc, weekStartStr, weekEndStr]);
 
-  // Lazy auto-generate: if the user navigates to a future week with zero tasks
-  // but reservations exist that should produce cleans, kick off generation.
-  // Guard against repeated triggers per week with a sessionStorage marker.
+  // Lazy auto-generate: if the user navigates to a current/future week that has
+  // zero tasks but reservations exist, kick off generation automatically.
+  // Visible to caller via `autoGenerating` so the UI can show a spinner.
+  const [autoGenerating, setAutoGenerating] = useState(false);
+  const inFlightRef = useRef<Set<string>>(new Set());
+  const recentSuccessRef = useRef<Map<string, number>>(new Map());
+
   useEffect(() => {
     if (tasksLoading) return;
     if (tasks.length > 0) return;
-    // Only auto-generate for current or future weeks (don't backfill the past).
     const todayStr = format(new Date(), "yyyy-MM-dd");
     if (weekEndStr < todayStr) return;
-    // Need at least one confirmed checkout falling inside this week to bother.
     const hasCheckoutsInWeek = reservations.some(
       (r) => r.check_out >= weekStartStr && r.check_out <= weekEndStr
     );
     if (!hasCheckoutsInWeek) return;
 
-    const markerKey = `matrix-autogen-${weekStartStr}`;
-    if (sessionStorage.getItem(markerKey)) return;
-    sessionStorage.setItem(markerKey, "1");
+    // Skip if already in flight or successfully generated in the last 60s
+    if (inFlightRef.current.has(weekStartStr)) return;
+    const lastOk = recentSuccessRef.current.get(weekStartStr);
+    if (lastOk && Date.now() - lastOk < 60_000) return;
+
+    inFlightRef.current.add(weekStartStr);
+    setAutoGenerating(true);
 
     (async () => {
       try {
-        await supabase.functions.invoke("generate-daily-cleaning-schedule", {
+        const { data, error } = await supabase.functions.invoke("generate-daily-cleaning-schedule", {
           body: { date: weekStartStr, days_ahead: 7 },
         });
-        qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
+        if (error) throw error;
+        recentSuccessRef.current.set(weekStartStr, Date.now());
+        const created = (data as any)?.tasksCreated ?? (data as any)?.created ?? null;
+        if (created != null && created > 0) {
+          toast({ title: "Week populated", description: `${created} clean${created === 1 ? "" : "s"} auto-scheduled` });
+        }
+        await qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
       } catch (e) {
-        // Silent — user can still press "Regenerate Week"
         console.warn("Auto-generate cleaning schedule failed", e);
+      } finally {
+        inFlightRef.current.delete(weekStartStr);
+        setAutoGenerating(false);
       }
     })();
-  }, [tasksLoading, tasks.length, reservations, weekStartStr, weekEndStr, qc]);
+  }, [tasksLoading, tasks.length, reservations, weekStartStr, weekEndStr, qc, toast]);
 
   // Mutations
   const reassignTask = useCallback(async (taskId: string, cleanerId: string | null, override?: { reason: string }) => {
