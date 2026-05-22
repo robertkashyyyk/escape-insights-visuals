@@ -337,7 +337,7 @@ Deno.serve(async (req) => {
 
     console.log(`Sync complete (${syncMode}): ${totalListings} listings, ${totalReservations} reservations, ${skippedReservations} skipped`);
 
-    // Trigger cleaning schedule generation for next 30 days (fire-and-forget)
+    // Trigger cleaning schedule generation for next 90 days (fire-and-forget)
     try {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
       const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
@@ -347,9 +347,9 @@ Deno.serve(async (req) => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${anonKey}`,
         },
-        body: JSON.stringify({ days_ahead: 30 }),
+        body: JSON.stringify({ days_ahead: 90 }),
       }).catch((e) => console.warn("Post-sync cleaning trigger failed:", e));
-      console.log("Triggered cleaning schedule regeneration (30-day rolling)");
+      console.log("Triggered cleaning schedule regeneration (90-day rolling)");
     } catch (e) {
       console.warn("Failed to trigger post-sync cleaning generation:", e);
     }
