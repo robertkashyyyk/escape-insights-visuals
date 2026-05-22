@@ -215,10 +215,18 @@ export function useMatrixSchedule(weekAnchor: Date) {
   }, [tasksLoading, tasks.length, reservations, weekStartStr, weekEndStr, qc]);
 
   // Mutations
-  const reassignTask = useCallback(async (taskId: string, cleanerId: string | null) => {
+  const reassignTask = useCallback(async (taskId: string, cleanerId: string | null, override?: { reason: string }) => {
     const newStatus = cleanerId ? "scheduled" : "unassigned";
+    const patch: Record<string, unknown> = { assigned_cleaner_id: cleanerId, status: newStatus };
+    if (cleanerId && override) {
+      patch.override_assignment = true;
+      patch.warning_reason = override.reason;
+    } else if (!cleanerId) {
+      patch.override_assignment = false;
+      patch.warning_reason = null;
+    }
     const { error } = await (supabase.from("clean_tasks" as any) as any)
-      .update({ assigned_cleaner_id: cleanerId, status: newStatus })
+      .update(patch)
       .eq("id", taskId);
     if (error) {
       toast({ title: "Reassignment failed", description: error.message, variant: "destructive" });
