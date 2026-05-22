@@ -181,36 +181,38 @@
   }
 
   /* Orphan Gap — stranded inventory between bookings (< min-stay).
-     Hatched, hollow, amber/copper border. Distinct from bookings & ops states. */
+     Navy blue for high contrast against red/amber/green heatmap cells. */
   .orphan-gap {
-    background-color: hsl(38 92% 50% / 0.04);
+    background-color: hsl(222 75% 22% / 0.95);
     background-image: repeating-linear-gradient(
       135deg,
-      hsl(38 92% 55% / 0.18) 0px,
-      hsl(38 92% 55% / 0.18) 1px,
+      hsl(217 91% 70% / 0.35) 0px,
+      hsl(217 91% 70% / 0.35) 1px,
       transparent 1px,
       transparent 6px
     );
-    border: 1px solid hsl(38 92% 55% / 0.55);
+    border: 1px solid hsl(217 91% 65% / 0.9);
     border-radius: 6px;
+    color: hsl(0 0% 100%);
   }
   .light .orphan-gap {
-    background-color: hsl(30 92% 50% / 0.05);
+    background-color: hsl(222 75% 28% / 0.95);
     background-image: repeating-linear-gradient(
       135deg,
-      hsl(30 90% 45% / 0.22) 0px,
-      hsl(30 90% 45% / 0.22) 1px,
+      hsl(217 91% 75% / 0.4) 0px,
+      hsl(217 91% 75% / 0.4) 1px,
       transparent 1px,
       transparent 6px
     );
-    border: 1px solid hsl(30 92% 45% / 0.55);
+    border: 1px solid hsl(222 75% 30% / 0.9);
+    color: hsl(0 0% 100%);
   }
   .orphan-gap-hover:hover {
-    background-color: hsl(38 92% 50% / 0.08);
-    box-shadow: 0 0 0 1px hsl(38 92% 55% / 0.45), 0 0 12px -2px hsl(38 92% 55% / 0.25);
+    background-color: hsl(222 75% 28% / 1);
+    box-shadow: 0 0 0 1px hsl(217 91% 65% / 0.8), 0 0 12px -2px hsl(217 91% 60% / 0.4);
   }
   .light .orphan-gap-hover:hover {
-    background-color: hsl(30 92% 50% / 0.1);
-    box-shadow: 0 0 0 1px hsl(30 92% 45% / 0.5), 0 0 10px -2px hsl(30 90% 45% / 0.25);
+    background-color: hsl(222 75% 32% / 1);
+    box-shadow: 0 0 0 1px hsl(222 75% 35% / 0.85), 0 0 10px -2px hsl(222 75% 35% / 0.35);
   }
 }

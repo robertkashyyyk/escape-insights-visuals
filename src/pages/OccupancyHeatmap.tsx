@@ -240,15 +240,15 @@ function HeatmapCell({ cell, propertyName, month, year }: { cell: MonthCell; pro
           <span className="text-foreground font-medium text-right">£{(cell?.revenue ?? 0).toLocaleString()}</span>
           {orphanNights > 0 && (
             <>
-              <span className="text-amber-400/90">Orphan gaps</span>
-              <span className="text-amber-300 font-semibold text-right">
+              <span className="text-blue-300/90">Orphan gaps</span>
+              <span className="text-blue-200 font-semibold text-right">
                 {orphanNights} night{orphanNights === 1 ? "" : "s"}
               </span>
             </>
           )}
         </div>
         {orphanNights > 0 && (
-          <p className="text-[10px] text-amber-400/80 italic pt-1">
+          <p className="text-[10px] text-blue-300/80 italic pt-1">
             Stranded inventory below min-stay
           </p>
         )}
