@@ -5,7 +5,7 @@ import { format, addDays, startOfWeek, endOfWeek, isSameDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
 /* ── types ── */
-export type Priority = "SAME_DAY" | "TIGHT_WINDOW" | "STANDARD";
+export type Priority = "ARRIVAL_RISK" | "SAME_DAY" | "TIGHT_WINDOW" | "STANDARD" | "GAP_FILL";
 export type TaskStatus = "unassigned" | "scheduled" | "in_progress" | "complete";
 
 export interface CleanTask {
