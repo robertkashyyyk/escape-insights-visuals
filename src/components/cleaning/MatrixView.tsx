@@ -358,6 +358,14 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
           For full matrix view, use a desktop or tablet.
         </div>
 
+        {/* Auto-generation indicator */}
+        {autoGenerating && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/30 text-xs text-primary">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span>Auto-scheduling cleans for this week…</span>
+          </div>
+        )}
+
         {/* Matrix */}
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
