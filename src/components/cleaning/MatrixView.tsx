@@ -57,7 +57,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
 
   const {
     days, groupedListings, listings,
-    cleaners, tasks, reservations, holidays, isLoading,
+    cleaners, tasks, reservations, holidays, isLoading, autoGenerating,
     reassignTask, completeTask, undoComplete, removeTask, updateNotes, addManualClean,
   } = useMatrixSchedule(weekAnchor);
 
@@ -357,6 +357,14 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
         <div className="md:hidden rounded-lg border border-border/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-300">
           For full matrix view, use a desktop or tablet.
         </div>
+
+        {/* Auto-generation indicator */}
+        {autoGenerating && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/30 text-xs text-primary">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span>Auto-scheduling cleans for this week…</span>
+          </div>
+        )}
 
         {/* Matrix */}
         {isLoading ? (
