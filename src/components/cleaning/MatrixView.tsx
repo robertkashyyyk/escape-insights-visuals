@@ -14,8 +14,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Loader2, ArrowUpDown } from "lucide-react";
 import { useMatrixSchedule, type MatrixListing, type MatrixTask } from "@/hooks/useMatrixSchedule";
 import {
   getCleanerColor,
@@ -50,6 +51,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
   const [filterCleaners, setFilterCleaners] = useState<Set<string>>(new Set()); // empty = all; "unassigned" = unassigned tasks
   const [showCompleted, setShowCompleted] = useState(true);
   const [activeDragTaskId, setActiveDragTaskId] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<"today" | "priority" | "cleaner" | "location" | "property">("today");
 
   // Derive weekStart locally from weekAnchor so the header label is always in sync
   // with the navigation buttons (independent of any caching inside the data hook).
