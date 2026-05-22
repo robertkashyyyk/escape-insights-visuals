@@ -750,6 +750,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
         estimated_start_time: t.estimated_start_time,
         travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
         checkout_time: t.checkout_time,
+        ...(t.notes ? { notes: t.notes } : {}),
       })
       .eq("id", t.existing_task_id!);
     if (updErr) throw updErr;
