@@ -59,6 +59,7 @@ interface TaskInfo {
   is_same_day_turnaround: boolean;
   existing_task_id?: string | null; // present if this is a pre-existing unassigned row to UPDATE rather than INSERT
   source?: string;
+  notes?: string;
 }
 
 interface CleanerInfo {
