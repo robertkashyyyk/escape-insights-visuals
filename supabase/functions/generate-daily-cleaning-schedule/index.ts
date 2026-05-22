@@ -170,19 +170,24 @@ Deno.serve(async (req) => {
 async function processDate(supabase: any, targetDate: string): Promise<{ created: number; unassigned: number }> {
   const targetDayOfWeek = DAY_NAMES[new Date(targetDate + "T12:00:00Z").getDay()];
 
-  // 0. P0 PROMOTION: any prior incomplete cleans for listings with a check-in today
-  // get pulled forward to today as P0 (arrival-risk orphan carryover).
-  // Manual overrides are preserved.
-  const { data: arrivalsTodayRaw } = await supabase
-    .from("reservations")
-    .select("listing_id")
-    .eq("check_in", targetDate)
-    .eq("status", "confirmed");
-  const arrivalListingIds: string[] = Array.from(
-    new Set((arrivalsTodayRaw || []).map((r: any) => String(r.listing_id)))
-  );
+  // 0. P0 PROMOTION: only on the actual current day. Future week regeneration
+  // must keep cleans on checkout day; the early-morning refresh promotes them
+  // to P0 only if they are still incomplete on arrival day.
+  const isCurrentDayRefresh = targetDate === todayLondon();
+  let arrivalListingIds: string[] = [];
 
-  if (arrivalListingIds.length > 0) {
+  if (isCurrentDayRefresh) {
+    const { data: arrivalsTodayRaw } = await supabase
+      .from("reservations")
+      .select("listing_id")
+      .eq("check_in", targetDate)
+      .eq("status", "confirmed");
+    arrivalListingIds = Array.from(
+      new Set((arrivalsTodayRaw || []).map((r: any) => String(r.listing_id)))
+    );
+  }
+
+  if (isCurrentDayRefresh && arrivalListingIds.length > 0) {
     const { data: priorOpen } = await supabase
       .from("clean_tasks")
       .select("id, listing_id, scheduled_date, status, override_assignment, assigned_cleaner_id, notes")
