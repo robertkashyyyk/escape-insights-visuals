@@ -527,7 +527,12 @@ export function CleanersSettings() {
                     {d}
                   </button>
                 ))}
-              </div>
+            </div>
+
+            {/* Holidays / Leave — only when editing an existing cleaner */}
+            {editing && (
+              <CleanerHolidaysSection cleanerId={editing.id} cleanerName={editing.name} />
+            )}
             </div>
             <div className="flex items-center gap-2">
               <Switch checked={form.active} onCheckedChange={v => setForm({ ...form, active: v })} />
