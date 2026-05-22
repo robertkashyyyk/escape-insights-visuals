@@ -118,8 +118,9 @@ export default function CleaningSchedule() {
             </p>
           </div>
           {(() => {
-            const isWeekScope = viewMode === "week" || (viewMode as any) === "matrix";
-            const handleClick = () => isWeekScope ? regenerateRange(7) : regenerate();
+            const isMatrixScope = (viewMode as any) === "matrix";
+            const isWeekScope = viewMode === "week" || isMatrixScope;
+            const handleClick = () => isMatrixScope ? regenerateRange(7, matrixWeekAnchor) : isWeekScope ? regenerateRange(7) : regenerate();
             const label = isRegenerating
               ? "Generating..."
               : isWeekScope
