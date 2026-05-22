@@ -296,16 +296,24 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     }
   }
 
-  // 4. Check existing tasks to avoid duplicates
-  const reservationIds = (checkouts || []).map((r: any) => r.id);
+  // 4. Check existing tasks to avoid duplicates — dedupe by (listing_id, scheduled_date)
+  // because Hostaway often returns multiple sibling reservations sharing the same checkout date
+  // for the same listing (split stays, channel re-imports, modified bookings). One clean per
+  // property per day is the operational truth.
   const { data: existingTasks } = await supabase
     .from("clean_tasks")
-    .select("reservation_id, scheduled_date")
-    .in("reservation_id", reservationIds)
+    .select("listing_id, reservation_id, scheduled_date")
     .eq("scheduled_date", targetDate);
-  const existingSet = new Set(
-    (existingTasks || []).map((t: any) => `${t.reservation_id}_${t.scheduled_date}`)
+  const existingByListing = new Set(
+    (existingTasks || []).map((t: any) => `${t.listing_id}_${t.scheduled_date}`)
   );
+  const existingByReservation = new Set(
+    (existingTasks || [])
+      .filter((t: any) => t.reservation_id)
+      .map((t: any) => `${t.reservation_id}_${t.scheduled_date}`)
+  );
+  // Keep the historical name available for downstream code that referenced it.
+  const existingSet = existingByReservation;
 
   // 5. Get active cleaners (including home location)
   const { data: cleanersRaw } = await supabase
@@ -444,8 +452,9 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     return best;
   }
 
-  // 7. Build new tasks
+  // 7. Build new tasks — at most ONE per (listing_id, scheduled_date).
   const newTasks: TaskInfo[] = [];
+  const plannedListingDate = new Set<string>();
 
   for (const r of checkouts || []) {
     const key = `${r.id}_${targetDate}`;
@@ -460,6 +469,14 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     for (const targetLid of targetListingIds) {
       const listing = listingMap.get(targetLid);
       if (!listing) continue;
+
+      // Dedupe: skip if a task for this listing+date already exists in DB or was
+      // planned earlier in this run (handles Hostaway returning sibling reservations
+      // with the same listing+checkout date).
+      const ldKey = `${targetLid}_${targetDate}`;
+      if (existingByListing.has(ldKey)) continue;
+      if (plannedListingDate.has(ldKey)) continue;
+      plannedListingDate.add(ldKey);
 
       const nextCI = nextCheckinMap.get(targetLid);
       const isSameDay = nextCI?.date === targetDate;
