@@ -104,5 +104,5 @@ export function getCleanerColor(
 export const CLEANER_COLOR_SWATCHES = [
   "#3b82f6", "#8b5cf6", "#ec4899", "#6366f1",
   "#f97316", "#a855f7", "#f59e0b", "#64748b",
-  "#06b6d4", "#d946ef", "#eab308", "#0ea5e9",
+  "#d946ef", "#eab308", "#0ea5e9", "#fb923c",
 ];
