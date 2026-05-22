@@ -10,6 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { Minus, Plus } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
+import { useLocationGroups } from "@/hooks/useLocationGroups";
+import { AlertTriangle } from "lucide-react";
 
 interface PropertyFormProps {
   open: boolean;
@@ -210,7 +212,7 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
           </div>
           <div className="grid grid-cols-2 gap-3">
             {field("Country", "country")}
-            {field("Location Group", "location_group")}
+            <LocationGroupField value={form.location_group} onChange={(v) => set("location_group", v)} />
           </div>
           {field("Property Type", "property_type")}
           <div className="grid grid-cols-3 gap-3">
