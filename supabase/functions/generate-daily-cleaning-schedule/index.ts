@@ -463,6 +463,8 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
 
       const nextCI = nextCheckinMap.get(targetLid);
       const isSameDay = nextCI?.date === targetDate;
+      // P1 = same-day turnaround, P2 = standard checkout
+      const priorityLevel = isSameDay ? 1 : 2;
       const priority = isSameDay ? "same_day_turnaround" : "standard";
 
       // Resolve checkout time: reservation > listing default > 10:00
@@ -483,6 +485,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
         reservation_id: r.id,
         scheduled_date: targetDate,
         priority,
+        priority_level: priorityLevel,
         cleaning_duration_minutes: listing.cleaning_duration_minutes || 90,
         latitude: listing.latitude,
         longitude: listing.longitude,
@@ -498,15 +501,22 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     }
   }
 
-  // 7b. Add pre-existing unassigned tasks into the allocation pool so they get re-evaluated
+  // 7b. Add pre-existing unassigned tasks into the allocation pool so they get re-evaluated.
+  // Orphan-promoted carryovers (set above) will arrive here as priority_level=0 (P0).
   for (const orphan of orphanUnassigned || []) {
     const listing = listingMap.get(String(orphan.listing_id));
     if (!listing) continue;
+    // Trust an explicit priority_level on the row; otherwise infer from priority text.
+    let lvl: number = typeof orphan.priority_level === "number" ? orphan.priority_level : 2;
+    if (orphan.priority === "arrival_risk_orphan") lvl = 0;
+    else if (orphan.priority === "same_day_turnaround") lvl = 1;
+    else if (orphan.priority === "orphan_gap_fill") lvl = 3;
     newTasks.push({
       listing_id: String(orphan.listing_id),
       reservation_id: orphan.reservation_id ?? null,
       scheduled_date: orphan.scheduled_date,
       priority: orphan.priority || "standard",
+      priority_level: lvl,
       cleaning_duration_minutes: orphan.cleaning_duration_minutes || listing.cleaning_duration_minutes || 90,
       latitude: listing.latitude,
       longitude: listing.longitude,
@@ -520,15 +530,13 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       is_same_day_turnaround: !!orphan.is_same_day_turnaround,
       existing_task_id: orphan.id,
       source: orphan.source || "hostaway",
+      warning_reason: orphan.warning_reason ?? null,
     });
   }
 
-  // Sort: same-day turnarounds first
-  newTasks.sort((a, b) => {
-    if (a.priority === "same_day_turnaround" && b.priority !== "same_day_turnaround") return -1;
-    if (b.priority === "same_day_turnaround" && a.priority !== "same_day_turnaround") return 1;
-    return 0;
-  });
+  // Sort by priority level: P0 first, then P1, P2, P3
+  newTasks.sort((a, b) => a.priority_level - b.priority_level);
+
 
   // 8. Allocate cleaners — fair-share deficit + nearby-property clustering.
   let unassignedCount = 0;
