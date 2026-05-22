@@ -392,6 +392,22 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
             />
             Show completed
           </label>
+          <div className="ml-auto flex items-center gap-1.5">
+            <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Sort:</span>
+            <Select value={sortMode} onValueChange={(v) => setSortMode(v as typeof sortMode)}>
+              <SelectTrigger className="h-7 w-[150px] text-xs bg-secondary/50 border-border/40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="priority">Priority</SelectItem>
+                <SelectItem value="cleaner">Cleaner</SelectItem>
+                <SelectItem value="location">Location Group</SelectItem>
+                <SelectItem value="property">Property</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
