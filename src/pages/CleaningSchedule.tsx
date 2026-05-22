@@ -239,12 +239,45 @@ export default function CleaningSchedule() {
 
         {/* Matrix View */}
         {(viewMode as any) === "matrix" && (
-          <MatrixView
-            initialDate={selectedDate}
-            weekAnchor={matrixWeekAnchor}
-            onWeekAnchorChange={setMatrixWeekAnchor}
-            hideWeekNav
-          />
+          <>
+            <MatrixView
+              initialDate={selectedDate}
+              weekAnchor={matrixWeekAnchor}
+              onWeekAnchorChange={setMatrixWeekAnchor}
+              hideWeekNav
+            />
+            {/* Floating right-edge week nav — always reachable while scrolling */}
+            <div className="fixed right-3 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-1.5 bg-card/95 backdrop-blur border border-border/40 rounded-full p-1.5 shadow-lg">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={matrixGoPrev}
+                className="h-9 w-9 rounded-full hover:bg-secondary"
+                title="Previous week"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={matrixGoThisWeek}
+                disabled={matrixIsCurrentWeek}
+                className="h-9 w-9 rounded-full hover:bg-secondary text-[10px] font-bold"
+                title="Back to current week"
+              >
+                NOW
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={matrixGoNext}
+                className="h-9 w-9 rounded-full hover:bg-secondary"
+                title="Next week"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </>
         )}
 
         {/* Week View */}
