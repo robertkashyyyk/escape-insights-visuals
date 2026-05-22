@@ -46,6 +46,9 @@ export interface MatrixTask {
   notes: string | null;
   priority: string;
   completed_at: string | null;
+  overloaded?: boolean | null;
+  override_assignment?: boolean | null;
+  warning_reason?: string | null;
 }
 
 export interface MatrixReservation {
