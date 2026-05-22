@@ -66,6 +66,8 @@ function getGroupBreakdown(cleaners: Cleaner[], group: string, excludeId: string
 
 export function CleanersSettings() {
   const { toast } = useToast();
+  const { data: locationGroupsData = [] } = useLocationGroups();
+  const LOCATION_GROUPS = locationGroupsData.map(g => g.name);
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
