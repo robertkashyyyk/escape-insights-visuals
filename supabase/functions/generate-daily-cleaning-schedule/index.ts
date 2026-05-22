@@ -213,6 +213,66 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     }
   }
 
+  // Self-heal rows incorrectly promoted into a future P0 during an earlier
+  // manual week regeneration. Future arrivals must not steal checkout-day
+  // cleans; only the real current-day refresh may promote P0.
+  const { data: healCheckouts } = await supabase
+    .from("reservations")
+    .select("id, listing_id")
+    .eq("check_out", targetDate)
+    .eq("status", "confirmed");
+  const healReservationIds = (healCheckouts || []).map((r: any) => String(r.id));
+  if (!isCurrentDayRefresh && healReservationIds.length > 0) {
+    const { data: futureP0Rows } = await supabase
+      .from("clean_tasks")
+      .select("id, listing_id, reservation_id, scheduled_date")
+      .in("reservation_id", healReservationIds)
+      .gt("scheduled_date", targetDate)
+      .eq("priority_level", 0)
+      .not("status", "in", "(completed,done,cancelled)")
+      .eq("override_assignment", false);
+
+    const movedListingIds = Array.from(new Set((futureP0Rows || []).map((t: any) => String(t.listing_id))));
+    if (movedListingIds.length > 0) {
+      const { data: existingAtCheckout } = await supabase
+        .from("clean_tasks")
+        .select("listing_id")
+        .in("listing_id", movedListingIds)
+        .eq("scheduled_date", targetDate)
+        .neq("source", "manual");
+      const covered = new Set((existingAtCheckout || []).map((t: any) => String(t.listing_id)));
+
+      const { data: sameDayArrivals } = await supabase
+        .from("reservations")
+        .select("listing_id")
+        .in("listing_id", movedListingIds)
+        .eq("check_in", targetDate)
+        .eq("status", "confirmed");
+      const sameDayListings = new Set((sameDayArrivals || []).map((r: any) => String(r.listing_id)));
+
+      for (const t of futureP0Rows || []) {
+        const lid = String(t.listing_id);
+        if (covered.has(lid)) continue;
+        const isSto = sameDayListings.has(lid);
+        await supabase
+          .from("clean_tasks")
+          .update({
+            scheduled_date: targetDate,
+            priority: isSto ? "same_day_turnaround" : "standard",
+            priority_level: isSto ? 1 : 2,
+            assigned_cleaner_id: null,
+            status: "unassigned",
+            estimated_start_time: null,
+            travel_time_from_previous_minutes: 0,
+            warning_reason: null,
+            overloaded: false,
+          })
+          .eq("id", t.id);
+        covered.add(lid);
+      }
+    }
+  }
+
   // 1. Get checkouts for target date (with checkout time)
   const { data: checkouts, error: coErr } = await supabase
     .from("reservations")
