@@ -115,13 +115,14 @@ export function useMatrixSchedule(weekAnchor: Date) {
   const { data: reservations = [] } = useQuery({
     queryKey: ["matrix-reservations", weekStartStr, weekEndStr],
     queryFn: async () => {
-      // Pull anything with either checkout or checkin in the week (or spanning it)
-      const lookEnd = format(addDays(weekEnd, 7), "yyyy-MM-dd");
+      // Widen window so we can detect orphan gaps that span the week boundary.
+      const lookStart = format(addDays(weekStart, -14), "yyyy-MM-dd");
+      const lookEnd = format(addDays(weekEnd, 14), "yyyy-MM-dd");
       const { data } = await supabase
         .from("reservations")
         .select("id, listing_id, check_in, check_out, guest_name, check_in_time, check_out_time, status")
         .eq("status", "confirmed")
-        .gte("check_out", weekStartStr)
+        .gte("check_out", lookStart)
         .lte("check_in", lookEnd);
       return (data || []) as MatrixReservation[];
     },
