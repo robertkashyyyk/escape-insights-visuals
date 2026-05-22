@@ -9,7 +9,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { CheckCircle2, Clock, Trash2, Save, Undo2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { getCleanerColor } from "@/lib/cleanerColors";
-import type { MatrixCleaner, MatrixListing, MatrixReservation, MatrixTask } from "@/hooks/useMatrixSchedule";
+import type { MatrixCleaner, MatrixListing, MatrixReservation, MatrixTask, CleanerHolidayRow } from "@/hooks/useMatrixSchedule";
+import { getUnavailabilityReason } from "@/lib/cleanerAvailability";
 
 interface Props {
   open: boolean;
@@ -18,6 +19,7 @@ interface Props {
   listing: MatrixListing | null;
   cleaners: MatrixCleaner[];
   reservations: MatrixReservation[];
+  holidays?: CleanerHolidayRow[];
   onReassign: (taskId: string, cleanerId: string | null) => Promise<boolean>;
   onComplete: (taskId: string, listingId: string) => Promise<boolean>;
   onUndoComplete: (taskId: string, listingId: string) => Promise<boolean>;
@@ -39,10 +41,12 @@ function timeDiffMinutes(start: string, end: string): number | null {
 }
 
 export function TaskDetailPanel({
-  open, onOpenChange, task, listing, cleaners, reservations,
+  open, onOpenChange, task, listing, cleaners, reservations, holidays = [],
   onReassign, onComplete, onUndoComplete, onRemove, onSaveNotes,
 }: Props) {
   const [notes, setNotes] = useState("");
+  const [pendingCleanerId, setPendingCleanerId] = useState<string | null>(null);
+  const [pendingUnavailReason, setPendingUnavailReason] = useState<string | null>(null);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -85,9 +89,28 @@ export function TaskDetailPanel({
   })();
 
   const handleReassign = async (val: string) => {
+    if (val !== "unassigned") {
+      const c = cleaners.find((x) => x.id === val);
+      const holidaysForC = holidays.filter((h) => h.cleaner_id === val);
+      const reason = getUnavailabilityReason(c, task.scheduled_date, holidaysForC);
+      if (reason) {
+        setPendingCleanerId(val);
+        setPendingUnavailReason(reason);
+        return;
+      }
+    }
     setBusy(true);
     await onReassign(task.id, val === "unassigned" ? null : val);
     setBusy(false);
+  };
+
+  const confirmReassign = async () => {
+    if (!pendingCleanerId) return;
+    setBusy(true);
+    await onReassign(task.id, pendingCleanerId);
+    setBusy(false);
+    setPendingCleanerId(null);
+    setPendingUnavailReason(null);
   };
 
   const handleComplete = async () => {
@@ -265,6 +288,28 @@ export function TaskDetailPanel({
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleRemove} disabled={busy} className="bg-destructive hover:bg-destructive/90">
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={!!pendingCleanerId}
+        onOpenChange={(o) => { if (!o) { setPendingCleanerId(null); setPendingUnavailReason(null); } }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cleaner is marked unavailable</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cleaners.find((c) => c.id === pendingCleanerId)?.name} is marked{" "}
+              <strong>{pendingUnavailReason}</strong> on{" "}
+              {format(parseISO(task.scheduled_date), "EEE d MMM")}. Assign anyway?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmReassign} disabled={busy}>
+              Assign anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

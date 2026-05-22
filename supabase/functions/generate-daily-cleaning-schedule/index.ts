@@ -59,6 +59,7 @@ interface TaskInfo {
   is_same_day_turnaround: boolean;
   existing_task_id?: string | null; // present if this is a pre-existing unassigned row to UPDATE rather than INSERT
   source?: string;
+  notes?: string;
 }
 
 interface CleanerInfo {
@@ -70,7 +71,13 @@ interface CleanerInfo {
   daily_working_hours: number;
   home_latitude: number | null;
   home_longitude: number | null;
+  /** [{start_date, end_date}] in yyyy-MM-dd */
+  holidays: Array<{ start_date: string; end_date: string; reason: string }>;
 }
+
+const CLUSTER_RADIUS_KM = 8; // ~5 miles
+const CLUSTER_SOFT_MAX = 3;  // 1–3 → one cleaner; 4+ → split
+const ROLLING_WINDOW_DAYS = 28;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -260,6 +267,22 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     .from("cleaners")
     .select("*")
     .eq("active", true);
+
+  // 5b. Load holidays overlapping the target date for these cleaners
+  const cleanerIds = (cleanersRaw || []).map((c: any) => c.id);
+  const { data: holidaysRaw } = await supabase
+    .from("cleaner_holidays")
+    .select("cleaner_id, start_date, end_date, reason")
+    .in("cleaner_id", cleanerIds.length ? cleanerIds : ["00000000-0000-0000-0000-000000000000"])
+    .lte("start_date", targetDate)
+    .gte("end_date", targetDate);
+
+  const holidaysByCleaner: Record<string, Array<{ start_date: string; end_date: string; reason: string }>> = {};
+  for (const h of holidaysRaw || []) {
+    if (!holidaysByCleaner[h.cleaner_id]) holidaysByCleaner[h.cleaner_id] = [];
+    holidaysByCleaner[h.cleaner_id].push(h);
+  }
+
   const cleaners: CleanerInfo[] = (cleanersRaw || []).map((c: any) => ({
     id: c.id,
     name: c.name,
@@ -269,6 +292,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     daily_working_hours: c.daily_working_hours ?? 8,
     home_latitude: c.home_latitude ?? null,
     home_longitude: c.home_longitude ?? null,
+    holidays: holidaysByCleaner[c.id] || [],
   }));
 
   // 6. Get already-scheduled tasks for today (for capacity calculation)
@@ -291,6 +315,88 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       cleanerScheduledMinutes[t.assigned_cleaner_id] +=
         (t.cleaning_duration_minutes || 0) + (t.travel_time_from_previous_minutes || 0);
     }
+  }
+
+  // 6b. Rolling actual share (last N days, per region) — drives fair-share deficit
+  const windowStartDate = new Date(targetDate + "T12:00:00Z");
+  windowStartDate.setUTCDate(windowStartDate.getUTCDate() - ROLLING_WINDOW_DAYS);
+  const windowStart = windowStartDate.toISOString().slice(0, 10);
+
+  const { data: rollingTasks } = await supabase
+    .from("clean_tasks")
+    .select("assigned_cleaner_id, listing_id, scheduled_date")
+    .gte("scheduled_date", windowStart)
+    .lt("scheduled_date", targetDate)
+    .not("status", "eq", "cancelled");
+
+  // listing_id -> location_group lookup (use already-loaded listings + fetch unknowns)
+  const listingGroupCache = new Map<string, string>();
+  for (const l of [...(rawListings || []), ...componentListings]) {
+    listingGroupCache.set(l.id, l.location_group || "Other");
+  }
+  const missingIds = Array.from(new Set(
+    (rollingTasks || [])
+      .map((t: any) => String(t.listing_id))
+      .filter((id: string) => !listingGroupCache.has(id))
+  ));
+  if (missingIds.length > 0) {
+    const { data: extraListings } = await supabase
+      .from("listings")
+      .select("id, location_group")
+      .in("id", missingIds);
+    for (const l of extraListings || []) listingGroupCache.set(l.id, l.location_group || "Other");
+  }
+
+  // rollingRegionCount[cleanerId][group] / rollingRegionTotal[group]
+  const rollingRegionCount: Record<string, Record<string, number>> = {};
+  const rollingRegionTotal: Record<string, number> = {};
+  for (const c of cleaners) rollingRegionCount[c.id] = {};
+  for (const t of rollingTasks || []) {
+    const grp = listingGroupCache.get(String(t.listing_id)) || "Other";
+    rollingRegionTotal[grp] = (rollingRegionTotal[grp] || 0) + 1;
+    if (t.assigned_cleaner_id && rollingRegionCount[t.assigned_cleaner_id]) {
+      rollingRegionCount[t.assigned_cleaner_id][grp] =
+        (rollingRegionCount[t.assigned_cleaner_id][grp] || 0) + 1;
+    }
+  }
+
+  function actualSharePct(cleanerId: string, group: string): number {
+    const total = (rollingRegionTotal[group] || 0)
+      + Object.values(cleanerRegionCount).reduce((s, m) => s + (m[group] || 0), 0);
+    if (total === 0) return 0;
+    const actual = (rollingRegionCount[cleanerId]?.[group] || 0)
+      + (cleanerRegionCount[cleanerId]?.[group] || 0);
+    return (actual / total) * 100;
+  }
+
+  function isEligibleBase(c: CleanerInfo, task: TaskInfo): boolean {
+    if (!c.location_groups.includes(task.location_group)) return false;
+    if (c.non_working_days.includes(targetDayOfWeek)) return false;
+    // Holiday filter — any holiday range covering targetDate disqualifies
+    for (const h of c.holidays) {
+      if (targetDate >= h.start_date && targetDate <= h.end_date) return false;
+    }
+    return true;
+  }
+
+  function hasCapacity(c: CleanerInfo, addMins: number): boolean {
+    const projected = cleanerScheduledMinutes[c.id] + addMins + 15;
+    return projected <= c.daily_working_hours * 60;
+  }
+
+  function pickByDeficit(pool: CleanerInfo[], group: string): CleanerInfo | null {
+    if (pool.length === 0) return null;
+    let best = pool[0];
+    let bestDeficit = -Infinity;
+    for (const c of pool) {
+      const target = c.workload_share[group] ?? 0;
+      const actual = actualSharePct(c.id, group);
+      const deficit = target - actual;
+      // Tie-break: prefer fewer minutes scheduled today
+      const score = deficit - cleanerScheduledMinutes[c.id] / 10000;
+      if (score > bestDeficit) { bestDeficit = score; best = c; }
+    }
+    return best;
   }
 
   // 7. Build new tasks
@@ -379,54 +485,112 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     return 0;
   });
 
-  // 8. Allocate cleaners — group tasks by eligible cleaner pool, then sequence per cleaner
+  // 8. Allocate cleaners — fair-share deficit + nearby-property clustering.
   let unassignedCount = 0;
+  const overloadFlags: Array<{ cleaner_id: string; cluster_size: number; group: string }> = [];
 
-  // Per-cleaner task buckets for route optimisation
   const cleanerBuckets: Record<string, TaskInfo[]> = {};
   for (const c of cleaners) cleanerBuckets[c.id] = [];
 
-  for (const task of newTasks) {
-    const eligible = cleaners.filter((c) => {
-      if (!c.location_groups.includes(task.location_group)) return false;
-      if (c.non_working_days.includes(targetDayOfWeek)) return false;
-      // Rough capacity check (will refine after route ordering)
-      const projected = cleanerScheduledMinutes[c.id] + task.cleaning_duration_minutes + 15; // 15 min est travel
-      const maxMins = c.daily_working_hours * 60;
-      return projected <= maxMins;
-    });
+  // Same-day turnarounds were already sorted to the front of newTasks.
+  // Group remaining tasks by location_group, build geo-clusters within each group.
+  const tasksByGroup: Record<string, TaskInfo[]> = {};
+  for (const t of newTasks) {
+    const g = t.location_group || "Other";
+    if (!tasksByGroup[g]) tasksByGroup[g] = [];
+    tasksByGroup[g].push(t);
+  }
 
-    if (eligible.length === 0) {
-      unassignedCount++;
-      continue;
+  // Greedy proximity clustering (≤ CLUSTER_RADIUS_KM)
+  function clusterByProximity(tasks: TaskInfo[]): TaskInfo[][] {
+    const clusters: TaskInfo[][] = [];
+    const remaining = [...tasks];
+    while (remaining.length > 0) {
+      const seed = remaining.shift()!;
+      const cluster = [seed];
+      for (let i = remaining.length - 1; i >= 0; i--) {
+        const t = remaining[i];
+        if (t.latitude == null || t.longitude == null || seed.latitude == null || seed.longitude == null) {
+          // No coords → cluster by group only (treat as same cluster as seed)
+          cluster.push(t);
+          remaining.splice(i, 1);
+          continue;
+        }
+        const d = haversineKm(seed.latitude, seed.longitude, t.latitude, t.longitude);
+        if (d <= CLUSTER_RADIUS_KM) {
+          cluster.push(t);
+          remaining.splice(i, 1);
+        }
+      }
+      clusters.push(cluster);
     }
+    return clusters;
+  }
 
-    // Pick cleaner with lowest workload share for this region
-    let best = eligible[0];
-    let bestDeficit = -Infinity;
-    for (const c of eligible) {
-      const targetShare = c.workload_share[task.location_group] ?? 100;
-      const totalInRegion = eligible.reduce(
-        (s, ec) => s + (cleanerRegionCount[ec.id]?.[task.location_group] ?? 0),
-        0
-      );
-      const actual = totalInRegion > 0
-        ? ((cleanerRegionCount[c.id]?.[task.location_group] ?? 0) / totalInRegion) * 100
-        : 0;
-      const deficit = targetShare - actual;
-      if (deficit > bestDeficit) {
-        bestDeficit = deficit;
-        best = c;
+  function assignTaskTo(cleanerOrNull: CleanerInfo | null, task: TaskInfo, overload = false): boolean {
+    if (!cleanerOrNull) {
+      unassignedCount++;
+      return false;
+    }
+    task.assigned_cleaner_id = cleanerOrNull.id;
+    task.status = "scheduled";
+    if (overload) {
+      const tag = "⚠ Overloaded: only cleaner available for nearby cluster";
+      task.notes = task.notes ? `${task.notes} | ${tag}` : tag;
+    }
+    cleanerBuckets[cleanerOrNull.id].push(task);
+    cleanerScheduledMinutes[cleanerOrNull.id] += task.cleaning_duration_minutes + 15;
+    cleanerRegionCount[cleanerOrNull.id][task.location_group] =
+      (cleanerRegionCount[cleanerOrNull.id][task.location_group] ?? 0) + 1;
+    return true;
+  }
+
+  for (const [group, groupTasks] of Object.entries(tasksByGroup)) {
+    const clusters = clusterByProximity(groupTasks);
+
+    for (const cluster of clusters) {
+      // Base eligibility (region + non-working + holiday) — capacity checked per-task or per-cluster
+      const baseEligible = cleaners.filter((c) => isEligibleBase(c, cluster[0]));
+
+      if (baseEligible.length === 0) {
+        for (const t of cluster) assignTaskTo(null, t);
+        continue;
+      }
+
+      // Sole-cleaner-region case → assign cluster to that cleaner, flag overload if 4+
+      if (baseEligible.length === 1) {
+        const sole = baseEligible[0];
+        for (const t of cluster) assignTaskTo(sole, t, cluster.length > CLUSTER_SOFT_MAX);
+        if (cluster.length > CLUSTER_SOFT_MAX) {
+          overloadFlags.push({ cleaner_id: sole.id, cluster_size: cluster.length, group });
+        }
+        continue;
+      }
+
+      if (cluster.length <= CLUSTER_SOFT_MAX) {
+        // Try one cleaner for the whole cluster
+        const totalMins = cluster.reduce((s, t) => s + t.cleaning_duration_minutes + 15, 0);
+        const capable = baseEligible.filter((c) => hasCapacity(c, totalMins - 15));
+        const pick = pickByDeficit(capable.length > 0 ? capable : baseEligible, group);
+        if (pick && capable.length > 0) {
+          for (const t of cluster) assignTaskTo(pick, t);
+        } else {
+          // Fall back: assign each task individually by deficit + capacity
+          for (const t of cluster) {
+            const elig = baseEligible.filter((c) => hasCapacity(c, t.cleaning_duration_minutes));
+            assignTaskTo(pickByDeficit(elig.length > 0 ? elig : baseEligible, group), t);
+          }
+        }
+      } else {
+        // 4+ → split: assign each task to the current largest-deficit cleaner with capacity
+        for (const t of cluster) {
+          const elig = baseEligible.filter((c) => hasCapacity(c, t.cleaning_duration_minutes));
+          assignTaskTo(pickByDeficit(elig.length > 0 ? elig : baseEligible, group), t);
+        }
       }
     }
-
-    task.assigned_cleaner_id = best.id;
-    task.status = "scheduled";
-    cleanerBuckets[best.id].push(task);
-    cleanerScheduledMinutes[best.id] += task.cleaning_duration_minutes + 15;
-    cleanerRegionCount[best.id][task.location_group] =
-      (cleanerRegionCount[best.id][task.location_group] ?? 0) + 1;
   }
+
 
   // 9. Route-optimise each cleaner's tasks: cluster by location group, then sequence
   for (const c of cleaners) {
@@ -569,6 +733,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       checkout_time: t.checkout_time,
       checkin_time: t.checkin_time,
       is_same_day_turnaround: t.is_same_day_turnaround,
+      notes: t.notes ?? null,
     }));
     const { error: insertErr } = await supabase.from("clean_tasks").insert(rows);
     if (insertErr) throw insertErr;
@@ -585,6 +750,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
         estimated_start_time: t.estimated_start_time,
         travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
         checkout_time: t.checkout_time,
+        ...(t.notes ? { notes: t.notes } : {}),
       })
       .eq("id", t.existing_task_id!);
     if (updErr) throw updErr;

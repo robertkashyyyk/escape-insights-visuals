@@ -19,6 +19,15 @@ export interface MatrixCleaner {
   active: boolean;
   location_groups?: string[];
   color?: string | null;
+  non_working_days?: string[];
+}
+
+export interface CleanerHolidayRow {
+  id: string;
+  cleaner_id: string;
+  start_date: string;
+  end_date: string;
+  reason: string;
 }
 
 export interface MatrixTask {
@@ -91,12 +100,26 @@ export function useMatrixSchedule(weekAnchor: Date) {
     queryFn: async () => {
       const { data } = await supabase
         .from("cleaners" as any)
-        .select("id, name, active, location_groups, color")
+        .select("id, name, active, location_groups, color, non_working_days")
         .eq("active", true)
         .order("name");
       return (data || []) as unknown as MatrixCleaner[];
     },
   });
+
+  // Cleaner holidays overlapping the visible week
+  const { data: holidays = [] } = useQuery({
+    queryKey: ["matrix-holidays", weekStartStr, weekEndStr],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("cleaner_holidays" as any)
+        .select("id, cleaner_id, start_date, end_date, reason")
+        .lte("start_date", weekEndStr)
+        .gte("end_date", weekStartStr);
+      return (data || []) as unknown as CleanerHolidayRow[];
+    },
+  });
+
 
   // Tasks for the week
   const { data: tasks = [], isLoading: tasksLoading } = useQuery({
@@ -346,7 +369,7 @@ export function useMatrixSchedule(weekAnchor: Date) {
   return {
     weekStart, weekEnd, days,
     listings, groupedListings,
-    cleaners, tasks, reservations,
+    cleaners, tasks, reservations, holidays,
     isLoading: listingsLoading || tasksLoading,
     reassignTask, completeTask, undoComplete, removeTask, updateNotes, addManualClean,
   };

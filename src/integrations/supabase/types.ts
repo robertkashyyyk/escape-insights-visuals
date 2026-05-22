@@ -307,6 +307,50 @@ export type Database = {
           },
         ]
       }
+      cleaner_holidays: {
+        Row: {
+          cleaner_id: string
+          created_at: string
+          created_by: string | null
+          end_date: string
+          id: string
+          notes: string | null
+          reason: string
+          start_date: string
+          updated_at: string
+        }
+        Insert: {
+          cleaner_id: string
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          id?: string
+          notes?: string | null
+          reason?: string
+          start_date: string
+          updated_at?: string
+        }
+        Update: {
+          cleaner_id?: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          id?: string
+          notes?: string | null
+          reason?: string
+          start_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cleaner_holidays_cleaner_id_fkey"
+            columns: ["cleaner_id"]
+            isOneToOne: false
+            referencedRelation: "cleaners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cleaners: {
         Row: {
           active: boolean
