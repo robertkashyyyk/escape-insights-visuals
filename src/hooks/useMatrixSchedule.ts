@@ -369,7 +369,7 @@ export function useMatrixSchedule(weekAnchor: Date) {
   return {
     weekStart, weekEnd, days,
     listings, groupedListings,
-    cleaners, tasks, reservations,
+    cleaners, tasks, reservations, holidays,
     isLoading: listingsLoading || tasksLoading,
     reassignTask, completeTask, undoComplete, removeTask, updateNotes, addManualClean,
   };
