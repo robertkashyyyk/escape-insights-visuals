@@ -535,8 +535,11 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     task.assigned_cleaner_id = cleanerOrNull.id;
     task.status = "scheduled";
     if (overload) {
-      const tag = "⚠ Overloaded: only cleaner available for nearby cluster";
-      task.notes = task.notes ? `${task.notes} | ${tag}` : tag;
+      task.overloaded = true;
+      task.warning_reason = "Only eligible cleaner for nearby cluster — workload exceeds soft cap";
+    } else {
+      task.overloaded = false;
+      task.warning_reason = null;
     }
     cleanerBuckets[cleanerOrNull.id].push(task);
     cleanerScheduledMinutes[cleanerOrNull.id] += task.cleaning_duration_minutes + 15;
