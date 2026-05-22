@@ -740,6 +740,9 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       checkin_time: t.checkin_time,
       is_same_day_turnaround: t.is_same_day_turnaround,
       notes: t.notes ?? null,
+      overloaded: t.overloaded ?? false,
+      override_assignment: t.override_assignment ?? false,
+      warning_reason: t.warning_reason ?? null,
     }));
     const { error: insertErr } = await supabase.from("clean_tasks").insert(rows);
     if (insertErr) throw insertErr;
