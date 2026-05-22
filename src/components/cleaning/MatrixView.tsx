@@ -527,7 +527,7 @@ function CleanerDropTarget({
 
 /* ── Single matrix cell ── */
 function MatrixCell({
-  date, listing, task, cleaners, isToday, dimmed, onTaskClick, onAddClick,
+  date, listing, task, cleaners, isToday, dimmed, isOrphanGap, minStayNights, onTaskClick, onAddClick,
 }: {
   date: Date;
   listing: MatrixListing;
@@ -535,6 +535,8 @@ function MatrixCell({
   cleaners: { id: string; name: string; location_groups?: string[] }[];
   isToday: boolean;
   dimmed: boolean;
+  isOrphanGap?: boolean;
+  minStayNights?: number;
   onTaskClick: (id: string) => void;
   onAddClick: () => void;
 }) {
@@ -543,6 +545,30 @@ function MatrixCell({
   const dimClass = dimmed ? "opacity-25" : "";
 
   if (!task) {
+    if (isOrphanGap) {
+      const tip = orphanGapTooltip(minStayNights ?? 2);
+      return (
+        <TooltipProvider delayDuration={150}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={onAddClick}
+                className={`group ${baseBorder} ${todayTint} flex items-center justify-center min-h-[56px] p-1`}
+                aria-label={tip}
+              >
+                <div className="orphan-gap orphan-gap-hover w-full h-full min-h-[44px] flex items-center justify-center gap-1 text-[10px] font-medium text-amber-500/90 dark:text-amber-300/90 transition-all">
+                  <Unlink2 className="h-3 w-3 opacity-70" />
+                  <span className="uppercase tracking-wider">Orphan</span>
+                </div>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[220px] text-xs">
+              {tip}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
     return (
       <button
         onClick={onAddClick}
