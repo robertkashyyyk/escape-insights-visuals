@@ -51,6 +51,8 @@ export function AddManualCleanModal({ open, onOpenChange, listing, date, cleaner
       task_type: taskType,
       assigned_cleaner_id: cleanerId === "unassigned" ? null : cleanerId,
       notes: notes.trim() || null,
+      override_assignment: !!unavailReason,
+      warning_reason: unavailReason ? `Override: ${unavailReason}` : null,
     });
     setSubmitting(false);
     if (ok) {
