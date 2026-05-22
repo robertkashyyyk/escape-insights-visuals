@@ -292,6 +292,28 @@ export function TaskDetailPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog
+        open={!!pendingCleanerId}
+        onOpenChange={(o) => { if (!o) { setPendingCleanerId(null); setPendingUnavailReason(null); } }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cleaner is marked unavailable</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cleaners.find((c) => c.id === pendingCleanerId)?.name} is marked{" "}
+              <strong>{pendingUnavailReason}</strong> on{" "}
+              {format(parseISO(task.scheduled_date), "EEE d MMM")}. Assign anyway?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmReassign} disabled={busy}>
+              Assign anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
