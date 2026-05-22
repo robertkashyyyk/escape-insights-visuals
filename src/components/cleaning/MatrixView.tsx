@@ -689,6 +689,22 @@ function DraggableCellInner({
             STO
           </span>
         )}
+        {task.overloaded && (
+          <span
+            className="text-[9px] font-bold px-1 rounded bg-amber-500 text-black tracking-wide"
+            title={task.warning_reason ?? "Overloaded — only eligible cleaner for nearby cluster"}
+          >
+            ⚠
+          </span>
+        )}
+        {task.override_assignment && (
+          <span
+            className="text-[9px] font-bold px-1 rounded bg-red-600 text-white tracking-wide"
+            title={task.warning_reason ?? "Manual override — cleaner marked unavailable"}
+          >
+            !
+          </span>
+        )}
       </div>
       {isUnassigned && (
         <div className="text-[9px] mt-0.5 leading-tight">
