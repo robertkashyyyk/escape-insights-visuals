@@ -400,6 +400,7 @@ export function useMatrixSchedule(weekAnchor: Date) {
     listings, groupedListings,
     cleaners, tasks, reservations, holidays,
     isLoading: listingsLoading || tasksLoading,
+    autoGenerating,
     reassignTask, completeTask, undoComplete, removeTask, updateNotes, addManualClean,
   };
 }
