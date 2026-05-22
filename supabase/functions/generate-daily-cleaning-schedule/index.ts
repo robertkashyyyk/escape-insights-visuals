@@ -46,6 +46,8 @@ interface TaskInfo {
   reservation_id: string | null;
   scheduled_date: string;
   priority: string;
+  /** 0=P0 arrival-risk orphan carryover, 1=P1 STO, 2=P2 standard checkout, 3=P3 orphan-gap fill */
+  priority_level: number;
   cleaning_duration_minutes: number;
   latitude: number | null;
   longitude: number | null;
@@ -64,6 +66,7 @@ interface TaskInfo {
   override_assignment?: boolean;
   warning_reason?: string | null;
 }
+
 
 interface CleanerInfo {
   id: string;
@@ -167,6 +170,44 @@ Deno.serve(async (req) => {
 async function processDate(supabase: any, targetDate: string): Promise<{ created: number; unassigned: number }> {
   const targetDayOfWeek = DAY_NAMES[new Date(targetDate + "T12:00:00Z").getDay()];
 
+  // 0. P0 PROMOTION: any prior incomplete cleans for listings with a check-in today
+  // get pulled forward to today as P0 (arrival-risk orphan carryover).
+  // Manual overrides are preserved.
+  const { data: arrivalsTodayRaw } = await supabase
+    .from("reservations")
+    .select("listing_id")
+    .eq("check_in", targetDate)
+    .eq("status", "confirmed");
+  const arrivalListingIds: string[] = Array.from(
+    new Set((arrivalsTodayRaw || []).map((r: any) => String(r.listing_id)))
+  );
+
+  if (arrivalListingIds.length > 0) {
+    const { data: priorOpen } = await supabase
+      .from("clean_tasks")
+      .select("id, listing_id, scheduled_date, status, override_assignment, assigned_cleaner_id, notes")
+      .in("listing_id", arrivalListingIds)
+      .lt("scheduled_date", targetDate)
+      .not("status", "in", "(completed,cancelled)");
+
+    for (const t of priorOpen || []) {
+      const keepCleaner = !!t.override_assignment;
+      await supabase
+        .from("clean_tasks")
+        .update({
+          scheduled_date: targetDate,
+          priority: "arrival_risk_orphan",
+          priority_level: 0,
+          status: keepCleaner ? "scheduled" : "unassigned",
+          assigned_cleaner_id: keepCleaner ? t.assigned_cleaner_id : null,
+          estimated_start_time: null,
+          warning_reason: "Promoted from prior orphan-gap day — guest arriving today",
+          overloaded: false,
+        })
+        .eq("id", t.id);
+    }
+  }
+
   // 1. Get checkouts for target date (with checkout time)
   const { data: checkouts, error: coErr } = await supabase
     .from("reservations")
@@ -178,7 +219,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
   // 1b. Get any pre-existing unassigned tasks for this date — these need re-assignment too
   const { data: orphanUnassigned } = await supabase
     .from("clean_tasks")
-    .select("id, listing_id, reservation_id, scheduled_date, priority, cleaning_duration_minutes, checkout_time, checkin_time, is_same_day_turnaround, source")
+    .select("id, listing_id, reservation_id, scheduled_date, priority, priority_level, cleaning_duration_minutes, checkout_time, checkin_time, is_same_day_turnaround, source, warning_reason")
     .eq("scheduled_date", targetDate)
     .eq("status", "unassigned");
 
@@ -192,6 +233,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
   if (rawListingIds.length === 0 && (orphanUnassigned || []).length === 0) {
     return { created: 0, unassigned: 0 };
   }
+
 
   const { data: rawListings } = await supabase
     .from("listings")
@@ -421,6 +463,8 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
 
       const nextCI = nextCheckinMap.get(targetLid);
       const isSameDay = nextCI?.date === targetDate;
+      // P1 = same-day turnaround, P2 = standard checkout
+      const priorityLevel = isSameDay ? 1 : 2;
       const priority = isSameDay ? "same_day_turnaround" : "standard";
 
       // Resolve checkout time: reservation > listing default > 10:00
@@ -441,6 +485,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
         reservation_id: r.id,
         scheduled_date: targetDate,
         priority,
+        priority_level: priorityLevel,
         cleaning_duration_minutes: listing.cleaning_duration_minutes || 90,
         latitude: listing.latitude,
         longitude: listing.longitude,
@@ -456,15 +501,22 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     }
   }
 
-  // 7b. Add pre-existing unassigned tasks into the allocation pool so they get re-evaluated
+  // 7b. Add pre-existing unassigned tasks into the allocation pool so they get re-evaluated.
+  // Orphan-promoted carryovers (set above) will arrive here as priority_level=0 (P0).
   for (const orphan of orphanUnassigned || []) {
     const listing = listingMap.get(String(orphan.listing_id));
     if (!listing) continue;
+    // Trust an explicit priority_level on the row; otherwise infer from priority text.
+    let lvl: number = typeof orphan.priority_level === "number" ? orphan.priority_level : 2;
+    if (orphan.priority === "arrival_risk_orphan") lvl = 0;
+    else if (orphan.priority === "same_day_turnaround") lvl = 1;
+    else if (orphan.priority === "orphan_gap_fill") lvl = 3;
     newTasks.push({
       listing_id: String(orphan.listing_id),
       reservation_id: orphan.reservation_id ?? null,
       scheduled_date: orphan.scheduled_date,
       priority: orphan.priority || "standard",
+      priority_level: lvl,
       cleaning_duration_minutes: orphan.cleaning_duration_minutes || listing.cleaning_duration_minutes || 90,
       latitude: listing.latitude,
       longitude: listing.longitude,
@@ -478,15 +530,13 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       is_same_day_turnaround: !!orphan.is_same_day_turnaround,
       existing_task_id: orphan.id,
       source: orphan.source || "hostaway",
+      warning_reason: orphan.warning_reason ?? null,
     });
   }
 
-  // Sort: same-day turnarounds first
-  newTasks.sort((a, b) => {
-    if (a.priority === "same_day_turnaround" && b.priority !== "same_day_turnaround") return -1;
-    if (b.priority === "same_day_turnaround" && a.priority !== "same_day_turnaround") return 1;
-    return 0;
-  });
+  // Sort by priority level: P0 first, then P1, P2, P3
+  newTasks.sort((a, b) => a.priority_level - b.priority_level);
+
 
   // 8. Allocate cleaners — fair-share deficit + nearby-property clustering.
   let unassignedCount = 0;
@@ -692,10 +742,23 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     }
 
     // Step E: Calculate travel times and estimated start times.
-    // Each task can't start before its property's checkout time + travel from previous stop.
+    // P0 carryovers (level 0) may start before checkout — property is already empty.
+    // The earliest morning start is 08:00.
+    const P0_EARLIEST = "08:00";
+    function earliestStartFor(t: TaskInfo, arrival: string): string {
+      if (t.priority_level === 0) {
+        return arrival >= P0_EARLIEST ? arrival : P0_EARLIEST;
+      }
+      return arrival >= t.checkout_time ? arrival : t.checkout_time;
+    }
+
     const firstTravel = travelMinutes(homeLat, homeLon, ordered[0].latitude, ordered[0].longitude);
     ordered[0].travel_time_from_previous_minutes = firstTravel;
-    ordered[0].estimated_start_time = addMinutesToTime(ordered[0].checkout_time, firstTravel);
+    const firstArrival = addMinutesToTime(
+      ordered[0].priority_level === 0 ? P0_EARLIEST : ordered[0].checkout_time,
+      firstTravel
+    );
+    ordered[0].estimated_start_time = earliestStartFor(ordered[0], firstArrival);
 
     let currentTime = addMinutesToTime(ordered[0].estimated_start_time, ordered[0].cleaning_duration_minutes);
 
@@ -706,11 +769,10 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       );
       ordered[i].travel_time_from_previous_minutes = travel;
       const arrivalAfterTravel = addMinutesToTime(currentTime, travel);
-      // Don't start before property checkout time
-      const earliestStart = arrivalAfterTravel >= ordered[i].checkout_time ? arrivalAfterTravel : ordered[i].checkout_time;
-      ordered[i].estimated_start_time = earliestStart;
-      currentTime = addMinutesToTime(earliestStart, ordered[i].cleaning_duration_minutes);
+      ordered[i].estimated_start_time = earliestStartFor(ordered[i], arrivalAfterTravel);
+      currentTime = addMinutesToTime(ordered[i].estimated_start_time, ordered[i].cleaning_duration_minutes);
     }
+
 
     cleanerBuckets[c.id] = ordered;
   }
@@ -733,6 +795,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       assigned_cleaner_id: t.assigned_cleaner_id,
       status: t.status,
       priority: t.priority,
+      priority_level: t.priority_level,
       estimated_start_time: t.estimated_start_time,
       cleaning_duration_minutes: t.cleaning_duration_minutes,
       travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
@@ -743,6 +806,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       overloaded: t.overloaded ?? false,
       override_assignment: t.override_assignment ?? false,
       warning_reason: t.warning_reason ?? null,
+
     }));
     const { error: insertErr } = await supabase.from("clean_tasks").insert(rows);
     if (insertErr) throw insertErr;
@@ -756,6 +820,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
         assigned_cleaner_id: t.assigned_cleaner_id,
         status: t.status,
         priority: t.priority,
+        priority_level: t.priority_level,
         estimated_start_time: t.estimated_start_time,
         travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
         checkout_time: t.checkout_time,

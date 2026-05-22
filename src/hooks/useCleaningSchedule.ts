@@ -5,7 +5,7 @@ import { format, addDays, startOfWeek, endOfWeek, isSameDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
 /* ── types ── */
-export type Priority = "SAME_DAY" | "TIGHT_WINDOW" | "STANDARD";
+export type Priority = "ARRIVAL_RISK" | "SAME_DAY" | "TIGHT_WINDOW" | "STANDARD" | "GAP_FILL";
 export type TaskStatus = "unassigned" | "scheduled" | "in_progress" | "complete";
 
 export interface CleanTask {
@@ -264,7 +264,12 @@ export function useCleaningSchedule() {
           assignedCleanerId: t.assigned_cleaner_id,
           assignedCleanerName: cleaner?.name ?? null,
           status: (t.status === "completed" ? "complete" : t.status) as TaskStatus,
-          priority: t.priority === "same_day_turnaround" ? "SAME_DAY" as Priority : "STANDARD" as Priority,
+          priority: (
+            t.priority_level === 0 || t.priority === "arrival_risk_orphan" ? "ARRIVAL_RISK" :
+            t.priority_level === 1 || t.priority === "same_day_turnaround" ? "SAME_DAY" :
+            t.priority_level === 3 || t.priority === "orphan_gap_fill" ? "GAP_FILL" :
+            "STANDARD"
+          ) as Priority,
           latitude: listing?.latitude ?? null,
           longitude: listing?.longitude ?? null,
           estimatedStart: t.estimated_start_time ? t.estimated_start_time.slice(0, 5) : undefined,
@@ -340,7 +345,7 @@ export function useCleaningSchedule() {
       };
     });
 
-    const priorityOrder: Record<Priority, number> = { TIGHT_WINDOW: 0, SAME_DAY: 1, STANDARD: 2 };
+    const priorityOrder: Record<Priority, number> = { ARRIVAL_RISK: 0, TIGHT_WINDOW: 1, SAME_DAY: 2, STANDARD: 3, GAP_FILL: 4 };
     tasks.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
 
     // Auto-allocate (client-side preview only)

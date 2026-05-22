@@ -232,6 +232,7 @@ export type Database = {
           overloaded: boolean
           override_assignment: boolean
           priority: string
+          priority_level: number
           reservation_id: string | null
           route_order: number | null
           scheduled_date: string
@@ -257,6 +258,7 @@ export type Database = {
           overloaded?: boolean
           override_assignment?: boolean
           priority?: string
+          priority_level?: number
           reservation_id?: string | null
           route_order?: number | null
           scheduled_date: string
@@ -282,6 +284,7 @@ export type Database = {
           overloaded?: boolean
           override_assignment?: boolean
           priority?: string
+          priority_level?: number
           reservation_id?: string | null
           route_order?: number | null
           scheduled_date?: string

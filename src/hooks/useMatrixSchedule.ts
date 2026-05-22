@@ -45,6 +45,7 @@ export interface MatrixTask {
   task_type: string;         // 'clean' | 'interim' | 'maintenance'
   notes: string | null;
   priority: string;
+  priority_level?: number | null;
   completed_at: string | null;
   overloaded?: boolean | null;
   override_assignment?: boolean | null;
@@ -370,6 +371,7 @@ export function useMatrixSchedule(weekAnchor: Date) {
       notes: input.notes,
       source: "manual",
       priority: "standard",
+      priority_level: 2,
       cleaning_duration_minutes: 90,
       override_assignment: input.override_assignment ?? false,
       warning_reason: input.warning_reason ?? null,

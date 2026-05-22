@@ -651,6 +651,17 @@ function DraggableCellInner({
   const initial = cleaner?.name?.charAt(0).toUpperCase() ?? "?";
 
   const isSameDayTA = !!task.is_same_day_turnaround;
+  const isP0 = (task.priority_level ?? -1) === 0 || task.priority === "arrival_risk_orphan";
+  const isP3 = (task.priority_level ?? -1) === 3 || task.priority === "orphan_gap_fill";
+
+  // P0 wins visually over STO border. P0 = strong copper/amber ring.
+  const borderClass = isP0
+    ? "border-[2.5px] border-amber-600 ring-1 ring-white shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
+    : isSameDayTA
+    ? "border-[2.5px] border-red-500 ring-1 ring-white shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
+    : isP3
+    ? "border border-dashed border-amber-500/70"
+    : "border";
 
   return (
     <button
@@ -660,14 +671,10 @@ function DraggableCellInner({
       {...attributes}
       className={`w-full h-full min-h-[48px] rounded-md p-1.5 text-left transition-all hover:shadow-sm ${
         isDragging ? "opacity-30" : ""
-      } ${isCompleted ? "opacity-90" : ""} ${
-        isSameDayTA
-          ? "border-[2.5px] border-red-500 ring-1 ring-white shadow-[0_0_0_1px_rgba(255,255,255,0.9)]"
-          : "border"
-      }`}
+      } ${isCompleted ? "opacity-90" : ""} ${borderClass}`}
       style={{
         backgroundColor: color.bg,
-        borderColor: isSameDayTA ? "#ef4444" : color.border,
+        borderColor: isP0 ? "#d97706" : isSameDayTA ? "#ef4444" : color.border,
         color: color.text,
       }}
     >
@@ -689,12 +696,28 @@ function DraggableCellInner({
             <span className="text-[10px] tabular-nums truncate">{checkout}</span>
           )}
         </div>
-        {isSameDayTA && (
+        {isP0 && (
+          <span
+            className="text-[9px] font-bold px-1 rounded bg-amber-600 text-white tracking-wide"
+            title={task.warning_reason ?? "P0 — arrival-risk orphan carryover. Property is empty; clean can start before checkout."}
+          >
+            P0
+          </span>
+        )}
+        {!isP0 && isSameDayTA && (
           <span
             className="text-[9px] font-bold px-1 rounded bg-red-500 text-white tracking-wide"
             title="Same-day turnaround"
           >
             STO
+          </span>
+        )}
+        {isP3 && (
+          <span
+            className="text-[9px] font-bold px-1 rounded bg-amber-500/30 text-amber-700 dark:text-amber-300 tracking-wide border border-amber-500/50"
+            title="P3 — orphan-gap fill. Opportunistic; safely deferred."
+          >
+            GAP
           </span>
         )}
         {task.overloaded && (
@@ -714,6 +737,7 @@ function DraggableCellInner({
           </span>
         )}
       </div>
+
       {isUnassigned && (
         <div className="text-[9px] mt-0.5 leading-tight">
           Unassigned
