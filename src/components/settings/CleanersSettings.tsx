@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, SprayCan, AlertTriangle, Loader2, UserCheck, KeyRound, X } from "lucide-react";
 import { CLEANER_COLOR_SWATCHES, getCleanerColor } from "@/lib/cleanerColors";
+import { CleanerHolidaysSection } from "./CleanerHolidaysSection";
 
 const LOCATION_GROUPS = ["Castle Hume", "Belfast", "Enniskillen", "North Coast", "Portstewart Coast", "Larne", "Kesh", "Other"];
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
