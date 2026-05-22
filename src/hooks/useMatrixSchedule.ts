@@ -19,6 +19,15 @@ export interface MatrixCleaner {
   active: boolean;
   location_groups?: string[];
   color?: string | null;
+  non_working_days?: string[];
+}
+
+export interface CleanerHolidayRow {
+  id: string;
+  cleaner_id: string;
+  start_date: string;
+  end_date: string;
+  reason: string;
 }
 
 export interface MatrixTask {
