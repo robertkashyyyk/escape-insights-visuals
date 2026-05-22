@@ -14,8 +14,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Loader2, ArrowUpDown } from "lucide-react";
 import { useMatrixSchedule, type MatrixListing, type MatrixTask } from "@/hooks/useMatrixSchedule";
 import {
   getCleanerColor,
@@ -50,6 +51,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
   const [filterCleaners, setFilterCleaners] = useState<Set<string>>(new Set()); // empty = all; "unassigned" = unassigned tasks
   const [showCompleted, setShowCompleted] = useState(true);
   const [activeDragTaskId, setActiveDragTaskId] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<"today" | "priority" | "cleaner" | "location" | "property">("today");
 
   // Derive weekStart locally from weekAnchor so the header label is always in sync
   // with the navigation buttons (independent of any caching inside the data hook).
@@ -116,8 +118,100 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
         .map(([g, ls]) => [g, ls.filter(l => listingsWithVisibleTask.has(l.id))] as [string, MatrixListing[]])
         .filter(([, ls]) => ls.length > 0);
     }
+
+    // Sort mode "location" = keep grouped-by-location-group layout (the default historical behaviour).
+    if (sortMode === "location") return groups;
+
+    // Otherwise flatten into custom sections.
+    const allListings = groups.flatMap(([, ls]) => ls);
+
+    if (sortMode === "property") {
+      const sorted = [...allListings].sort((a, b) => a.name.localeCompare(b.name));
+      return [["All properties", sorted]] as [string, MatrixListing[]][];
+    }
+
+    // Index this listing's task for today (if any) to drive priority / today sorts.
+    const taskToday = new Map<string, MatrixTask | undefined>();
+    for (const l of allListings) taskToday.set(l.id, taskGrid.get(`${l.id}|${todayStr}`));
+
+    if (sortMode === "today") {
+      const withToday: MatrixListing[] = [];
+      const rest: MatrixListing[] = [];
+      for (const l of allListings) {
+        if (taskToday.get(l.id)) withToday.push(l); else rest.push(l);
+      }
+      const sortByPriorityThenTime = (a: MatrixListing, b: MatrixListing) => {
+        const ta = taskToday.get(a.id);
+        const tb = taskToday.get(b.id);
+        const pa = ta?.priority_level ?? 99;
+        const pb = tb?.priority_level ?? 99;
+        if (pa !== pb) return pa - pb;
+        const tta = ta?.checkout_time || "99:99";
+        const ttb = tb?.checkout_time || "99:99";
+        if (tta !== ttb) return tta.localeCompare(ttb);
+        return a.name.localeCompare(b.name);
+      };
+      withToday.sort(sortByPriorityThenTime);
+      rest.sort((a, b) => (a.location_group || "Other").localeCompare(b.location_group || "Other") || a.name.localeCompare(b.name));
+      const sections: [string, MatrixListing[]][] = [];
+      if (withToday.length > 0) sections.push([`Today (${withToday.length})`, withToday]);
+      if (rest.length > 0) sections.push(["Rest of week", rest]);
+      return sections;
+    }
+
+    if (sortMode === "priority") {
+      // Use the lowest priority_level across the visible week for each listing.
+      const bestPrio = new Map<string, number>();
+      for (const t of tasks) {
+        if (!isTaskVisible(t)) continue;
+        const cur = bestPrio.get(t.listing_id);
+        const lvl = t.priority_level ?? 99;
+        if (cur === undefined || lvl < cur) bestPrio.set(t.listing_id, lvl);
+      }
+      const sorted = [...allListings].sort((a, b) => {
+        const pa = bestPrio.get(a.id) ?? 99;
+        const pb = bestPrio.get(b.id) ?? 99;
+        if (pa !== pb) return pa - pb;
+        return a.name.localeCompare(b.name);
+      });
+      return [["By priority", sorted]] as [string, MatrixListing[]][];
+    }
+
+    if (sortMode === "cleaner") {
+      // Group by the cleaner most-frequently assigned this week for each listing.
+      const cleanerByListing = new Map<string, string | null>();
+      const counts = new Map<string, Map<string, number>>();
+      for (const t of tasks) {
+        if (!isTaskVisible(t)) continue;
+        const key = t.assigned_cleaner_id || "__unassigned__";
+        const m = counts.get(t.listing_id) || new Map();
+        m.set(key, (m.get(key) || 0) + 1);
+        counts.set(t.listing_id, m);
+      }
+      for (const l of allListings) {
+        const m = counts.get(l.id);
+        if (!m) { cleanerByListing.set(l.id, null); continue; }
+        const top = [...m.entries()].sort((a, b) => b[1] - a[1])[0][0];
+        cleanerByListing.set(l.id, top === "__unassigned__" ? null : top);
+      }
+      const buckets = new Map<string, MatrixListing[]>();
+      for (const l of allListings) {
+        const cid = cleanerByListing.get(l.id);
+        const name = cid ? (cleaners.find(c => c.id === cid)?.name || "Unknown") : "Unassigned";
+        if (!buckets.has(name)) buckets.set(name, []);
+        buckets.get(name)!.push(l);
+      }
+      for (const arr of buckets.values()) arr.sort((a, b) => a.name.localeCompare(b.name));
+      // Unassigned first, then alphabetical
+      return Array.from(buckets.entries()).sort((a, b) => {
+        if (a[0] === "Unassigned") return -1;
+        if (b[0] === "Unassigned") return 1;
+        return a[0].localeCompare(b[0]);
+      });
+    }
+
     return groups;
-  }, [groupedListings, filterGroups, cleanerFilterActive, listingsWithVisibleTask]);
+  }, [groupedListings, filterGroups, cleanerFilterActive, listingsWithVisibleTask, sortMode, taskGrid, todayStr, tasks, isTaskVisible, cleaners]);
 
   // Summary
   const summary = useMemo(() => {
@@ -298,6 +392,22 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
             />
             Show completed
           </label>
+          <div className="ml-auto flex items-center gap-1.5">
+            <ArrowUpDown className="h-3 w-3 text-muted-foreground" />
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Sort:</span>
+            <Select value={sortMode} onValueChange={(v) => setSortMode(v as typeof sortMode)}>
+              <SelectTrigger className="h-7 w-[150px] text-xs bg-secondary/50 border-border/40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="priority">Priority</SelectItem>
+                <SelectItem value="cleaner">Cleaner</SelectItem>
+                <SelectItem value="location">Location Group</SelectItem>
+                <SelectItem value="property">Property</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 

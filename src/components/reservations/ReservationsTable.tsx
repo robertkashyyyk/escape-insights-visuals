@@ -10,13 +10,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { differenceInDays, format, parseISO } from "date-fns";
+import { useLocationGroups } from "@/hooks/useLocationGroups";
 
 type SortKey = "guest_name" | "property" | "check_in" | "check_out" | "nights" | "lead_time" | "amount" | "platform" | "status";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 250];
 
-const LOCATION_GROUPS = ["Castle Hume", "Belfast", "Enniskillen", "North Coast", "Portstewart Coast", "Larne", "Kesh", "Other"];
+
 
 function statusBadgeClass(s: string) {
   switch (s.toLowerCase()) {
@@ -28,6 +29,8 @@ function statusBadgeClass(s: string) {
 }
 
 export function ReservationsTable() {
+  const { data: locationGroupsData = [] } = useLocationGroups();
+  const LOCATION_GROUPS = locationGroupsData.map(g => g.name);
   const [search, setSearch] = useState("");
   const [timeFilter, setTimeFilter] = useState<"all" | "future" | "past">("all");
   const [yearFilter, setYearFilter] = useState("all");

@@ -12,8 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, SprayCan, AlertTriangle, Loader2, UserCheck, KeyRound, X } from "lucide-react";
 import { CLEANER_COLOR_SWATCHES, getCleanerColor } from "@/lib/cleanerColors";
 import { CleanerHolidaysSection } from "./CleanerHolidaysSection";
+import { useLocationGroups } from "@/hooks/useLocationGroups";
 
-const LOCATION_GROUPS = ["Castle Hume", "Belfast", "Enniskillen", "North Coast", "Portstewart Coast", "Larne", "Kesh", "Other"];
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 interface Cleaner {
@@ -66,6 +66,8 @@ function getGroupBreakdown(cleaners: Cleaner[], group: string, excludeId: string
 
 export function CleanersSettings() {
   const { toast } = useToast();
+  const { data: locationGroupsData = [] } = useLocationGroups();
+  const LOCATION_GROUPS = locationGroupsData.map(g => g.name);
   const [cleaners, setCleaners] = useState<Cleaner[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
