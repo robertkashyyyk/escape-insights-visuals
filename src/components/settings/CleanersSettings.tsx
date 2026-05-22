@@ -407,7 +407,44 @@ export function CleanersSettings() {
                     />
                   );
                 })}
+
+                {/* Custom colour wheel + hex input */}
+                <div className="flex items-center gap-1.5 ml-1 pl-2 border-l border-border/30">
+                  <label
+                    className="relative h-7 w-7 rounded-md cursor-pointer overflow-hidden ring-1 ring-border/40 hover:scale-105 transition-transform"
+                    title="Pick custom colour"
+                    aria-label="Pick custom colour"
+                    style={{
+                      background:
+                        "conic-gradient(from 0deg, #ef4444, #f59e0b, #eab308, #84cc16, #10b981, #06b6d4, #3b82f6, #8b5cf6, #ec4899, #ef4444)",
+                    }}
+                  >
+                    <input
+                      type="color"
+                      value={form.color || "#3b82f6"}
+                      onChange={(e) => setForm({ ...form, color: e.target.value })}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      aria-label="Custom colour wheel"
+                    />
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="#hex"
+                    value={form.color ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value.trim();
+                      if (v === "") return setForm({ ...form, color: null });
+                      if (/^#[0-9a-fA-F]{6}$/.test(v)) setForm({ ...form, color: v });
+                      else setForm({ ...form, color: v }); // allow typing
+                    }}
+                    className="h-7 w-24 text-[11px] tabular-nums bg-secondary/50 border-border/40 px-2"
+                    maxLength={7}
+                  />
+                </div>
               </div>
+              <p className="text-[10px] text-muted-foreground/80 italic pt-1">
+                Avoid greens (reserved for "completed") and reds (reserved for same-day turnarounds / dirty).
+              </p>
             </div>
 
             <div className="space-y-1.5">
