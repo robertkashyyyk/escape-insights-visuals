@@ -760,6 +760,8 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
         travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
         checkout_time: t.checkout_time,
         ...(t.notes ? { notes: t.notes } : {}),
+        overloaded: t.overloaded ?? false,
+        warning_reason: t.warning_reason ?? null,
       })
       .eq("id", t.existing_task_id!);
     if (updErr) throw updErr;
