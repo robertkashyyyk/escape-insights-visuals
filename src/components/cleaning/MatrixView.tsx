@@ -475,6 +475,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
         listing={selectedListing ?? null}
         cleaners={cleaners}
         reservations={reservations}
+        holidays={holidays}
         onReassign={reassignTask}
         onComplete={completeTask}
         onUndoComplete={undoComplete}
@@ -488,6 +489,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
         listing={addCleanCell?.listing ?? null}
         date={addCleanCell?.date ?? null}
         cleaners={cleaners}
+        holidays={holidays}
         onSubmit={addManualClean}
       />
     </div>
