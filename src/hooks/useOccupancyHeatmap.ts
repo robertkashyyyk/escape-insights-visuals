@@ -1,6 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { differenceInDays, getDaysInMonth, parseISO, startOfMonth, endOfMonth, max as dateMax, min as dateMin } from "date-fns";
+import {
+  differenceInDays,
+  getDaysInMonth,
+  parseISO,
+  startOfMonth,
+  endOfMonth,
+  max as dateMax,
+  min as dateMin,
+  addDays,
+  format,
+} from "date-fns";
+import { computeOrphanGapDates } from "@/lib/orphanGaps";
 
 export interface MonthCell {
   occupancy: number;
@@ -8,12 +19,14 @@ export interface MonthCell {
   nightsAvailable: number;
   revenue: number;
   bookings: number;
+  orphanNights: number;
 }
 
 export interface ListingOccupancy {
   id: string;
   name: string;
   locationGroup: string;
+  minStayNights: number;
   months: MonthCell[];
 }
 
@@ -25,10 +38,10 @@ export function useOccupancyHeatmap(year: number) {
       const yearEnd = `${year}-12-31`;
 
       const [{ data: listings }, { data: reservations }] = await Promise.all([
-        supabase.from("listings").select("id, name, location_group").eq("status", "active").order("name"),
+        supabase.from("listings").select("id, name, location_group, min_stay_nights").eq("status", "active").order("name"),
         supabase
           .from("reservations")
-          .select("listing_id, check_in, check_out, total_amount")
+          .select("listing_id, check_in, check_out, total_amount, status")
           .gte("check_out", yearStart)
           .lte("check_in", yearEnd)
           .eq("status", "confirmed"),
@@ -36,15 +49,17 @@ export function useOccupancyHeatmap(year: number) {
 
       if (!listings) return { listings: [] as ListingOccupancy[], locationGroups: [] as string[] };
 
-      const resMap = new Map<string, { check_in: string; check_out: string; total_amount: number | null }[]>();
+      const resMap = new Map<string, { check_in: string; check_out: string; total_amount: number | null; status?: string | null }[]>();
       (reservations || []).forEach((r) => {
         const arr = resMap.get(r.listing_id) || [];
         arr.push(r);
         resMap.set(r.listing_id, arr);
       });
 
-      const result: ListingOccupancy[] = listings.map((listing) => {
+      const result: ListingOccupancy[] = (listings as any[]).map((listing) => {
         const resos = resMap.get(listing.id) || [];
+        const minStay = listing.min_stay_nights ?? 2;
+        const orphanSet = computeOrphanGapDates(resos, minStay);
         const months: MonthCell[] = [];
 
         for (let m = 0; m < 12; m++) {
@@ -71,11 +86,30 @@ export function useOccupancyHeatmap(year: number) {
             }
           });
 
+          // Count orphan-gap nights falling inside this month
+          let orphanNights = 0;
+          for (let d = mStart; d <= mEnd; d = addDays(d, 1)) {
+            if (orphanSet.has(format(d, "yyyy-MM-dd"))) orphanNights++;
+          }
+
           const occupancy = Math.min(100, Math.round((nights / daysInMonth) * 100));
-          months.push({ occupancy, nightsBooked: nights, nightsAvailable: daysInMonth, revenue: Math.round(revenue), bookings });
+          months.push({
+            occupancy,
+            nightsBooked: nights,
+            nightsAvailable: daysInMonth,
+            revenue: Math.round(revenue),
+            bookings,
+            orphanNights,
+          });
         }
 
-        return { id: listing.id, name: listing.name, locationGroup: listing.location_group || "Ungrouped", months };
+        return {
+          id: listing.id,
+          name: listing.name,
+          locationGroup: listing.location_group || "Ungrouped",
+          minStayNights: minStay,
+          months,
+        };
       });
 
       const locationGroups = [...new Set(result.map((l) => l.locationGroup))].sort();

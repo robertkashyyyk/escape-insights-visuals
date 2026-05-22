@@ -10,6 +10,7 @@ export interface MatrixListing {
   location_group: string | null;
   default_check_out_time: string | null;
   default_check_in_time: string | null;
+  min_stay_nights: number;
 }
 
 export interface MatrixCleaner {
@@ -69,7 +70,7 @@ export function useMatrixSchedule(weekAnchor: Date) {
     queryFn: async () => {
       const { data } = await supabase
         .from("listings")
-        .select("id, name, location_group, default_check_in_time, default_check_out_time, status, is_bundle")
+        .select("id, name, location_group, default_check_in_time, default_check_out_time, status, is_bundle, min_stay_nights")
         .eq("status", "active");
       return ((data || []) as any[])
         .filter(l => !l.is_bundle)
@@ -79,6 +80,7 @@ export function useMatrixSchedule(weekAnchor: Date) {
           location_group: l.location_group,
           default_check_in_time: l.default_check_in_time,
           default_check_out_time: l.default_check_out_time,
+          min_stay_nights: l.min_stay_nights ?? 2,
         })) as MatrixListing[];
     },
   });
@@ -113,13 +115,14 @@ export function useMatrixSchedule(weekAnchor: Date) {
   const { data: reservations = [] } = useQuery({
     queryKey: ["matrix-reservations", weekStartStr, weekEndStr],
     queryFn: async () => {
-      // Pull anything with either checkout or checkin in the week (or spanning it)
-      const lookEnd = format(addDays(weekEnd, 7), "yyyy-MM-dd");
+      // Widen window so we can detect orphan gaps that span the week boundary.
+      const lookStart = format(addDays(weekStart, -14), "yyyy-MM-dd");
+      const lookEnd = format(addDays(weekEnd, 14), "yyyy-MM-dd");
       const { data } = await supabase
         .from("reservations")
         .select("id, listing_id, check_in, check_out, guest_name, check_in_time, check_out_time, status")
         .eq("status", "confirmed")
-        .gte("check_out", weekStartStr)
+        .gte("check_out", lookStart)
         .lte("check_in", lookEnd);
       return (data || []) as MatrixReservation[];
     },

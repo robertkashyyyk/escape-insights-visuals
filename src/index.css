@@ -179,4 +179,38 @@
   .glow-teal {
     box-shadow: 0 0 20px -4px hsl(var(--glow-accent) / 0.3);
   }
+
+  /* Orphan Gap — stranded inventory between bookings (< min-stay).
+     Hatched, hollow, amber/copper border. Distinct from bookings & ops states. */
+  .orphan-gap {
+    background-color: hsl(38 92% 50% / 0.04);
+    background-image: repeating-linear-gradient(
+      135deg,
+      hsl(38 92% 55% / 0.18) 0px,
+      hsl(38 92% 55% / 0.18) 1px,
+      transparent 1px,
+      transparent 6px
+    );
+    border: 1px solid hsl(38 92% 55% / 0.55);
+    border-radius: 6px;
+  }
+  .light .orphan-gap {
+    background-color: hsl(30 92% 50% / 0.05);
+    background-image: repeating-linear-gradient(
+      135deg,
+      hsl(30 90% 45% / 0.22) 0px,
+      hsl(30 90% 45% / 0.22) 1px,
+      transparent 1px,
+      transparent 6px
+    );
+    border: 1px solid hsl(30 92% 45% / 0.55);
+  }
+  .orphan-gap-hover:hover {
+    background-color: hsl(38 92% 50% / 0.08);
+    box-shadow: 0 0 0 1px hsl(38 92% 55% / 0.45), 0 0 12px -2px hsl(38 92% 55% / 0.25);
+  }
+  .light .orphan-gap-hover:hover {
+    background-color: hsl(30 92% 50% / 0.1);
+    box-shadow: 0 0 0 1px hsl(30 92% 45% / 0.5), 0 0 10px -2px hsl(30 90% 45% / 0.25);
+  }
 }

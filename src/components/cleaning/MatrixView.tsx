@@ -26,6 +26,8 @@ import {
 import { TaskDetailPanel } from "./TaskDetailPanel";
 import { AddManualCleanModal } from "./AddManualCleanModal";
 import { shortenName } from "@/lib/shortenName";
+import { computeOrphanGapDates, orphanGapTooltip } from "@/lib/orphanGaps";
+import { Unlink2 } from "lucide-react";
 
 interface Props {
   initialDate?: Date;
@@ -65,6 +67,22 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
     for (const t of tasks) map.set(`${t.listing_id}|${t.scheduled_date}`, t);
     return map;
   }, [tasks]);
+
+  // Orphan-gap dates per listing (using each listing's min_stay_nights)
+  const orphanGapsByListing = useMemo(() => {
+    const byListing = new Map<string, typeof reservations>();
+    for (const r of reservations) {
+      const arr = byListing.get(r.listing_id) || [];
+      arr.push(r);
+      byListing.set(r.listing_id, arr);
+    }
+    const out = new Map<string, Set<string>>();
+    for (const l of listings) {
+      const resos = byListing.get(l.id) || [];
+      out.set(l.id, computeOrphanGapDates(resos, l.min_stay_nights ?? 2));
+    }
+    return out;
+  }, [reservations, listings]);
 
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
@@ -407,6 +425,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                           const visible = isTaskVisible(rawTask);
                           // Hide filtered-out tasks entirely (render as empty cell)
                           const task = visible ? rawTask : undefined;
+                          const isOrphan = !task && (orphanGapsByListing.get(listing.id)?.has(ds) ?? false);
 
                           return (
                             <MatrixCell
@@ -417,6 +436,8 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                               cleaners={cleaners}
                               isToday={isTodayCol}
                               dimmed={false}
+                              isOrphanGap={isOrphan}
+                              minStayNights={listing.min_stay_nights ?? 2}
                               onTaskClick={(id) => setSelectedTaskId(id)}
                               onAddClick={() => setAddCleanCell({ listing, date: d })}
                             />
@@ -506,7 +527,7 @@ function CleanerDropTarget({
 
 /* ── Single matrix cell ── */
 function MatrixCell({
-  date, listing, task, cleaners, isToday, dimmed, onTaskClick, onAddClick,
+  date, listing, task, cleaners, isToday, dimmed, isOrphanGap, minStayNights, onTaskClick, onAddClick,
 }: {
   date: Date;
   listing: MatrixListing;
@@ -514,6 +535,8 @@ function MatrixCell({
   cleaners: { id: string; name: string; location_groups?: string[] }[];
   isToday: boolean;
   dimmed: boolean;
+  isOrphanGap?: boolean;
+  minStayNights?: number;
   onTaskClick: (id: string) => void;
   onAddClick: () => void;
 }) {
@@ -522,6 +545,30 @@ function MatrixCell({
   const dimClass = dimmed ? "opacity-25" : "";
 
   if (!task) {
+    if (isOrphanGap) {
+      const tip = orphanGapTooltip(minStayNights ?? 2);
+      return (
+        <TooltipProvider delayDuration={150}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={onAddClick}
+                className={`group ${baseBorder} ${todayTint} flex items-center justify-center min-h-[56px] p-1`}
+                aria-label={tip}
+              >
+                <div className="orphan-gap orphan-gap-hover w-full h-full min-h-[44px] flex items-center justify-center gap-1 text-[10px] font-medium text-amber-500/90 dark:text-amber-300/90 transition-all">
+                  <Unlink2 className="h-3 w-3 opacity-70" />
+                  <span className="uppercase tracking-wider">Orphan</span>
+                </div>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[220px] text-xs">
+              {tip}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
     return (
       <button
         onClick={onAddClick}
