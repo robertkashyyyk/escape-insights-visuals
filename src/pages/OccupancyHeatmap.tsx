@@ -192,17 +192,27 @@ function HeatmapCell({ cell, propertyName, month, year }: { cell: MonthCell; pro
   const pct = cell?.occupancy ?? 0;
   const band = getBand(pct);
   const showText = pct > 0;
+  const orphanNights = cell?.orphanNights ?? 0;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <div className="p-[2px]">
           <div
-            className={`w-full rounded-[3px] transition-all duration-150 hover:scale-110 hover:z-10 cursor-default flex items-center justify-center ${band.text}`}
+            className={`relative w-full rounded-[3px] transition-all duration-150 hover:scale-110 hover:z-10 cursor-default flex items-center justify-center ${band.text}`}
             style={{ backgroundColor: band.bg, minHeight: "32px" }}
           >
             {showText && (
               <span className="text-[10px] font-semibold tabular-nums leading-none">
                 {pct}%
+              </span>
+            )}
+            {orphanNights > 0 && (
+              <span
+                aria-label={`${orphanNights} orphan night${orphanNights === 1 ? "" : "s"}`}
+                className="absolute top-[1px] right-[1px] h-3 min-w-[12px] px-[3px] rounded-[2px] flex items-center justify-center text-[8px] font-bold tabular-nums orphan-gap"
+                style={{ color: "hsl(38 92% 65%)" }}
+              >
+                {orphanNights}
               </span>
             )}
           </div>
@@ -221,7 +231,20 @@ function HeatmapCell({ cell, propertyName, month, year }: { cell: MonthCell; pro
           <span className="text-foreground font-medium text-right">{cell?.bookings ?? 0}</span>
           <span className="text-muted-foreground">Revenue</span>
           <span className="text-foreground font-medium text-right">£{(cell?.revenue ?? 0).toLocaleString()}</span>
+          {orphanNights > 0 && (
+            <>
+              <span className="text-amber-400/90">Orphan gaps</span>
+              <span className="text-amber-300 font-semibold text-right">
+                {orphanNights} night{orphanNights === 1 ? "" : "s"}
+              </span>
+            </>
+          )}
         </div>
+        {orphanNights > 0 && (
+          <p className="text-[10px] text-amber-400/80 italic pt-1">
+            Stranded inventory below min-stay
+          </p>
+        )}
       </TooltipContent>
     </Tooltip>
   );
