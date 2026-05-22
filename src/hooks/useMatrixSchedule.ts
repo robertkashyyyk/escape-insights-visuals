@@ -45,6 +45,7 @@ export interface MatrixTask {
   task_type: string;         // 'clean' | 'interim' | 'maintenance'
   notes: string | null;
   priority: string;
+  priority_level?: number | null;
   completed_at: string | null;
   overloaded?: boolean | null;
   override_assignment?: boolean | null;
