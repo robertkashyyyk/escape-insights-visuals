@@ -70,7 +70,13 @@ interface CleanerInfo {
   daily_working_hours: number;
   home_latitude: number | null;
   home_longitude: number | null;
+  /** [{start_date, end_date}] in yyyy-MM-dd */
+  holidays: Array<{ start_date: string; end_date: string; reason: string }>;
 }
+
+const CLUSTER_RADIUS_KM = 8; // ~5 miles
+const CLUSTER_SOFT_MAX = 3;  // 1–3 → one cleaner; 4+ → split
+const ROLLING_WINDOW_DAYS = 28;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
