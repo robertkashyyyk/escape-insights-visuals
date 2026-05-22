@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { MatrixCleaner, MatrixListing } from "@/hooks/useMatrixSchedule";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertTriangle } from "lucide-react";
+import type { MatrixCleaner, MatrixListing, CleanerHolidayRow } from "@/hooks/useMatrixSchedule";
 import { format } from "date-fns";
+import { getUnavailabilityReason } from "@/lib/cleanerAvailability";
 
 interface Props {
   open: boolean;
@@ -13,6 +16,7 @@ interface Props {
   listing: MatrixListing | null;
   date: Date | null;
   cleaners: MatrixCleaner[];
+  holidays?: CleanerHolidayRow[];
   onSubmit: (input: {
     listing_id: string;
     scheduled_date: string;
@@ -22,11 +26,18 @@ interface Props {
   }) => Promise<boolean>;
 }
 
-export function AddManualCleanModal({ open, onOpenChange, listing, date, cleaners, onSubmit }: Props) {
+export function AddManualCleanModal({ open, onOpenChange, listing, date, cleaners, holidays = [], onSubmit }: Props) {
   const [taskType, setTaskType] = useState<"clean" | "interim" | "maintenance">("clean");
   const [cleanerId, setCleanerId] = useState<string>("unassigned");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const unavailReason = useMemo(() => {
+    if (!date || cleanerId === "unassigned") return null;
+    const c = cleaners.find((x) => x.id === cleanerId);
+    const hs = holidays.filter((h) => h.cleaner_id === cleanerId);
+    return getUnavailabilityReason(c, date, hs);
+  }, [cleanerId, date, cleaners, holidays]);
 
   if (!listing || !date) return null;
 
@@ -93,6 +104,16 @@ export function AddManualCleanModal({ open, onOpenChange, listing, date, cleaner
               </SelectContent>
             </Select>
           </div>
+
+          {unavailReason && (
+            <Alert className="border-amber-500/30 bg-amber-500/10">
+              <AlertTriangle className="h-4 w-4 text-amber-400" />
+              <AlertDescription className="text-xs text-amber-300">
+                This cleaner is marked <strong>{unavailReason}</strong> on this date.
+                Assigning is allowed but will be flagged as an override.
+              </AlertDescription>
+            </Alert>
+          )}
 
           <div>
             <Label htmlFor="notes" className="text-xs">Notes (optional)</Label>
