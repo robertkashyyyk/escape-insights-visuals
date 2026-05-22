@@ -6,7 +6,7 @@ export interface CleanerHoliday {
   start_date: string; // yyyy-MM-dd
   end_date: string;   // yyyy-MM-dd
   reason: string;
-  notes: string | null;
+  notes?: string | null;
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
