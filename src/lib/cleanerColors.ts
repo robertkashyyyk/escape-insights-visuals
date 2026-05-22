@@ -9,22 +9,23 @@ export interface CleanerColor {
   initialBg: string;   // avatar circle bg
 }
 
-// NOTE: Green hues are reserved for "completed" status — never assign green to a cleaner.
+// NOTE: Green hues are reserved for "completed" (clean) status — never assign green/teal to a cleaner.
+// NOTE: Red hues are reserved for "dirty" / same-day turnaround alerts — never assign red/rose to a cleaner.
 const PALETTE: CleanerColor[] = [
-  { hex: "#0d9488", bg: "rgba(13,148,136,0.18)",  border: "rgba(13,148,136,0.45)",  text: "#5eead4", initialBg: "#0d9488" },  // teal
   { hex: "#3b82f6", bg: "rgba(59,130,246,0.18)",  border: "rgba(59,130,246,0.45)",  text: "#93c5fd", initialBg: "#3b82f6" },  // blue
   { hex: "#8b5cf6", bg: "rgba(139,92,246,0.18)",  border: "rgba(139,92,246,0.45)",  text: "#c4b5fd", initialBg: "#8b5cf6" },  // purple
   { hex: "#ec4899", bg: "rgba(236,72,153,0.18)",  border: "rgba(236,72,153,0.45)",  text: "#f9a8d4", initialBg: "#ec4899" },  // pink
   { hex: "#6366f1", bg: "rgba(99,102,241,0.18)",  border: "rgba(99,102,241,0.45)",  text: "#a5b4fc", initialBg: "#6366f1" },  // indigo
   { hex: "#f97316", bg: "rgba(249,115,22,0.18)",  border: "rgba(249,115,22,0.45)",  text: "#fdba74", initialBg: "#f97316" },  // orange
-  { hex: "#06b6d4", bg: "rgba(6,182,212,0.18)",   border: "rgba(6,182,212,0.45)",   text: "#67e8f9", initialBg: "#06b6d4" },  // cyan
-  { hex: "#e11d48", bg: "rgba(225,29,72,0.18)",   border: "rgba(225,29,72,0.45)",   text: "#fda4af", initialBg: "#e11d48" },  // rose
+  { hex: "#a855f7", bg: "rgba(168,85,247,0.18)",  border: "rgba(168,85,247,0.45)",  text: "#d8b4fe", initialBg: "#a855f7" },  // violet
+  { hex: "#f59e0b", bg: "rgba(245,158,11,0.18)",  border: "rgba(245,158,11,0.45)",  text: "#fcd34d", initialBg: "#f59e0b" },  // amber
+  { hex: "#64748b", bg: "rgba(100,116,139,0.20)", border: "rgba(100,116,139,0.50)", text: "#cbd5e1", initialBg: "#64748b" },  // slate
 ];
 
 // Explicit overrides by lower-cased name (first names from spec)
 const NAME_OVERRIDES: Record<string, number> = {
-  kirstie: 0,  // teal
-  andreas: 1,  // blue
+  kirstie: 1,  // purple (was teal — teal reads as green)
+  andreas: 0,  // blue
 };
 
 export const UNASSIGNED_COLOR: CleanerColor = {
@@ -99,9 +100,9 @@ export function getCleanerColor(
 }
 
 // Curated palette of hex values for the cleaner colour picker.
-// NOTE: Green hues (emerald, lime, teal-green) are reserved for "completed" — excluded here.
+// NOTE: Green/teal hues reserved for "completed" (clean). Red/rose hues reserved for "dirty"/STO alerts.
 export const CLEANER_COLOR_SWATCHES = [
-  "#0d9488", "#3b82f6", "#8b5cf6", "#ec4899",
-  "#6366f1", "#f97316", "#06b6d4", "#e11d48",
-  "#f59e0b", "#a855f7", "#ef4444", "#64748b",
+  "#3b82f6", "#8b5cf6", "#ec4899", "#6366f1",
+  "#f97316", "#a855f7", "#f59e0b", "#64748b",
+  "#06b6d4", "#d946ef", "#eab308", "#0ea5e9",
 ];
