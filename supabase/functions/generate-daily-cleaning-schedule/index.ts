@@ -266,6 +266,22 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     .from("cleaners")
     .select("*")
     .eq("active", true);
+
+  // 5b. Load holidays overlapping the target date for these cleaners
+  const cleanerIds = (cleanersRaw || []).map((c: any) => c.id);
+  const { data: holidaysRaw } = await supabase
+    .from("cleaner_holidays")
+    .select("cleaner_id, start_date, end_date, reason")
+    .in("cleaner_id", cleanerIds.length ? cleanerIds : ["00000000-0000-0000-0000-000000000000"])
+    .lte("start_date", targetDate)
+    .gte("end_date", targetDate);
+
+  const holidaysByCleaner: Record<string, Array<{ start_date: string; end_date: string; reason: string }>> = {};
+  for (const h of holidaysRaw || []) {
+    if (!holidaysByCleaner[h.cleaner_id]) holidaysByCleaner[h.cleaner_id] = [];
+    holidaysByCleaner[h.cleaner_id].push(h);
+  }
+
   const cleaners: CleanerInfo[] = (cleanersRaw || []).map((c: any) => ({
     id: c.id,
     name: c.name,
@@ -275,6 +291,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     daily_working_hours: c.daily_working_hours ?? 8,
     home_latitude: c.home_latitude ?? null,
     home_longitude: c.home_longitude ?? null,
+    holidays: holidaysByCleaner[c.id] || [],
   }));
 
   // 6. Get already-scheduled tasks for today (for capacity calculation)
@@ -297,6 +314,88 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       cleanerScheduledMinutes[t.assigned_cleaner_id] +=
         (t.cleaning_duration_minutes || 0) + (t.travel_time_from_previous_minutes || 0);
     }
+  }
+
+  // 6b. Rolling actual share (last N days, per region) — drives fair-share deficit
+  const windowStartDate = new Date(targetDate + "T12:00:00Z");
+  windowStartDate.setUTCDate(windowStartDate.getUTCDate() - ROLLING_WINDOW_DAYS);
+  const windowStart = windowStartDate.toISOString().slice(0, 10);
+
+  const { data: rollingTasks } = await supabase
+    .from("clean_tasks")
+    .select("assigned_cleaner_id, listing_id, scheduled_date")
+    .gte("scheduled_date", windowStart)
+    .lt("scheduled_date", targetDate)
+    .not("status", "eq", "cancelled");
+
+  // listing_id -> location_group lookup (use already-loaded listings + fetch unknowns)
+  const listingGroupCache = new Map<string, string>();
+  for (const l of [...(rawListings || []), ...componentListings]) {
+    listingGroupCache.set(l.id, l.location_group || "Other");
+  }
+  const missingIds = Array.from(new Set(
+    (rollingTasks || [])
+      .map((t: any) => String(t.listing_id))
+      .filter((id: string) => !listingGroupCache.has(id))
+  ));
+  if (missingIds.length > 0) {
+    const { data: extraListings } = await supabase
+      .from("listings")
+      .select("id, location_group")
+      .in("id", missingIds);
+    for (const l of extraListings || []) listingGroupCache.set(l.id, l.location_group || "Other");
+  }
+
+  // rollingRegionCount[cleanerId][group] / rollingRegionTotal[group]
+  const rollingRegionCount: Record<string, Record<string, number>> = {};
+  const rollingRegionTotal: Record<string, number> = {};
+  for (const c of cleaners) rollingRegionCount[c.id] = {};
+  for (const t of rollingTasks || []) {
+    const grp = listingGroupCache.get(String(t.listing_id)) || "Other";
+    rollingRegionTotal[grp] = (rollingRegionTotal[grp] || 0) + 1;
+    if (t.assigned_cleaner_id && rollingRegionCount[t.assigned_cleaner_id]) {
+      rollingRegionCount[t.assigned_cleaner_id][grp] =
+        (rollingRegionCount[t.assigned_cleaner_id][grp] || 0) + 1;
+    }
+  }
+
+  function actualSharePct(cleanerId: string, group: string): number {
+    const total = (rollingRegionTotal[group] || 0)
+      + Object.values(cleanerRegionCount).reduce((s, m) => s + (m[group] || 0), 0);
+    if (total === 0) return 0;
+    const actual = (rollingRegionCount[cleanerId]?.[group] || 0)
+      + (cleanerRegionCount[cleanerId]?.[group] || 0);
+    return (actual / total) * 100;
+  }
+
+  function isEligibleBase(c: CleanerInfo, task: TaskInfo): boolean {
+    if (!c.location_groups.includes(task.location_group)) return false;
+    if (c.non_working_days.includes(targetDayOfWeek)) return false;
+    // Holiday filter — any holiday range covering targetDate disqualifies
+    for (const h of c.holidays) {
+      if (targetDate >= h.start_date && targetDate <= h.end_date) return false;
+    }
+    return true;
+  }
+
+  function hasCapacity(c: CleanerInfo, addMins: number): boolean {
+    const projected = cleanerScheduledMinutes[c.id] + addMins + 15;
+    return projected <= c.daily_working_hours * 60;
+  }
+
+  function pickByDeficit(pool: CleanerInfo[], group: string): CleanerInfo | null {
+    if (pool.length === 0) return null;
+    let best = pool[0];
+    let bestDeficit = -Infinity;
+    for (const c of pool) {
+      const target = c.workload_share[group] ?? 0;
+      const actual = actualSharePct(c.id, group);
+      const deficit = target - actual;
+      // Tie-break: prefer fewer minutes scheduled today
+      const score = deficit - cleanerScheduledMinutes[c.id] / 10000;
+      if (score > bestDeficit) { bestDeficit = score; best = c; }
+    }
+    return best;
   }
 
   // 7. Build new tasks
