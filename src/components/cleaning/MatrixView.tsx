@@ -146,8 +146,8 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
         const pa = ta?.priority_level ?? 99;
         const pb = tb?.priority_level ?? 99;
         if (pa !== pb) return pa - pb;
-        const tta = ta?.estimated_start_time || ta?.checkout_time || "99:99";
-        const ttb = tb?.estimated_start_time || tb?.checkout_time || "99:99";
+        const tta = ta?.checkout_time || "99:99";
+        const ttb = tb?.checkout_time || "99:99";
         if (tta !== ttb) return tta.localeCompare(ttb);
         return a.name.localeCompare(b.name);
       };
