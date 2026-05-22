@@ -89,9 +89,28 @@ export function TaskDetailPanel({
   })();
 
   const handleReassign = async (val: string) => {
+    if (val !== "unassigned") {
+      const c = cleaners.find((x) => x.id === val);
+      const holidaysForC = holidays.filter((h) => h.cleaner_id === val);
+      const reason = getUnavailabilityReason(c, task.scheduled_date, holidaysForC);
+      if (reason) {
+        setPendingCleanerId(val);
+        setPendingUnavailReason(reason);
+        return;
+      }
+    }
     setBusy(true);
     await onReassign(task.id, val === "unassigned" ? null : val);
     setBusy(false);
+  };
+
+  const confirmReassign = async () => {
+    if (!pendingCleanerId) return;
+    setBusy(true);
+    await onReassign(task.id, pendingCleanerId);
+    setBusy(false);
+    setPendingCleanerId(null);
+    setPendingUnavailReason(null);
   };
 
   const handleComplete = async () => {
