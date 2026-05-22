@@ -165,7 +165,8 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
       for (const t of tasks) {
         if (!isTaskVisible(t)) continue;
         const cur = bestPrio.get(t.listing_id);
-        if (cur === undefined || t.priority_level < cur) bestPrio.set(t.listing_id, t.priority_level);
+        const lvl = t.priority_level ?? 99;
+        if (cur === undefined || lvl < cur) bestPrio.set(t.listing_id, lvl);
       }
       const sorted = [...allListings].sort((a, b) => {
         const pa = bestPrio.get(a.id) ?? 99;
