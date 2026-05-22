@@ -425,6 +425,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                           const visible = isTaskVisible(rawTask);
                           // Hide filtered-out tasks entirely (render as empty cell)
                           const task = visible ? rawTask : undefined;
+                          const isOrphan = !task && (orphanGapsByListing.get(listing.id)?.has(ds) ?? false);
 
                           return (
                             <MatrixCell
@@ -435,6 +436,8 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                               cleaners={cleaners}
                               isToday={isTodayCol}
                               dimmed={false}
+                              isOrphanGap={isOrphan}
+                              minStayNights={listing.min_stay_nights ?? 2}
                               onTaskClick={(id) => setSelectedTaskId(id)}
                               onAddClick={() => setAddCleanCell({ listing, date: d })}
                             />
