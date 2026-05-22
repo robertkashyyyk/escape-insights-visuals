@@ -60,6 +60,9 @@ interface TaskInfo {
   existing_task_id?: string | null; // present if this is a pre-existing unassigned row to UPDATE rather than INSERT
   source?: string;
   notes?: string;
+  overloaded?: boolean;
+  override_assignment?: boolean;
+  warning_reason?: string | null;
 }
 
 interface CleanerInfo {
@@ -535,8 +538,11 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     task.assigned_cleaner_id = cleanerOrNull.id;
     task.status = "scheduled";
     if (overload) {
-      const tag = "⚠ Overloaded: only cleaner available for nearby cluster";
-      task.notes = task.notes ? `${task.notes} | ${tag}` : tag;
+      task.overloaded = true;
+      task.warning_reason = "Only eligible cleaner for nearby cluster — workload exceeds soft cap";
+    } else {
+      task.overloaded = false;
+      task.warning_reason = null;
     }
     cleanerBuckets[cleanerOrNull.id].push(task);
     cleanerScheduledMinutes[cleanerOrNull.id] += task.cleaning_duration_minutes + 15;
@@ -734,6 +740,9 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       checkin_time: t.checkin_time,
       is_same_day_turnaround: t.is_same_day_turnaround,
       notes: t.notes ?? null,
+      overloaded: t.overloaded ?? false,
+      override_assignment: t.override_assignment ?? false,
+      warning_reason: t.warning_reason ?? null,
     }));
     const { error: insertErr } = await supabase.from("clean_tasks").insert(rows);
     if (insertErr) throw insertErr;
@@ -751,6 +760,8 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
         travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
         checkout_time: t.checkout_time,
         ...(t.notes ? { notes: t.notes } : {}),
+        overloaded: t.overloaded ?? false,
+        warning_reason: t.warning_reason ?? null,
       })
       .eq("id", t.existing_task_id!);
     if (updErr) throw updErr;

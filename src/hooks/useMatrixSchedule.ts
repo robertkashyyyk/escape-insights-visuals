@@ -46,6 +46,9 @@ export interface MatrixTask {
   notes: string | null;
   priority: string;
   completed_at: string | null;
+  overloaded?: boolean | null;
+  override_assignment?: boolean | null;
+  warning_reason?: string | null;
 }
 
 export interface MatrixReservation {
@@ -212,10 +215,18 @@ export function useMatrixSchedule(weekAnchor: Date) {
   }, [tasksLoading, tasks.length, reservations, weekStartStr, weekEndStr, qc]);
 
   // Mutations
-  const reassignTask = useCallback(async (taskId: string, cleanerId: string | null) => {
+  const reassignTask = useCallback(async (taskId: string, cleanerId: string | null, override?: { reason: string }) => {
     const newStatus = cleanerId ? "scheduled" : "unassigned";
+    const patch: Record<string, unknown> = { assigned_cleaner_id: cleanerId, status: newStatus };
+    if (cleanerId && override) {
+      patch.override_assignment = true;
+      patch.warning_reason = override.reason;
+    } else if (!cleanerId) {
+      patch.override_assignment = false;
+      patch.warning_reason = null;
+    }
     const { error } = await (supabase.from("clean_tasks" as any) as any)
-      .update({ assigned_cleaner_id: cleanerId, status: newStatus })
+      .update(patch)
       .eq("id", taskId);
     if (error) {
       toast({ title: "Reassignment failed", description: error.message, variant: "destructive" });
@@ -333,6 +344,8 @@ export function useMatrixSchedule(weekAnchor: Date) {
     task_type: "clean" | "interim" | "maintenance";
     assigned_cleaner_id: string | null;
     notes: string | null;
+    override_assignment?: boolean;
+    warning_reason?: string | null;
   }) => {
     const { error } = await (supabase.from("clean_tasks" as any) as any).insert({
       listing_id: input.listing_id,
@@ -344,6 +357,8 @@ export function useMatrixSchedule(weekAnchor: Date) {
       source: "manual",
       priority: "standard",
       cleaning_duration_minutes: 90,
+      override_assignment: input.override_assignment ?? false,
+      warning_reason: input.warning_reason ?? null,
     });
     if (error) {
       toast({ title: "Failed to add", description: error.message, variant: "destructive" });

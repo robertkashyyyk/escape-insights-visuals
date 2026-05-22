@@ -23,6 +23,8 @@ interface Props {
     task_type: "clean" | "interim" | "maintenance";
     assigned_cleaner_id: string | null;
     notes: string | null;
+    override_assignment?: boolean;
+    warning_reason?: string | null;
   }) => Promise<boolean>;
 }
 
@@ -49,6 +51,8 @@ export function AddManualCleanModal({ open, onOpenChange, listing, date, cleaner
       task_type: taskType,
       assigned_cleaner_id: cleanerId === "unassigned" ? null : cleanerId,
       notes: notes.trim() || null,
+      override_assignment: !!unavailReason,
+      warning_reason: unavailReason ? `Override: ${unavailReason}` : null,
     });
     setSubmitting(false);
     if (ok) {

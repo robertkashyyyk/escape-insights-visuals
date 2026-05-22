@@ -229,6 +229,8 @@ export type Database = {
           is_same_day_turnaround: boolean | null
           listing_id: string
           notes: string | null
+          overloaded: boolean
+          override_assignment: boolean
           priority: string
           reservation_id: string | null
           route_order: number | null
@@ -238,6 +240,7 @@ export type Database = {
           task_type: string
           travel_time_from_previous_minutes: number | null
           updated_at: string
+          warning_reason: string | null
         }
         Insert: {
           assigned_cleaner_id?: string | null
@@ -251,6 +254,8 @@ export type Database = {
           is_same_day_turnaround?: boolean | null
           listing_id: string
           notes?: string | null
+          overloaded?: boolean
+          override_assignment?: boolean
           priority?: string
           reservation_id?: string | null
           route_order?: number | null
@@ -260,6 +265,7 @@ export type Database = {
           task_type?: string
           travel_time_from_previous_minutes?: number | null
           updated_at?: string
+          warning_reason?: string | null
         }
         Update: {
           assigned_cleaner_id?: string | null
@@ -273,6 +279,8 @@ export type Database = {
           is_same_day_turnaround?: boolean | null
           listing_id?: string
           notes?: string | null
+          overloaded?: boolean
+          override_assignment?: boolean
           priority?: string
           reservation_id?: string | null
           route_order?: number | null
@@ -282,6 +290,7 @@ export type Database = {
           task_type?: string
           travel_time_from_previous_minutes?: number | null
           updated_at?: string
+          warning_reason?: string | null
         }
         Relationships: [
           {

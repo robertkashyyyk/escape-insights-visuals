@@ -20,7 +20,7 @@ interface Props {
   cleaners: MatrixCleaner[];
   reservations: MatrixReservation[];
   holidays?: CleanerHolidayRow[];
-  onReassign: (taskId: string, cleanerId: string | null) => Promise<boolean>;
+  onReassign: (taskId: string, cleanerId: string | null, override?: { reason: string }) => Promise<boolean>;
   onComplete: (taskId: string, listingId: string) => Promise<boolean>;
   onUndoComplete: (taskId: string, listingId: string) => Promise<boolean>;
   onRemove: (taskId: string) => Promise<boolean>;
@@ -107,7 +107,7 @@ export function TaskDetailPanel({
   const confirmReassign = async () => {
     if (!pendingCleanerId) return;
     setBusy(true);
-    await onReassign(task.id, pendingCleanerId);
+    await onReassign(task.id, pendingCleanerId, { reason: `Override: ${pendingUnavailReason ?? "cleaner unavailable"}` });
     setBusy(false);
     setPendingCleanerId(null);
     setPendingUnavailReason(null);
