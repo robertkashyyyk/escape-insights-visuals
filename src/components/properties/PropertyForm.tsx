@@ -321,3 +321,36 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
     </Sheet>
   );
 }
+
+function LocationGroupField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { data: groups = [] } = useLocationGroups();
+  const managed = groups.map(g => g.name);
+  const isLegacy = !!value && !managed.includes(value);
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">Location Group</Label>
+      <Select value={value || "__none__"} onValueChange={(v) => onChange(v === "__none__" ? "" : v)}>
+        <SelectTrigger>
+          <SelectValue placeholder="Select location group" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">— None —</SelectItem>
+          {isLegacy && (
+            <SelectItem value={value}>
+              {value} (legacy)
+            </SelectItem>
+          )}
+          {managed.map(name => (
+            <SelectItem key={name} value={name}>{name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {isLegacy && (
+        <p className="text-[10px] text-amber-300 flex items-center gap-1">
+          <AlertTriangle className="h-3 w-3" />
+          Legacy value — remap to a managed group, or add it under Settings → General → Location Groups.
+        </p>
+      )}
+    </div>
+  );
+}
