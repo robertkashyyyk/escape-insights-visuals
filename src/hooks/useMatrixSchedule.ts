@@ -344,6 +344,8 @@ export function useMatrixSchedule(weekAnchor: Date) {
     task_type: "clean" | "interim" | "maintenance";
     assigned_cleaner_id: string | null;
     notes: string | null;
+    override_assignment?: boolean;
+    warning_reason?: string | null;
   }) => {
     const { error } = await (supabase.from("clean_tasks" as any) as any).insert({
       listing_id: input.listing_id,
@@ -355,6 +357,8 @@ export function useMatrixSchedule(weekAnchor: Date) {
       source: "manual",
       priority: "standard",
       cleaning_duration_minutes: 90,
+      override_assignment: input.override_assignment ?? false,
+      warning_reason: input.warning_reason ?? null,
     });
     if (error) {
       toast({ title: "Failed to add", description: error.message, variant: "destructive" });
