@@ -68,6 +68,22 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
     return map;
   }, [tasks]);
 
+  // Orphan-gap dates per listing (using each listing's min_stay_nights)
+  const orphanGapsByListing = useMemo(() => {
+    const byListing = new Map<string, typeof reservations>();
+    for (const r of reservations) {
+      const arr = byListing.get(r.listing_id) || [];
+      arr.push(r);
+      byListing.set(r.listing_id, arr);
+    }
+    const out = new Map<string, Set<string>>();
+    for (const l of listings) {
+      const resos = byListing.get(l.id) || [];
+      out.set(l.id, computeOrphanGapDates(resos, l.min_stay_nights ?? 2));
+    }
+    return out;
+  }, [reservations, listings]);
+
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
 
