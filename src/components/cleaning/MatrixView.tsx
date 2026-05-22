@@ -373,7 +373,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
           </div>
         ) : (
           <div className="border border-border/30 rounded-xl overflow-hidden bg-card/30">
-            <div className="overflow-x-auto">
+            <div className="overflow-auto max-h-[calc(100vh-220px)]">
               <div className="min-w-[900px]">
                 {/* Header row */}
                 <div className="grid grid-cols-[200px_repeat(7,minmax(110px,1fr))] sticky top-0 z-20 bg-card/95 backdrop-blur border-b border-border/40">
