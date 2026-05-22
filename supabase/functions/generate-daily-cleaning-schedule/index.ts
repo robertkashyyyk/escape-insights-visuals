@@ -60,6 +60,9 @@ interface TaskInfo {
   existing_task_id?: string | null; // present if this is a pre-existing unassigned row to UPDATE rather than INSERT
   source?: string;
   notes?: string;
+  overloaded?: boolean;
+  override_assignment?: boolean;
+  warning_reason?: string | null;
 }
 
 interface CleanerInfo {
