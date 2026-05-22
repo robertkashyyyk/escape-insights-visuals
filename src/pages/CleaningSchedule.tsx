@@ -15,9 +15,11 @@ import { MatrixView } from "@/components/cleaning/MatrixView";
 import { useRole } from "@/contexts/AuthContext";
 
 const PRIORITY_CONFIG: Record<Priority, { label: string; color: string; icon: string }> = {
+  ARRIVAL_RISK: { label: "P0 · ARRIVAL RISK", color: "bg-amber-600/25 text-amber-300 border-amber-600/60", icon: "🟧" },
+  SAME_DAY: { label: "P1 · SAME-DAY TURNAROUND", color: "bg-red-500/20 text-red-400 border-red-500/30", icon: "🔴" },
   TIGHT_WINDOW: { label: "TIGHT WINDOW", color: "bg-amber-500/20 text-amber-400 border-amber-500/30", icon: "🟡" },
-  SAME_DAY: { label: "SAME-DAY TURNAROUND", color: "bg-red-500/20 text-red-400 border-red-500/30", icon: "🔴" },
   STANDARD: { label: "STANDARD", color: "bg-muted text-muted-foreground border-border/30", icon: "⚪" },
+  GAP_FILL: { label: "P3 · GAP FILL", color: "bg-amber-500/10 text-amber-300/80 border-amber-500/40 border-dashed", icon: "▱" },
 };
 
 export default function CleaningSchedule() {
