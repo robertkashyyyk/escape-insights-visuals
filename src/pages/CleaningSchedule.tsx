@@ -138,8 +138,9 @@ export default function CleaningSchedule() {
           })()}
         </div>
 
-        {/* Controls */}
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Controls — sticky so week nav stays in view while scrolling the matrix */}
+        <div className="flex flex-wrap items-center gap-3 sticky top-0 z-30 bg-background/95 backdrop-blur-sm py-3 -mx-4 px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8 border-b border-border/30">
+
           <div className="flex items-center gap-1 bg-secondary/50 rounded-lg border border-border/30 p-1">
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goBack}>
               <ChevronLeft className="h-4 w-4" />
