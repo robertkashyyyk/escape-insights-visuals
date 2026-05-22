@@ -371,6 +371,7 @@ export function useMatrixSchedule(weekAnchor: Date) {
       notes: input.notes,
       source: "manual",
       priority: "standard",
+      priority_level: 2,
       cleaning_duration_minutes: 90,
       override_assignment: input.override_assignment ?? false,
       warning_reason: input.warning_reason ?? null,
