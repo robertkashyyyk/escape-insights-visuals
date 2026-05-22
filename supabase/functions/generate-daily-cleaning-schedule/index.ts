@@ -742,10 +742,23 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
     }
 
     // Step E: Calculate travel times and estimated start times.
-    // Each task can't start before its property's checkout time + travel from previous stop.
+    // P0 carryovers (level 0) may start before checkout — property is already empty.
+    // The earliest morning start is 08:00.
+    const P0_EARLIEST = "08:00";
+    function earliestStartFor(t: TaskInfo, arrival: string): string {
+      if (t.priority_level === 0) {
+        return arrival >= P0_EARLIEST ? arrival : P0_EARLIEST;
+      }
+      return arrival >= t.checkout_time ? arrival : t.checkout_time;
+    }
+
     const firstTravel = travelMinutes(homeLat, homeLon, ordered[0].latitude, ordered[0].longitude);
     ordered[0].travel_time_from_previous_minutes = firstTravel;
-    ordered[0].estimated_start_time = addMinutesToTime(ordered[0].checkout_time, firstTravel);
+    const firstArrival = addMinutesToTime(
+      ordered[0].priority_level === 0 ? P0_EARLIEST : ordered[0].checkout_time,
+      firstTravel
+    );
+    ordered[0].estimated_start_time = earliestStartFor(ordered[0], firstArrival);
 
     let currentTime = addMinutesToTime(ordered[0].estimated_start_time, ordered[0].cleaning_duration_minutes);
 
@@ -756,11 +769,10 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       );
       ordered[i].travel_time_from_previous_minutes = travel;
       const arrivalAfterTravel = addMinutesToTime(currentTime, travel);
-      // Don't start before property checkout time
-      const earliestStart = arrivalAfterTravel >= ordered[i].checkout_time ? arrivalAfterTravel : ordered[i].checkout_time;
-      ordered[i].estimated_start_time = earliestStart;
-      currentTime = addMinutesToTime(earliestStart, ordered[i].cleaning_duration_minutes);
+      ordered[i].estimated_start_time = earliestStartFor(ordered[i], arrivalAfterTravel);
+      currentTime = addMinutesToTime(ordered[i].estimated_start_time, ordered[i].cleaning_duration_minutes);
     }
+
 
     cleanerBuckets[c.id] = ordered;
   }
