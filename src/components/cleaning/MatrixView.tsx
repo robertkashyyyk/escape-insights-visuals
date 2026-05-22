@@ -817,28 +817,20 @@ function DraggableCellInner({
             <span className="text-[10px] tabular-nums truncate">{checkout}</span>
           )}
         </div>
-        {isP0 && (
+        {pBadge && (
           <span
-            className="text-[9px] font-bold px-1 rounded bg-amber-600 text-white tracking-wide"
-            title={task.warning_reason ?? "P0 — arrival-risk orphan carryover. Property is empty; clean can start before checkout."}
+            className="text-[9px] font-bold px-1 rounded bg-black text-white tracking-wide border border-white/60"
+            title={pTitle}
           >
-            P0
+            {pBadge}
           </span>
         )}
-        {!isP0 && isSameDayTA && (
+        {isSameDayTA && (
           <span
-            className="text-[9px] font-bold px-1 rounded bg-red-500 text-white tracking-wide"
+            className="text-[9px] font-bold px-1 rounded bg-red-600 text-white tracking-wide border border-white/60"
             title="Same-day turnaround"
           >
             STO
-          </span>
-        )}
-        {isP3 && (
-          <span
-            className="text-[9px] font-bold px-1 rounded bg-amber-500/30 text-amber-700 dark:text-amber-300 tracking-wide border border-amber-500/50"
-            title="P3 — orphan-gap fill. Opportunistic; safely deferred."
-          >
-            GAP
           </span>
         )}
         {task.overloaded && (
