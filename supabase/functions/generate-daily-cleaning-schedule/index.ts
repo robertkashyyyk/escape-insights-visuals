@@ -795,6 +795,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       assigned_cleaner_id: t.assigned_cleaner_id,
       status: t.status,
       priority: t.priority,
+      priority_level: t.priority_level,
       estimated_start_time: t.estimated_start_time,
       cleaning_duration_minutes: t.cleaning_duration_minutes,
       travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
@@ -805,6 +806,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       overloaded: t.overloaded ?? false,
       override_assignment: t.override_assignment ?? false,
       warning_reason: t.warning_reason ?? null,
+
     }));
     const { error: insertErr } = await supabase.from("clean_tasks").insert(rows);
     if (insertErr) throw insertErr;
