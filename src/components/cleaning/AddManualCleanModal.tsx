@@ -23,6 +23,8 @@ interface Props {
     task_type: "clean" | "interim" | "maintenance";
     assigned_cleaner_id: string | null;
     notes: string | null;
+    override_assignment?: boolean;
+    warning_reason?: string | null;
   }) => Promise<boolean>;
 }
 
