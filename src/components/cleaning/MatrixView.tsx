@@ -96,11 +96,15 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
   const isTaskVisible = useCallback((t: MatrixTask | undefined): boolean => {
     if (!t) return true; // empty cells always visible
     if (!showCompleted && t.status === "completed") return false;
+    if (filterPriorities.size > 0) {
+      const lvl = (t.priority_level ?? 99) as number;
+      if (![0, 1, 2, 3].includes(lvl) || !filterPriorities.has(lvl as 0 | 1 | 2 | 3)) return false;
+    }
     if (filterCleaners.size === 0) return true;
     if (filterCleaners.has("unassigned") && (!t.assigned_cleaner_id || t.status === "unassigned")) return true;
     if (t.assigned_cleaner_id && filterCleaners.has(t.assigned_cleaner_id)) return true;
     return false;
-  }, [showCompleted, filterCleaners]);
+  }, [showCompleted, filterCleaners, filterPriorities]);
 
   // When a cleaner filter is active, hide property rows that have no
   // matching tasks at all this week (so the matrix collapses instead of
