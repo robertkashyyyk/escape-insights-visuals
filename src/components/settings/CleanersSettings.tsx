@@ -280,10 +280,29 @@ export function CleanersSettings() {
 
   return (
     <div className="space-y-4">
+      <Card className="border-border/30 bg-card/50 backdrop-blur-sm">
+        <CardContent className="p-4 flex items-center justify-between gap-4">
+          <div>
+            <h4 className="text-sm font-semibold text-foreground" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+              Cleaner email notifications
+            </h4>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              When ON, cleaners receive an email each time they are auto-assigned a new clean for today. Managers also get a copy.
+            </p>
+          </div>
+          <Switch
+            checked={emailNotifEnabled}
+            onCheckedChange={toggleEmailNotifications}
+            disabled={emailNotifLoading}
+          />
+        </CardContent>
+      </Card>
+
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{cleaners.length} cleaner{cleaners.length !== 1 ? "s" : ""}</p>
         <Button size="sm" onClick={openNew}><Plus className="h-4 w-4 mr-1" />Add Cleaner</Button>
       </div>
+
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading...</p>
