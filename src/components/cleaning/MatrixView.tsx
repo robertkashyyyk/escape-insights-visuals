@@ -788,9 +788,28 @@ function MatrixCell({
     }
   }
 
+  const orphanTip = orphanGapTooltip(minStayNights ?? 2);
   const cell = (
-    <div className={`${baseBorder} ${todayTint} ${pastClass} ${dimClass} p-1`}>
+    <div className={`relative ${baseBorder} ${todayTint} ${pastClass} ${dimClass} p-1`}>
       <DraggableCellInner task={task} cleaners={cleaners} guestName={guestName} onClick={() => onTaskClick(task.id)} />
+      {isOrphanGap && (
+        <TooltipProvider delayDuration={150}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className="absolute bottom-0.5 left-0.5 z-10 flex items-center gap-0.5 px-1 rounded bg-amber-500 text-black text-[8px] font-bold tracking-wide border border-white/60 pointer-events-auto leading-3"
+                aria-label={orphanTip}
+              >
+                <Unlink2 className="h-2 w-2" />
+                ORPHAN
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[220px] text-xs">
+              {orphanTip} — clean still required, but no booking that night.
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
     </div>
   );
 
