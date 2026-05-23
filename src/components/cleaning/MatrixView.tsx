@@ -51,6 +51,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
   const [addCleanCell, setAddCleanCell] = useState<{ listing: MatrixListing; date: Date } | null>(null);
   const [filterGroups, setFilterGroups] = useState<Set<string>>(new Set());
   const [filterCleaners, setFilterCleaners] = useState<Set<string>>(new Set()); // empty = all; "unassigned" = unassigned tasks
+  const [filterPriorities, setFilterPriorities] = useState<Set<0 | 1 | 2 | 3>>(new Set()); // empty = ALL
   const [showCompleted, setShowCompleted] = useState(true);
   const [activeDragTaskId, setActiveDragTaskId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<"today" | "priority" | "cleaner" | "location" | "property">("today");
