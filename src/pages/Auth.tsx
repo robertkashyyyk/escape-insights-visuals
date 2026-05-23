@@ -37,7 +37,7 @@ export default function Auth() {
       const latestRole = roleRef.current;
       const dest = latestRole === "client" ? "/owner" : latestRole === "cleaner" ? "/cleaner" : "/today";
       navigate(dest, { replace });
-    }, 3000);
+    }, 2700);
   }, [navigate]);
 
   // Show the "Preparing your workspace…" animation for ALL authenticated arrivals
