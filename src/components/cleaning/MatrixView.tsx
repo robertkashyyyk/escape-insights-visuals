@@ -582,17 +582,21 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                         className="grid grid-cols-[200px_repeat(7,minmax(110px,1fr))] border-b border-border/20 hover:bg-secondary/10 transition-colors min-h-[56px]"
                       >
                         {/* Property name (sticky col) */}
-                        <div className="px-3 py-2 border-r border-border/30 sticky left-0 bg-card/80 backdrop-blur-sm z-10 flex flex-col justify-center">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPropertyId(listing.id)}
+                          className="px-3 py-2 border-r border-border/30 sticky left-0 bg-card/80 backdrop-blur-sm z-10 flex flex-col justify-center text-left hover:bg-secondary/40 transition-colors cursor-pointer"
+                          title={`Open ${listing.name} info`}
+                        >
                           <p
-                            className="text-xs font-medium text-foreground leading-tight truncate"
-                            title={listing.name}
+                            className="text-xs font-medium text-foreground leading-tight truncate hover:text-amber-400 transition-colors"
                           >
                             {shortenName(listing.name)}
                           </p>
                           {listing.location_group && (
                             <span className="text-[9px] text-muted-foreground/70 mt-0.5">{listing.location_group}</span>
                           )}
-                        </div>
+                        </button>
 
                         {days.map(d => {
                           const ds = format(d, "yyyy-MM-dd");
