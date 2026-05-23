@@ -866,7 +866,7 @@ function DraggableCellInner({
       onClick={onClick}
       {...listeners}
       {...attributes}
-      className={`w-full h-full min-h-[48px] rounded-md p-1.5 text-left transition-all hover:shadow-sm ${
+      className={`relative w-full h-full min-h-[48px] rounded-md p-1.5 pb-3.5 text-left transition-all hover:shadow-sm ${
         isDragging ? "opacity-30" : ""
       } ${isCompleted ? "opacity-90" : ""} ${borderClass}`}
       style={{
@@ -893,38 +893,32 @@ function DraggableCellInner({
             <span className="text-[10px] tabular-nums truncate">{checkout}</span>
           )}
         </div>
-        {pBadge && (
-          <span
-            className="text-[9px] font-bold px-1 rounded bg-black text-white tracking-wide border border-white/60"
-            title={pTitle}
-          >
-            {pBadge}
-          </span>
-        )}
-        {isSameDayTA && (
-          <span
-            className="text-[9px] font-bold px-1 rounded bg-red-600 text-white tracking-wide border border-white/60"
-            title="Same-day turnaround"
-          >
-            STO
-          </span>
-        )}
-        {task.overloaded && (
-          <span
-            className="text-[9px] font-bold px-1 rounded bg-amber-500 text-black tracking-wide"
-            title={task.warning_reason ?? "Overloaded — only eligible cleaner for nearby cluster"}
-          >
-            ⚠
-          </span>
-        )}
-        {task.override_assignment && (
-          <span
-            className="text-[9px] font-bold px-1 rounded bg-red-600 text-white tracking-wide"
-            title={task.warning_reason ?? "Manual override — cleaner marked unavailable"}
-          >
-            !
-          </span>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {isSameDayTA && (
+            <span
+              className="text-[9px] font-bold px-1 rounded bg-red-600 text-white tracking-wide border border-white/60"
+              title="Same-day turnaround"
+            >
+              STO
+            </span>
+          )}
+          {task.overloaded && (
+            <span
+              className="text-[9px] font-bold px-1 rounded bg-amber-500 text-black tracking-wide"
+              title={task.warning_reason ?? "Overloaded — only eligible cleaner for nearby cluster"}
+            >
+              ⚠
+            </span>
+          )}
+          {task.override_assignment && (
+            <span
+              className="text-[9px] font-bold px-1 rounded bg-red-600 text-white tracking-wide"
+              title={task.warning_reason ?? "Manual override — cleaner marked unavailable"}
+            >
+              !
+            </span>
+          )}
+        </div>
       </div>
 
       {isUnassigned && (
@@ -938,6 +932,16 @@ function DraggableCellInner({
       )}
       {guestName && task.reservation_id && !isCompleted && (
         <div className="text-[9px] opacity-70 truncate leading-tight">{guestName.split(/\s+/)[0]}</div>
+      )}
+
+      {/* P-number badge — pinned bottom-right of the card */}
+      {pBadge && (
+        <span
+          className="absolute bottom-0.5 right-0.5 text-[9px] font-bold px-1 rounded bg-black text-white tracking-wide border border-white/60"
+          title={pTitle}
+        >
+          {pBadge}
+        </span>
       )}
     </button>
   );
