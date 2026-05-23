@@ -745,7 +745,7 @@ function MatrixCell({
   }
 
   const cell = (
-    <div className={`${baseBorder} ${todayTint} ${dimClass} p-1`}>
+    <div className={`${baseBorder} ${todayTint} ${pastClass} ${dimClass} p-1`}>
       <DraggableCellInner task={task} cleaners={cleaners} onClick={() => onTaskClick(task.id)} />
     </div>
   );
