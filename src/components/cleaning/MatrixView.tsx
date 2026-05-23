@@ -565,6 +565,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                           const ds = format(d, "yyyy-MM-dd");
                           const rawTask = taskGrid.get(`${listing.id}|${ds}`);
                           const isTodayCol = isSameDay(d, today);
+                          const isPast = d < today && !isTodayCol;
                           const visible = isTaskVisible(rawTask);
                           // Hide filtered-out tasks entirely (render as empty cell)
                           const task = visible ? rawTask : undefined;
@@ -578,6 +579,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                               task={task}
                               cleaners={cleaners}
                               isToday={isTodayCol}
+                              isPast={isPast}
                               dimmed={false}
                               isOrphanGap={isOrphan}
                               minStayNights={listing.min_stay_nights ?? 2}
