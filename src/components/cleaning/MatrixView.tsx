@@ -29,6 +29,7 @@ import { AddManualCleanModal } from "./AddManualCleanModal";
 import { shortenName } from "@/lib/shortenName";
 import { computeOrphanGapDates, orphanGapTooltip } from "@/lib/orphanGaps";
 import { Unlink2 } from "lucide-react";
+import { ReassignConfirmDialog, type ReassignPending } from "./ReassignConfirmDialog";
 
 interface Props {
   initialDate?: Date;
@@ -249,14 +250,37 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
     setActiveDragTaskId(String(e.active.id));
   };
 
+  const [pendingReassign, setPendingReassign] = useState<ReassignPending | null>(null);
+
   const handleDragEnd = async (e: DragEndEvent) => {
     setActiveDragTaskId(null);
     const taskId = String(e.active.id);
     const overId = e.over?.id ? String(e.over.id) : null;
     if (!overId) return;
     if (!overId.startsWith("cleaner:")) return;
-    const cleanerId = overId.slice("cleaner:".length);
-    await reassignTask(taskId, cleanerId === "unassigned" ? null : cleanerId);
+    const rawCleanerId = overId.slice("cleaner:".length);
+    const toCleanerId = rawCleanerId === "unassigned" ? null : rawCleanerId;
+
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    if ((task.assigned_cleaner_id ?? null) === toCleanerId) return; // no-op
+
+    const listing = listings.find(l => l.id === task.listing_id);
+    const fromCleaner = task.assigned_cleaner_id ? cleaners.find(c => c.id === task.assigned_cleaner_id) : null;
+    const toCleaner = toCleanerId ? cleaners.find(c => c.id === toCleanerId) : null;
+    const group = listing?.location_group || "Other";
+    const outsideArea = !!toCleaner && !(toCleaner.location_groups || []).includes(group);
+
+    setPendingReassign({
+      taskId,
+      fromCleanerName: fromCleaner?.name || "Unassigned",
+      toCleanerName: toCleaner?.name || "Unassigned",
+      toCleanerId,
+      propertyName: listing?.name || "—",
+      locationGroup: group,
+      date: parseISO(task.scheduled_date),
+      outsideArea,
+    });
   };
 
   const toggleGroup = (g: string) => {
@@ -492,12 +516,13 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                   </div>
                   {days.map(d => {
                     const isTodayCol = isSameDay(d, today);
+                    const isPast = d < today && !isTodayCol;
                     return (
                       <div
                         key={d.toISOString()}
                         className={`px-3 py-2 text-center text-[11px] font-medium border-r border-border/20 last:border-r-0 ${
                           isTodayCol ? "bg-amber-500/10 text-amber-300" : "text-muted-foreground"
-                        }`}
+                        } ${isPast ? "line-through opacity-60" : ""}`}
                       >
                         <div>{format(d, "EEE")}</div>
                         <div className="text-foreground tabular-nums text-sm font-display font-semibold mt-0.5">
@@ -540,6 +565,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                           const ds = format(d, "yyyy-MM-dd");
                           const rawTask = taskGrid.get(`${listing.id}|${ds}`);
                           const isTodayCol = isSameDay(d, today);
+                          const isPast = d < today && !isTodayCol;
                           const visible = isTaskVisible(rawTask);
                           // Hide filtered-out tasks entirely (render as empty cell)
                           const task = visible ? rawTask : undefined;
@@ -553,6 +579,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                               task={task}
                               cleaners={cleaners}
                               isToday={isTodayCol}
+                              isPast={isPast}
                               dimmed={false}
                               isOrphanGap={isOrphan}
                               minStayNights={listing.min_stay_nights ?? 2}
@@ -610,6 +637,17 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
         holidays={holidays}
         onSubmit={addManualClean}
       />
+
+      <ReassignConfirmDialog
+        pending={pendingReassign}
+        onCancel={() => setPendingReassign(null)}
+        onConfirm={async () => {
+          if (!pendingReassign) return;
+          const { taskId, toCleanerId } = pendingReassign;
+          setPendingReassign(null);
+          await reassignTask(taskId, toCleanerId);
+        }}
+      />
     </div>
   );
 }
@@ -647,13 +685,14 @@ function CleanerDropTarget({
 
 /* ── Single matrix cell ── */
 function MatrixCell({
-  date, listing, task, cleaners, isToday, dimmed, isOrphanGap, minStayNights, onTaskClick, onAddClick,
+  date, listing, task, cleaners, isToday, isPast, dimmed, isOrphanGap, minStayNights, onTaskClick, onAddClick,
 }: {
   date: Date;
   listing: MatrixListing;
   task: MatrixTask | undefined;
   cleaners: { id: string; name: string; location_groups?: string[] }[];
   isToday: boolean;
+  isPast?: boolean;
   dimmed: boolean;
   isOrphanGap?: boolean;
   minStayNights?: number;
@@ -662,6 +701,9 @@ function MatrixCell({
 }) {
   const baseBorder = "border-r border-border/20 last:border-r-0";
   const todayTint = isToday ? "bg-amber-500/[0.04]" : "";
+  const pastClass = isPast
+    ? "relative opacity-60 after:content-[''] after:absolute after:inset-x-1 after:top-1/2 after:h-px after:bg-foreground/30 after:rotate-[-8deg] after:pointer-events-none"
+    : "";
   const dimClass = dimmed ? "opacity-25" : "";
 
   if (!task) {
@@ -673,7 +715,7 @@ function MatrixCell({
             <TooltipTrigger asChild>
               <button
                 onClick={onAddClick}
-                className={`group ${baseBorder} ${todayTint} flex items-center justify-center min-h-[56px] p-1`}
+                className={`group ${baseBorder} ${todayTint} ${pastClass} flex items-center justify-center min-h-[56px] p-1`}
                 aria-label={tip}
               >
                 <div className="orphan-gap orphan-gap-hover w-full h-full min-h-[44px] flex items-center justify-center gap-1 text-[10px] font-medium text-amber-500/90 dark:text-amber-300/90 transition-all">
@@ -692,7 +734,7 @@ function MatrixCell({
     return (
       <button
         onClick={onAddClick}
-        className={`group ${baseBorder} ${todayTint} flex items-center justify-center text-muted-foreground/0 hover:text-muted-foreground hover:bg-secondary/30 transition-colors min-h-[56px]`}
+        className={`group ${baseBorder} ${todayTint} ${pastClass} flex items-center justify-center text-muted-foreground/0 hover:text-muted-foreground hover:bg-secondary/30 transition-colors min-h-[56px]`}
         aria-label={`Add manual clean for ${listing.name} on ${format(date, "EEE d MMM")}`}
       >
         <Plus className="h-4 w-4 opacity-0 group-hover:opacity-60 transition-opacity" />
@@ -714,7 +756,7 @@ function MatrixCell({
   }
 
   const cell = (
-    <div className={`${baseBorder} ${todayTint} ${dimClass} p-1`}>
+    <div className={`${baseBorder} ${todayTint} ${pastClass} ${dimClass} p-1`}>
       <DraggableCellInner task={task} cleaners={cleaners} onClick={() => onTaskClick(task.id)} />
     </div>
   );
