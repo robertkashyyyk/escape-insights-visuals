@@ -36,20 +36,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchUserData = async (userId: string) => {
-    const [profileRes, roleRes] = await Promise.all([
+    const userDataPromise = Promise.all([
       supabase.from("profiles").select("*").eq("id", userId).single(),
       supabase.from("user_roles").select("role").eq("user_id", userId).single(),
     ]);
 
-    if (profileRes.data) setProfile(profileRes.data as Profile);
-    if (roleRes.data) setRole(roleRes.data.role as AppRole);
+    const [profileRes, roleRes] = await Promise.race([
+      userDataPromise,
+      new Promise<never>((_, reject) => {
+        window.setTimeout(() => reject(new Error("Timed out loading user data")), 8000);
+      }),
+    ]);
+
+    setProfile((profileRes.data as Profile) ?? null);
+    setRole((roleRes.data?.role as AppRole) ?? null);
   };
 
   useEffect(() => {
+    let isMounted = true;
+
+    const loadUserData = async (userId: string) => {
+      try {
+        await fetchUserData(userId);
+      } catch (error) {
+        console.error("Failed to load authenticated user data", error);
+        if (!isMounted) return;
+        setProfile(null);
+        setRole(null);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (_event, session) => {
         // Skip INITIAL_SESSION — handled by getSession() below to avoid double-init
         if (_event === 'INITIAL_SESSION') return;
+
+        if (!['SIGNED_IN', 'SIGNED_OUT', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(_event)) return;
 
         setSession(session);
         setUser(session?.user ?? null);
@@ -61,27 +85,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED
-        if (session?.user) {
-          await fetchUserData(session.user.id);
-          setLoading(false);
+        if (_event === 'SIGNED_IN' && session?.user) {
+          setLoading(true);
+          // Defer Supabase queries until after the auth callback returns.
+          setTimeout(() => {
+            if (isMounted) void loadUserData(session.user.id);
+          }, 0);
+          return;
         }
+
+        setLoading(false);
       }
     );
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return;
+
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchUserData(session.user.id);
-      } else {
+
+      if (!session?.user) {
         setProfile(null);
         setRole(null);
+        setLoading(false);
+        return;
       }
+
+      void loadUserData(session.user.id);
+    }).catch((error) => {
+      console.error("Failed to initialise auth session", error);
+      if (!isMounted) return;
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      setRole(null);
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
