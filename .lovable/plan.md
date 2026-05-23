@@ -1,83 +1,61 @@
-# Cleaner Holidays + Smarter Allocation
+## 1. Why we have "duplicates" and "unlinked"
 
-Two coordinated improvements. Both extend existing logic — no parallel systems.
+After a deeper look, the real story is cleaner than the earlier breakdown suggested. **All 45 "missing"-link bookings actually have a clean on that listing+date — it's just linked to a different reservation row.** Almost every case follows one pattern:
 
----
+- A guest first appears as an **inquiry** (e.g. Craig, 30 May → Ernie's Den).
+- The auto-clean trigger fires on the inquiry and creates a clean.
+- The guest later converts (or another guest books the same night) and a **confirmed** reservation lands on the same listing + checkout date.
+- The trigger sees a clean already exists for that listing+date and refuses to create another — but it never re-points the `reservation_id` to the confirmed booking, so the confirmed one looks "unlinked".
 
-## 1. Cleaner Holidays / Leave
+So the two numbers were really one bug: **inquiries are being given cleans**. The user has already stated inquiries should never get a clean.
 
-### Database
-New table `cleaner_holidays`:
-- `cleaner_id` (uuid), `start_date`, `end_date` (inclusive), `reason` (Holiday / Leave / Unavailable / Sick / Other), `notes`, `created_by`.
-- RLS: super/senior manage; admin read all; a cleaner can read their own.
+**Fix (data + trigger):**
+- Migration to update `auto_create_clean_from_reservation` so it skips `inquiry` status (in addition to cancelled/declined/expired).
+- One-off backfill: for every clean currently linked to an inquiry where a confirmed sibling exists on the same listing+checkout date, re-point `reservation_id` to the confirmed booking. Then delete any non-manual clean that is still linked to an inquiry with no confirmed sibling.
 
-### Settings UI (`CleanersSettings.tsx`)
-- New "Holidays / Leave" section inside the cleaner edit dialog: list upcoming + add new (date range + reason + notes).
-- After saving a new holiday, query `clean_tasks` for that cleaner inside the date range.
-  - If any exist → dialog: *"This cleaner has N cleans assigned in this period. Reallocate them now?"* → Yes unassigns them and silently calls `generate-daily-cleaning-schedule` for those dates; No leaves them (with a warning badge later).
+After this: every confirmed future booking is linked 1:1, inquiries stay off the schedule (as intended), and the only remaining "duplicates" would be genuine same-day double-bookings (currently 2 — Hilltop Views 30 Jun, Harbour Heights 13 Jul), which legitimately share one clean.
 
-### Scheduler UI
-- Matrix + planner cells: when the column's date falls in a holiday for that cleaner, show a small badge "On leave" + tooltip with the reason. Reuse non-working-day visual treatment.
-- Manual assignment (TaskDetailPanel reassign dropdown / AddManualCleanModal): if chosen cleaner is on holiday or non-working that date, show a non-blocking confirm — "X is marked unavailable (reason). Assign anyway?".
+## 2. Matrix View — cross out past days
 
-### Edge function (`generate-daily-cleaning-schedule`)
-- Load all `cleaner_holidays` overlapping the processed date window.
-- Add to the existing eligibility filter: skip cleaner if the target date falls inside any of their holiday ranges (additive to the existing `non_working_days` weekday check). No other change to the unavailable-day path.
+In `src/components/cleaning/MatrixView.tsx`, for any cell whose date is **strictly before today**:
+- Apply `opacity-60` to the whole cell.
+- Add a diagonal strikethrough overlay (a thin `bg-foreground/20` line via a pseudo-element / absolutely-positioned div rotated 45°) so the cell is clearly "in the past" but contents stay readable.
+- Day-column headers for past dates get `line-through text-muted-foreground`.
 
----
+Today and future dates render unchanged.
 
-## 2. Allocation: Fair-Share Deficit + Nearby Property Clustering
+## 3. Matrix drag-and-drop — confirmation flow
 
-All changes inside `generate-daily-cleaning-schedule` `processDate()`. No schema change.
+Currently a drop instantly writes `assigned_cleaner_id`. Replace with a two-stage confirm:
 
-### Fair-share deficit (refined)
-Current code compares the cleaner's *same-day region count* against target share. Refine to use a rolling actual:
-
-```text
-window = last 28 days + current pass
-actual_pct  = cleaner_completed_in_region / total_in_region (window)
-target_pct  = workload_share[region]
-deficit     = target_pct - actual_pct
+**Primary dialog** (always shown on drop):
+```
+Reassign clean?
+  Original cleaner : <name>      (or "Unassigned")
+  New cleaner      : <name>
+  Property         : <listing name>
+  Location group   : <listing.location_group>
+  Date             : <scheduled_date>
+[Cancel]  [Confirm]
 ```
 
-Pick the eligible cleaner with the largest positive deficit. Tie-break = fewer minutes scheduled today.
+**Secondary dialog** (only if the new cleaner's `location_groups` array does NOT include the listing's `location_group`):
+```
+Outside cleaner's area
+  <Cleaner> doesn't cover "<location group>".
+  This is outside their normal patch — are you really sure?
+[Cancel]  [Confirm anyway]
+```
 
-### Nearby-property clustering (new, before per-task assignment)
-For each `(date, location_group)`:
-1. Build geo-clusters: greedy — two listings join the same cluster if within ~5 miles (haversine ≤ 8 km).
-2. For each cluster:
-   - **1–3 properties** → try to assign the whole cluster to one cleaner (chosen by fair-share deficit among eligible cleaners with enough remaining capacity for the whole cluster).
-   - **4+ properties** → split: peel groups of ~3 and assign each group to the next best fair-share cleaner.
-   - If only one eligible cleaner exists for the cluster's region/date, assign all to that cleaner and tag the day with an `overloaded` flag (logged into `automation_logs.error_message` as a soft warning + surfaced as a cell badge via task `notes` like "⚠ Overloaded: only cleaner available").
-3. Within an assigned cluster, the existing route optimisation (nearest-next from previous stop) still runs.
+Only after the final Confirm do we run the existing update. Cancel at any stage = no DB write, card snaps back.
 
-### Compromise warnings surfaced
-- Overload tag → small "⚠ Overloaded" pill in MatrixView header for the affected cleaner/day, plus a tooltip "Only one cleaner available for N nearby properties".
-- Assignments forced onto holiday/non-working day (only possible via admin override) → red "Override" pill.
-
----
-
-## Out of scope (kept untouched)
-- Existing weekly `non_working_days` logic.
-- Hostaway sync and orphan-fill path (still drives task creation; only the allocation block changes).
-- Owner/Cleaner portal views.
-
----
+### Technical detail
+- New component `src/components/cleaning/ReassignConfirmDialog.tsx` using existing shadcn `AlertDialog`.
+- `MatrixView.tsx` `onDrop` handler: instead of calling the mutation, stash `{ taskId, fromCleanerId, toCleanerId, listing, date }` in local state and open the dialog. Dialog reads cleaner names from already-loaded `cleaners` and listing.location_group from the task's listing; runs the mutation on Confirm.
+- Suitability check: `cleaner.location_groups?.includes(listing.location_group)` — if false, after primary confirm, open the secondary warning before committing.
 
 ## Files
 
-**New**
-- `supabase/migrations/<ts>_cleaner_holidays.sql`
-- `src/components/settings/CleanerHolidaysSection.tsx`
-- `src/lib/cleanerAvailability.ts` (shared client-side helper: `isCleanerUnavailable(cleaner, date, holidays)`)
-
-**Edited**
-- `supabase/functions/generate-daily-cleaning-schedule/index.ts` — holidays filter, deficit refactor, clustering pass, overload tagging.
-- `src/components/settings/CleanersSettings.tsx` — mount holidays section.
-- `src/components/cleaning/MatrixView.tsx` — leave/overload badges; reassign warning.
-- `src/components/cleaning/TaskDetailPanel.tsx` — warning before assigning unavailable cleaner.
-- `src/components/cleaning/AddManualCleanModal.tsx` — same warning.
-- `src/hooks/useMatrixSchedule.ts` — load holidays for the visible week.
-- `src/integrations/supabase/types.ts` — regenerated automatically after migration.
-
-Approve and I'll build it.
+- `supabase/migrations/<new>.sql` — trigger fix + backfill (one migration).
+- `src/components/cleaning/MatrixView.tsx` — past-day styling, replace drop handler.
+- `src/components/cleaning/ReassignConfirmDialog.tsx` — new.
