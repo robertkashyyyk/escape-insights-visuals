@@ -25,6 +25,7 @@ import {
   MANUAL_CLEAN_COLOR,
 } from "@/lib/cleanerColors";
 import { TaskDetailPanel } from "./TaskDetailPanel";
+import { PropertyInfoDrawer } from "./PropertyInfoDrawer";
 import { AddManualCleanModal } from "./AddManualCleanModal";
 import { shortenName } from "@/lib/shortenName";
 import { computeOrphanGapDates, orphanGapTooltip } from "@/lib/orphanGaps";
