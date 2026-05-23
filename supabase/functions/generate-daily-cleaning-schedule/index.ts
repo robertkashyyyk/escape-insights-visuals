@@ -188,14 +188,34 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
   }
 
   if (isCurrentDayRefresh && arrivalListingIds.length > 0) {
+    // Only promote prior ORPHAN-GAP-FILL tasks (P3) — never a legitimate
+    // checkout-day clean (P1/P2). Promoting a checkout-day clean leaves a
+    // duplicate behind once the checkout day is regenerated, producing the
+    // bug where a property appears with cleans on two consecutive days.
     const { data: priorOpen } = await supabase
       .from("clean_tasks")
-      .select("id, listing_id, scheduled_date, status, override_assignment, assigned_cleaner_id, notes")
+      .select("id, listing_id, scheduled_date, status, override_assignment, assigned_cleaner_id, notes, priority_level, priority")
       .in("listing_id", arrivalListingIds)
       .lt("scheduled_date", targetDate)
+      .eq("priority_level", 3)
       .not("status", "in", "(completed,cancelled)");
 
+    // Don't promote into a listing that already has a clean scheduled for
+    // today (would create two tasks for the same listing+day).
+    const { data: existingToday } = await supabase
+      .from("clean_tasks")
+      .select("listing_id")
+      .in("listing_id", arrivalListingIds)
+      .eq("scheduled_date", targetDate);
+    const haveToday = new Set((existingToday || []).map((r: any) => String(r.listing_id)));
+
     for (const t of priorOpen || []) {
+      if (haveToday.has(String(t.listing_id))) {
+        // Already covered today — delete the redundant prior orphan rather
+        // than promoting it. Keeps the matrix clean.
+        await supabase.from("clean_tasks").delete().eq("id", t.id);
+        continue;
+      }
       const keepCleaner = !!t.override_assignment;
       await supabase
         .from("clean_tasks")
@@ -210,6 +230,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
           overloaded: false,
         })
         .eq("id", t.id);
+      haveToday.add(String(t.listing_id));
     }
   }
 

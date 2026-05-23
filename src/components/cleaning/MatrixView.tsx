@@ -51,6 +51,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
   const [addCleanCell, setAddCleanCell] = useState<{ listing: MatrixListing; date: Date } | null>(null);
   const [filterGroups, setFilterGroups] = useState<Set<string>>(new Set());
   const [filterCleaners, setFilterCleaners] = useState<Set<string>>(new Set()); // empty = all; "unassigned" = unassigned tasks
+  const [filterPriorities, setFilterPriorities] = useState<Set<0 | 1 | 2 | 3>>(new Set()); // empty = ALL
   const [showCompleted, setShowCompleted] = useState(true);
   const [activeDragTaskId, setActiveDragTaskId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<"today" | "priority" | "cleaner" | "location" | "property">("today");
@@ -95,11 +96,15 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
   const isTaskVisible = useCallback((t: MatrixTask | undefined): boolean => {
     if (!t) return true; // empty cells always visible
     if (!showCompleted && t.status === "completed") return false;
+    if (filterPriorities.size > 0) {
+      const lvl = (t.priority_level ?? 99) as number;
+      if (![0, 1, 2, 3].includes(lvl) || !filterPriorities.has(lvl as 0 | 1 | 2 | 3)) return false;
+    }
     if (filterCleaners.size === 0) return true;
     if (filterCleaners.has("unassigned") && (!t.assigned_cleaner_id || t.status === "unassigned")) return true;
     if (t.assigned_cleaner_id && filterCleaners.has(t.assigned_cleaner_id)) return true;
     return false;
-  }, [showCompleted, filterCleaners]);
+  }, [showCompleted, filterCleaners, filterPriorities]);
 
   // When a cleaner filter is active, hide property rows that have no
   // matching tasks at all this week (so the matrix collapses instead of
@@ -438,6 +443,49 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
             </Select>
           </div>
         </div>
+
+        {/* Priority filter */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground mr-1">Priority:</span>
+          <button
+            onClick={() => setFilterPriorities(new Set())}
+            className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+              filterPriorities.size === 0
+                ? "bg-primary/15 border-primary/40 text-primary"
+                : "border-border/40 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All
+          </button>
+          {([0, 1, 2, 3] as const).map(lvl => {
+            const active = filterPriorities.has(lvl);
+            const tone = lvl === 0
+              ? "border-amber-600/60 bg-amber-600/15 text-amber-300"
+              : lvl === 1
+              ? "border-red-500/50 bg-red-500/15 text-red-300"
+              : lvl === 2
+              ? "border-border/60 bg-secondary/60 text-foreground"
+              : "border-amber-500/40 bg-amber-500/10 text-amber-300/90";
+            return (
+              <button
+                key={lvl}
+                onClick={() => {
+                  setFilterPriorities(prev => {
+                    const next = new Set(prev);
+                    next.has(lvl) ? next.delete(lvl) : next.add(lvl);
+                    return next;
+                  });
+                }}
+                className={`px-2.5 py-1 text-xs rounded-full border transition-colors font-semibold tracking-wide ${
+                  active ? tone : "border-border/40 text-muted-foreground hover:text-foreground"
+                }`}
+                title={`Show only P${lvl} cleans`}
+              >
+                P{lvl}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -468,29 +516,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
           </div>
         </Card>
 
-        {/* Summary bar */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground px-1">
-          <span>
-            Week of {format(weekStart, "d MMM")}: <span className="font-semibold text-foreground tabular-nums">{summary.total}</span> cleans total
-          </span>
-          {cleaners.map(c => {
-            const count = summary.byCleaner[c.id] || 0;
-            if (count === 0) return null;
-            return (
-              <span key={c.id}>
-                {c.name}: <span className="font-semibold text-foreground tabular-nums">{count}</span>
-              </span>
-            );
-          })}
-          {summary.unassigned > 0 && (
-            <button
-              onClick={() => setFilterCleaners(new Set(["unassigned"]))}
-              className="text-amber-400 font-semibold hover:underline"
-            >
-              Unassigned: {summary.unassigned}
-            </button>
-          )}
-        </div>
+        {/* Summary bar removed — totals now live in the controls row above the matrix. */}
 
         {/* Mobile banner */}
         <div className="md:hidden rounded-lg border border-border/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-300">
@@ -525,14 +551,14 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                     return (
                       <div
                         key={d.toISOString()}
-                        className={`px-3 py-2 text-center text-[11px] font-medium border-r border-border/20 last:border-r-0 ${
+                        className={`px-2 py-2 text-center text-[11px] font-medium border-r border-border/20 last:border-r-0 ${
                           isTodayCol ? "bg-amber-500/10 text-amber-300" : "text-muted-foreground"
                         } ${isPast ? "opacity-60 line-through decoration-foreground/50" : ""}`}
                       >
-                        <div>{format(d, "EEE")}</div>
-                        <div className="text-foreground tabular-nums text-sm font-display font-semibold mt-0.5">
+                        <span className="uppercase tracking-wider">{format(d, "EEE")}</span>
+                        <span className="ml-1.5 text-foreground tabular-nums text-sm font-display font-semibold">
                           {format(d, "d")}
-                        </div>
+                        </span>
                       </div>
                     );
                   })}
@@ -840,7 +866,7 @@ function DraggableCellInner({
       onClick={onClick}
       {...listeners}
       {...attributes}
-      className={`w-full h-full min-h-[48px] rounded-md p-1.5 text-left transition-all hover:shadow-sm ${
+      className={`relative w-full h-full min-h-[48px] rounded-md p-1.5 pb-3.5 text-left transition-all hover:shadow-sm ${
         isDragging ? "opacity-30" : ""
       } ${isCompleted ? "opacity-90" : ""} ${borderClass}`}
       style={{
@@ -867,38 +893,32 @@ function DraggableCellInner({
             <span className="text-[10px] tabular-nums truncate">{checkout}</span>
           )}
         </div>
-        {pBadge && (
-          <span
-            className="text-[9px] font-bold px-1 rounded bg-black text-white tracking-wide border border-white/60"
-            title={pTitle}
-          >
-            {pBadge}
-          </span>
-        )}
-        {isSameDayTA && (
-          <span
-            className="text-[9px] font-bold px-1 rounded bg-red-600 text-white tracking-wide border border-white/60"
-            title="Same-day turnaround"
-          >
-            STO
-          </span>
-        )}
-        {task.overloaded && (
-          <span
-            className="text-[9px] font-bold px-1 rounded bg-amber-500 text-black tracking-wide"
-            title={task.warning_reason ?? "Overloaded — only eligible cleaner for nearby cluster"}
-          >
-            ⚠
-          </span>
-        )}
-        {task.override_assignment && (
-          <span
-            className="text-[9px] font-bold px-1 rounded bg-red-600 text-white tracking-wide"
-            title={task.warning_reason ?? "Manual override — cleaner marked unavailable"}
-          >
-            !
-          </span>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {isSameDayTA && (
+            <span
+              className="text-[9px] font-bold px-1 rounded bg-red-600 text-white tracking-wide border border-white/60"
+              title="Same-day turnaround"
+            >
+              STO
+            </span>
+          )}
+          {task.overloaded && (
+            <span
+              className="text-[9px] font-bold px-1 rounded bg-amber-500 text-black tracking-wide"
+              title={task.warning_reason ?? "Overloaded — only eligible cleaner for nearby cluster"}
+            >
+              ⚠
+            </span>
+          )}
+          {task.override_assignment && (
+            <span
+              className="text-[9px] font-bold px-1 rounded bg-red-600 text-white tracking-wide"
+              title={task.warning_reason ?? "Manual override — cleaner marked unavailable"}
+            >
+              !
+            </span>
+          )}
+        </div>
       </div>
 
       {isUnassigned && (
@@ -912,6 +932,16 @@ function DraggableCellInner({
       )}
       {guestName && task.reservation_id && !isCompleted && (
         <div className="text-[9px] opacity-70 truncate leading-tight">{guestName.split(/\s+/)[0]}</div>
+      )}
+
+      {/* P-number badge — pinned bottom-right of the card */}
+      {pBadge && (
+        <span
+          className="absolute bottom-0.5 right-0.5 text-[9px] font-bold px-1 rounded bg-black text-white tracking-wide border border-white/60"
+          title={pTitle}
+        >
+          {pBadge}
+        </span>
       )}
     </button>
   );

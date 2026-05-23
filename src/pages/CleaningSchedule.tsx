@@ -30,7 +30,7 @@ export default function CleaningSchedule() {
     selectedDate, setSelectedDate, viewMode, setViewMode,
     filterCleaner, setFilterCleaner, filterLocation, setFilterLocation,
     cleanerDays, unassigned, weekSummary,
-    cleaners, locationGroups, totalTasks,
+    cleaners, locationGroups,
     regenerate, regenerateRange, completeTask, goBack, goForward, isToday, isRegenerating,
     buildDaySchedule,
   } = useCleaningSchedule();
@@ -105,45 +105,20 @@ export default function CleaningSchedule() {
     });
   }, [viewMode, weekSummary, selectedDate, buildDaySchedule]);
 
+  const isMatrixScope = (viewMode as any) === "matrix";
+  const isWeekScope = viewMode === "week" || isMatrixScope;
+  const regenLabel = isRegenerating
+    ? "Generating..."
+    : isMatrixScope
+      ? `Regenerate ${format(matrixWeekStart, "d MMM")} – ${format(addDays(matrixWeekStart, 6), "d MMM")}`
+      : isWeekScope
+        ? "Regenerate Week"
+        : "Regenerate";
+  const handleRegen = () => isMatrixScope ? regenerateRange(7, matrixWeekAnchor) : isWeekScope ? regenerateRange(7) : regenerate();
+
   return (
     <AppLayout>
-      <div className="p-4 md:p-6 lg:p-8 space-y-6">
-        {/* Header */}
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight font-display">
-              Schedule
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              {totalTasks} clean{totalTasks !== 1 ? "s" : ""} · {format(selectedDate, "EEEE d MMMM yyyy")}
-            </p>
-          </div>
-          {(() => {
-            const isMatrixScope = (viewMode as any) === "matrix";
-            const isWeekScope = viewMode === "week" || isMatrixScope;
-            const handleClick = () => isMatrixScope ? regenerateRange(7, matrixWeekAnchor) : isWeekScope ? regenerateRange(7) : regenerate();
-            const label = isRegenerating
-              ? "Generating..."
-              : isMatrixScope
-                ? `Regenerate ${format(matrixWeekStart, "d MMM")} – ${format(addDays(matrixWeekStart, 6), "d MMM")}`
-                : isWeekScope
-                  ? "Regenerate Week"
-                  : "Regenerate";
-            return (
-              <Button
-                size="sm" variant="outline"
-                onClick={handleClick}
-                disabled={isRegenerating}
-                className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
-                title={isWeekScope ? "Regenerate cleans across the visible 7-day week" : "Regenerate cleans for this day"}
-              >
-                {isRegenerating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
-                {label}
-              </Button>
-            );
-          })()}
-        </div>
-
+      <div className="p-4 md:p-6 lg:p-8 space-y-4">
         {/* Controls — sticky so week nav stays in view while scrolling the matrix */}
         <div className="flex flex-wrap items-center gap-3 sticky top-0 z-30 bg-background/95 backdrop-blur-sm py-3 -mx-4 px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8 border-b border-border/30">
 
@@ -195,9 +170,9 @@ export default function CleaningSchedule() {
             </button>
           </div>
 
-          {/* Matrix-view-only inline week navigation, sits to the right of the toggle */}
-          {(viewMode as any) === "matrix" && (
-            <div className="flex items-center gap-2 ml-auto">
+          {/* Matrix-view-only inline week navigation, sits next to the toggle (centre-left) */}
+          {isMatrixScope && (
+            <div className="flex items-center gap-2">
               <Button variant="outline" size="icon" onClick={matrixGoPrev} className="h-9 w-9">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -253,6 +228,18 @@ export default function CleaningSchedule() {
               </Select>
             </>
           )}
+
+          {/* Regenerate button — pushed to the far right, fills the space that the old title row used */}
+          <Button
+            size="sm" variant="outline"
+            onClick={handleRegen}
+            disabled={isRegenerating}
+            className="ml-auto border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+            title={isWeekScope ? "Regenerate cleans across the visible 7-day week" : "Regenerate cleans for this day"}
+          >
+            {isRegenerating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+            {regenLabel}
+          </Button>
         </div>
 
         {/* Matrix View */}
