@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag } from "lucide-react";
+import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag, Sunrise } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
@@ -17,6 +17,7 @@ interface CleanTask {
   estimated_start_time: string | null;
   travel_time_from_previous_minutes: number | null;
   is_same_day_turnaround: boolean;
+  priority_level: number | null;
   checkout_time: string | null;
   checkin_time: string | null;
   cleaning_duration_minutes: number;
@@ -110,7 +111,7 @@ export default function CleanerPortal() {
       .from("clean_tasks")
       .select(`
         id, status, route_order, estimated_start_time,
-        travel_time_from_previous_minutes, is_same_day_turnaround,
+        travel_time_from_previous_minutes, is_same_day_turnaround, priority_level,
         checkout_time, checkin_time, cleaning_duration_minutes,
         listing_id,
         listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms, latitude, longitude)
@@ -133,6 +134,7 @@ export default function CleanerPortal() {
       estimated_start_time: t.estimated_start_time,
       travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
       is_same_day_turnaround: t.is_same_day_turnaround,
+      priority_level: t.priority_level ?? null,
       checkout_time: t.checkout_time,
       checkin_time: t.checkin_time,
       cleaning_duration_minutes: t.cleaning_duration_minutes,
@@ -165,7 +167,7 @@ export default function CleanerPortal() {
       .from("clean_tasks")
       .select(`
         id, status, route_order, estimated_start_time,
-        travel_time_from_previous_minutes, is_same_day_turnaround,
+        travel_time_from_previous_minutes, is_same_day_turnaround, priority_level,
         checkout_time, checkin_time, cleaning_duration_minutes,
         listing_id,
         listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms, latitude, longitude)
@@ -187,7 +189,7 @@ export default function CleanerPortal() {
       .from("clean_tasks")
       .select(`
         id, status, route_order, estimated_start_time,
-        travel_time_from_previous_minutes, is_same_day_turnaround,
+        travel_time_from_previous_minutes, is_same_day_turnaround, priority_level,
         checkout_time, checkin_time, cleaning_duration_minutes,
         listing_id, created_at,
         listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms, latitude, longitude)
@@ -488,6 +490,15 @@ export default function CleanerPortal() {
                             {task.location_group && (
                               <span className="inline-block mt-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-primary/15 text-primary">
                                 {task.location_group}
+                              </span>
+                            )}
+
+                            {task.priority_level === 0 && (
+                              <span
+                                className="inline-flex items-center gap-1 mt-1.5 ml-1.5 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600"
+                                title="Property already vacant — pre-11am clean possible"
+                              >
+                                <Sunrise className="h-3 w-3" /> EARLY START
                               </span>
                             )}
 

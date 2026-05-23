@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Loader2, ArrowUpDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Loader2, ArrowUpDown, Sunrise } from "lucide-react";
 import { useMatrixSchedule, type MatrixListing, type MatrixTask } from "@/hooks/useMatrixSchedule";
 import {
   getCleanerColor,
@@ -894,6 +894,14 @@ function DraggableCellInner({
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          {isP0 && (
+            <span
+              className="flex items-center justify-center h-4 w-4 rounded bg-amber-500 text-black border border-white/60"
+              title="Early Start — property already vacant, clean can begin pre-11am"
+            >
+              <Sunrise className="h-2.5 w-2.5" />
+            </span>
+          )}
           {isSameDayTA && (
             <span
               className="text-[9px] font-bold px-1 rounded bg-red-600 text-white tracking-wide border border-white/60"
