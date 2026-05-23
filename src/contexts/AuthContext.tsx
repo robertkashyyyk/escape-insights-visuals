@@ -86,11 +86,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (_event === 'SIGNED_IN' && session?.user) {
+          setLoading(true);
           // Defer Supabase queries until after the auth callback returns.
           setTimeout(() => {
             if (isMounted) void loadUserData(session.user.id);
           }, 0);
+          return;
         }
+
+        setLoading(false);
       }
     );
 
