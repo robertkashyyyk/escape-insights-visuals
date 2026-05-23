@@ -529,16 +529,15 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
           For full matrix view, use a desktop or tablet.
         </div>
 
-        {/* Auto-generation indicator */}
-        {autoGenerating && (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/30 text-xs text-primary">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span>Auto-scheduling cleans for this week…</span>
-          </div>
-        )}
-
         {/* Matrix */}
-        {isLoading ? (
+        {autoGenerating ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
+            <img src="/images/eg_icon_standalone.png" alt="Escape Grids" className="h-12 w-12" />
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <div className="text-sm text-muted-foreground">Building this week's schedule from Hostaway bookings…</div>
+            <div className="text-xs text-muted-foreground/60">This only happens once per week — subsequent visits load instantly.</div>
+          </div>
+        ) : isLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
