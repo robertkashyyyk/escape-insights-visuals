@@ -98,10 +98,12 @@ Deno.serve(async (req) => {
   try {
     let targetDate: string | null = null;
     let daysAhead = 0;
+    let targetListingId: string | null = null;
     try {
       const body = await req.json();
       if (body?.date) targetDate = body.date;
       if (typeof body?.days_ahead === "number") daysAhead = body.days_ahead;
+      if (typeof body?.listing_id === "string" && body.listing_id) targetListingId = body.listing_id;
     } catch {
       // no body
     }
@@ -127,7 +129,7 @@ Deno.serve(async (req) => {
     const perDayResults: Array<{ date: string; created: number; unassigned: number }> = [];
 
     for (const targetDate of dates) {
-      const { created, unassigned } = await processDate(supabase, targetDate);
+      const { created, unassigned } = await processDate(supabase, targetDate, targetListingId);
       grandTotalCreated += created;
       grandTotalUnassigned += unassigned;
       perDayResults.push({ date: targetDate, created, unassigned });
