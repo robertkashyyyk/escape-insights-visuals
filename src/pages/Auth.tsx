@@ -24,15 +24,21 @@ export default function Auth() {
   const isCleaner = (role as string) === "cleaner";
   const isClient = (role as string) === "client";
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const roleRef = useRef<typeof role>(role);
+
+  useEffect(() => {
+    roleRef.current = role;
+  }, [role]);
 
   const beginWorkspaceRedirect = useCallback((replace = true) => {
     if (redirectTimerRef.current) return;
     setShowTransition(true);
     redirectTimerRef.current = setTimeout(() => {
-      const dest = isClient ? "/owner" : isCleaner ? "/cleaner" : "/today";
+      const latestRole = roleRef.current;
+      const dest = latestRole === "client" ? "/owner" : latestRole === "cleaner" ? "/cleaner" : "/today";
       navigate(dest, { replace });
     }, 3000);
-  }, [isClient, isCleaner, navigate]);
+  }, [navigate]);
 
   // Show the "Preparing your workspace…" animation for ALL authenticated arrivals
   // (magic-link returns, refreshed sessions, and post-password-login), not just
