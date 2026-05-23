@@ -493,6 +493,15 @@ export default function CleanerPortal() {
                               </span>
                             )}
 
+                            {task.priority_level === 0 && (
+                              <span
+                                className="inline-flex items-center gap-1 mt-1.5 ml-1.5 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600"
+                                title="Property already vacant — pre-11am clean possible"
+                              >
+                                <Sunrise className="h-3 w-3" /> EARLY START
+                              </span>
+                            )}
+
                             {task.is_same_day_turnaround && (
                               <span className="inline-block mt-1.5 ml-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-destructive/15 text-destructive">
                                 SAME-DAY TURNAROUND
