@@ -33,13 +33,13 @@ export default function Today() {
             <StatChip label="Checkouts" value={isLoading ? "–" : String(data?.checkoutsToday ?? 0)} icon={<LogOut className="h-3.5 w-3.5" />} />
             <StatChip label="Check-ins" value={isLoading ? "–" : String(data?.checkinsToday ?? 0)} icon={<LogIn className="h-3.5 w-3.5" />} />
             <StatChip label="Cleans" value={isLoading ? "–" : String(data?.checkoutsToday ?? 0)} icon={<CalendarCheck className="h-3.5 w-3.5" />} />
-            {!isLoading && (data?.dirtyProperties ?? 0) > 0 && (
+            {progress.total > 0 && (
               <Link to="/operations/cleaning">
                 <StatChip
-                  label="Needs Cleaning"
-                  value={String(data?.dirtyProperties ?? 0)}
+                  label="Today's Cleans"
+                  value={`${progress.completed}/${progress.total}`}
                   icon={<SprayCan className="h-3.5 w-3.5" />}
-                  alert
+                  alert={progress.completed < progress.total}
                 />
               </Link>
             )}
