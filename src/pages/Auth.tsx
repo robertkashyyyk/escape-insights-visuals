@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,18 +23,37 @@ export default function Auth() {
   const navigate = useNavigate();
   const isCleaner = (role as string) === "cleaner";
   const isClient = (role as string) === "client";
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const roleRef = useRef<typeof role>(role);
+
+  useEffect(() => {
+    roleRef.current = role;
+  }, [role]);
+
+  const beginWorkspaceRedirect = useCallback((replace = true) => {
+    if (redirectTimerRef.current) return;
+    setShowTransition(true);
+    redirectTimerRef.current = setTimeout(() => {
+      const latestRole = roleRef.current;
+      const dest = latestRole === "client" ? "/owner" : latestRole === "cleaner" ? "/cleaner" : "/today";
+      navigate(dest, { replace });
+    }, 3000);
+  }, [navigate]);
 
   // Show the "Preparing your workspace…" animation for ALL authenticated arrivals
   // (magic-link returns, refreshed sessions, and post-password-login), not just
   // after a fresh password login.
   useEffect(() => {
-    if (!authLoading && user && !showTransition) {
-      setShowTransition(true);
-      const dest = isClient ? "/owner" : isCleaner ? "/cleaner" : "/today";
-      const t = setTimeout(() => navigate(dest, { replace: true }), 3000);
-      return () => clearTimeout(t);
+    if (!authLoading && user) {
+      beginWorkspaceRedirect(true);
     }
-  }, [authLoading, user, isClient, isCleaner, navigate, showTransition]);
+  }, [authLoading, user, beginWorkspaceRedirect]);
+
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+    };
+  }, []);
 
   if (authLoading) {
     return (
@@ -45,11 +64,7 @@ export default function Auth() {
   }
 
   const handleLoginSuccess = () => {
-    setShowTransition(true);
-    setTimeout(() => {
-      const dest = isClient ? "/owner" : isCleaner ? "/cleaner" : "/today";
-      navigate(dest);
-    }, 3000);
+    beginWorkspaceRedirect(false);
   };
 
   const handleMagicLink = async (e: React.FormEvent) => {
