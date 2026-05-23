@@ -443,6 +443,49 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
             </Select>
           </div>
         </div>
+
+        {/* Priority filter */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground mr-1">Priority:</span>
+          <button
+            onClick={() => setFilterPriorities(new Set())}
+            className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+              filterPriorities.size === 0
+                ? "bg-primary/15 border-primary/40 text-primary"
+                : "border-border/40 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            All
+          </button>
+          {([0, 1, 2, 3] as const).map(lvl => {
+            const active = filterPriorities.has(lvl);
+            const tone = lvl === 0
+              ? "border-amber-600/60 bg-amber-600/15 text-amber-300"
+              : lvl === 1
+              ? "border-red-500/50 bg-red-500/15 text-red-300"
+              : lvl === 2
+              ? "border-border/60 bg-secondary/60 text-foreground"
+              : "border-amber-500/40 bg-amber-500/10 text-amber-300/90";
+            return (
+              <button
+                key={lvl}
+                onClick={() => {
+                  setFilterPriorities(prev => {
+                    const next = new Set(prev);
+                    next.has(lvl) ? next.delete(lvl) : next.add(lvl);
+                    return next;
+                  });
+                }}
+                className={`px-2.5 py-1 text-xs rounded-full border transition-colors font-semibold tracking-wide ${
+                  active ? tone : "border-border/40 text-muted-foreground hover:text-foreground"
+                }`}
+                title={`Show only P${lvl} cleans`}
+              >
+                P{lvl}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
