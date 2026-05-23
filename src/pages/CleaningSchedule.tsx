@@ -44,6 +44,7 @@ export default function CleaningSchedule() {
   }, [isManager, defaulted, setViewMode]);
 
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
+  const [matrixSummary, setMatrixSummary] = useState<{ total: number; unassigned: number } | null>(null);
 
   // Week anchor for the Matrix view (lifted up so the week nav can render
   // inline next to the Day/Week/Matrix toggle).
@@ -123,9 +124,11 @@ export default function CleaningSchedule() {
             const handleClick = () => isMatrixScope ? regenerateRange(7, matrixWeekAnchor) : isWeekScope ? regenerateRange(7) : regenerate();
             const label = isRegenerating
               ? "Generating..."
-              : isWeekScope
-                ? "Regenerate Week"
-                : "Regenerate";
+              : isMatrixScope
+                ? `Regenerate ${format(matrixWeekStart, "d MMM")} – ${format(addDays(matrixWeekStart, 6), "d MMM")}`
+                : isWeekScope
+                  ? "Regenerate Week"
+                  : "Regenerate";
             return (
               <Button
                 size="sm" variant="outline"
@@ -144,27 +147,31 @@ export default function CleaningSchedule() {
         {/* Controls — sticky so week nav stays in view while scrolling the matrix */}
         <div className="flex flex-wrap items-center gap-3 sticky top-0 z-30 bg-background/95 backdrop-blur-sm py-3 -mx-4 px-4 md:-mx-6 md:px-6 lg:-mx-8 lg:px-8 border-b border-border/30">
 
-          <div className="flex items-center gap-1 bg-secondary/50 rounded-lg border border-border/30 p-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goBack}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <button
-              onClick={() => setSelectedDate(new Date())}
-              className="px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary rounded-md transition-colors"
-            >
-              {isToday ? "Today" : format(selectedDate, "d MMM")}
-            </button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goForward}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-          {!isToday && (
-            <button
-              onClick={() => setSelectedDate(new Date())}
-              className="text-xs text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
-            >
-              Back to Today
-            </button>
+          {(viewMode as any) !== "matrix" && (
+            <>
+              <div className="flex items-center gap-1 bg-secondary/50 rounded-lg border border-border/30 p-1">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goBack}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <button
+                  onClick={() => setSelectedDate(new Date())}
+                  className="px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary rounded-md transition-colors"
+                >
+                  {isToday ? "Today" : format(selectedDate, "d MMM")}
+                </button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goForward}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              {!isToday && (
+                <button
+                  onClick={() => setSelectedDate(new Date())}
+                  className="text-xs text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
+                >
+                  Back to Today
+                </button>
+              )}
+            </>
           )}
 
           <div className="flex items-center gap-1 bg-secondary/50 rounded-lg border border-border/30 p-1">
@@ -209,6 +216,14 @@ export default function CleaningSchedule() {
               <span key={format(matrixWeekStart, "yyyy-MM-dd")} className="ml-1 text-sm font-medium text-foreground tabular-nums">
                 {format(matrixWeekStart, "d MMM")} – {format(addDays(matrixWeekStart, 6), "d MMM yyyy")}
               </span>
+              {matrixSummary && (
+                <span className="text-xs tabular-nums ml-2">
+                  <span className="text-muted-foreground">{matrixSummary.total} cleans</span>
+                  <span className={matrixSummary.unassigned > 0 ? "text-amber-400 ml-2" : "text-muted-foreground ml-2"}>
+                    · {matrixSummary.unassigned > 0 ? `⚠ ${matrixSummary.unassigned} unassigned` : "all assigned"}
+                  </span>
+                </span>
+              )}
             </div>
           )}
 
@@ -248,6 +263,7 @@ export default function CleaningSchedule() {
               weekAnchor={matrixWeekAnchor}
               onWeekAnchorChange={setMatrixWeekAnchor}
               hideWeekNav
+              onSummaryChange={setMatrixSummary}
             />
             {/* Floating right-edge week nav — always reachable while scrolling */}
             <div className="fixed right-3 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-1.5 bg-card/95 backdrop-blur border border-border/40 rounded-full p-1.5 shadow-lg">
@@ -265,10 +281,10 @@ export default function CleaningSchedule() {
                 size="icon"
                 onClick={matrixGoThisWeek}
                 disabled={matrixIsCurrentWeek}
-                className="h-9 w-9 rounded-full hover:bg-secondary text-[10px] font-bold"
+                className="h-9 px-2 rounded-full hover:bg-secondary text-[10px] font-bold"
                 title="Back to current week"
               >
-                NOW
+                This Week
               </Button>
               <Button
                 variant="ghost"
