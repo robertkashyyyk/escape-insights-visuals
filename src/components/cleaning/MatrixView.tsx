@@ -468,29 +468,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
           </div>
         </Card>
 
-        {/* Summary bar */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground px-1">
-          <span>
-            Week of {format(weekStart, "d MMM")}: <span className="font-semibold text-foreground tabular-nums">{summary.total}</span> cleans total
-          </span>
-          {cleaners.map(c => {
-            const count = summary.byCleaner[c.id] || 0;
-            if (count === 0) return null;
-            return (
-              <span key={c.id}>
-                {c.name}: <span className="font-semibold text-foreground tabular-nums">{count}</span>
-              </span>
-            );
-          })}
-          {summary.unassigned > 0 && (
-            <button
-              onClick={() => setFilterCleaners(new Set(["unassigned"]))}
-              className="text-amber-400 font-semibold hover:underline"
-            >
-              Unassigned: {summary.unassigned}
-            </button>
-          )}
-        </div>
+        {/* Summary bar removed — totals now live in the controls row above the matrix. */}
 
         {/* Mobile banner */}
         <div className="md:hidden rounded-lg border border-border/30 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-300">
