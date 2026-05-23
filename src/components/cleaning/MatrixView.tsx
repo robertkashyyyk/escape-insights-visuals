@@ -666,6 +666,11 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
         onSaveNotes={updateNotes}
       />
 
+      <PropertyInfoDrawer
+        listingId={selectedPropertyId}
+        onOpenChange={(o) => !o && setSelectedPropertyId(null)}
+      />
+
       <AddManualCleanModal
         open={!!addCleanCell}
         onOpenChange={(o) => !o && setAddCleanCell(null)}
