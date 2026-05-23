@@ -219,7 +219,10 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
         await supabase.from("clean_tasks").delete().eq("id", t.id);
         continue;
       }
-      const keepCleaner = !!t.override_assignment;
+      // Preserve any existing assignment (manual override OR routine assignment)
+      // so the carryover is owned by the same cleaner today.
+      const keepCleaner = !!t.assigned_cleaner_id;
+      const priorDate = t.scheduled_date;
       await supabase
         .from("clean_tasks")
         .update({
@@ -228,8 +231,11 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
           priority_level: 0,
           status: keepCleaner ? "scheduled" : "unassigned",
           assigned_cleaner_id: keepCleaner ? t.assigned_cleaner_id : null,
+          override_assignment: false,
           estimated_start_time: null,
-          warning_reason: "Promoted from prior incomplete clean — property already vacant, guest arriving today",
+          warning_reason: keepCleaner
+            ? `Carried over from ${priorDate} — clean not completed`
+            : "Promoted from prior incomplete clean — property already vacant, guest arriving today",
           overloaded: false,
         })
         .eq("id", t.id);
@@ -880,6 +886,17 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
       currentTime = addMinutesToTime(ordered[i].estimated_start_time, ordered[i].cleaning_duration_minutes);
     }
 
+    // Step F: STO completion-window check. For same-day turnaround tasks,
+    // flag if the projected finish time runs past the guest check-in time.
+    for (const t of ordered) {
+      if (t.is_same_day_turnaround && t.checkin_time && t.estimated_start_time) {
+        const finish = addMinutesToTime(t.estimated_start_time, t.cleaning_duration_minutes);
+        if (finish > t.checkin_time) {
+          t.overloaded = true;
+          t.warning_reason = `Tight window — projected finish ${finish} is after guest check-in ${t.checkin_time}`;
+        }
+      }
+    }
 
     cleanerBuckets[c.id] = ordered;
   }
