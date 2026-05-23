@@ -49,6 +49,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
     else setWeekAnchorInternal(next);
   };
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [addCleanCell, setAddCleanCell] = useState<{ listing: MatrixListing; date: Date } | null>(null);
   const [filterGroups, setFilterGroups] = useState<Set<string>>(new Set());
   const [filterCleaners, setFilterCleaners] = useState<Set<string>>(new Set()); // empty = all; "unassigned" = unassigned tasks
