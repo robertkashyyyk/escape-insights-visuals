@@ -30,7 +30,7 @@ export default function CleaningSchedule() {
     selectedDate, setSelectedDate, viewMode, setViewMode,
     filterCleaner, setFilterCleaner, filterLocation, setFilterLocation,
     cleanerDays, unassigned, weekSummary,
-    cleaners, locationGroups, totalTasks,
+    cleaners, locationGroups,
     regenerate, regenerateRange, completeTask, goBack, goForward, isToday, isRegenerating,
     buildDaySchedule,
   } = useCleaningSchedule();
