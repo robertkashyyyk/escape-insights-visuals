@@ -64,7 +64,7 @@ export default function Auth() {
   }
 
   const handleLoginSuccess = () => {
-    beginWorkspaceRedirect(false);
+    // AuthContext will redirect once the session and role are fully loaded.
   };
 
   const handleMagicLink = async (e: React.FormEvent) => {
