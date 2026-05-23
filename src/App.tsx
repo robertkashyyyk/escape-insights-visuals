@@ -42,7 +42,16 @@ import PropertyKnowledgeDetail from "./pages/PropertyKnowledgeDetail";
 import Amenities from "./pages/Amenities";
 import GuestPortal from "./pages/GuestPortal";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 60, // 1 hour
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
