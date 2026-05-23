@@ -48,15 +48,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        // Skip INITIAL_SESSION — handled by getSession() below to avoid double-init
+        if (_event === 'INITIAL_SESSION') return;
+
         setSession(session);
         setUser(session?.user ?? null);
 
-        if (session?.user) {
-          await fetchUserData(session.user.id);
-          setLoading(false);
-        } else {
+        if (_event === 'SIGNED_OUT') {
           setProfile(null);
           setRole(null);
+          setLoading(false);
+          return;
+        }
+
+        // SIGNED_IN, TOKEN_REFRESHED, USER_UPDATED
+        if (session?.user) {
+          await fetchUserData(session.user.id);
           setLoading(false);
         }
       }
