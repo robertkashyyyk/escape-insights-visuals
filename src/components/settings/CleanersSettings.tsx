@@ -76,6 +76,36 @@ export function CleanersSettings() {
   const [geocoding, setGeocoding] = useState(false);
   const [geocodeResult, setGeocodeResult] = useState<string | null>(null);
   const [enablingLogin, setEnablingLogin] = useState<string | null>(null);
+  const [emailNotifEnabled, setEmailNotifEnabled] = useState<boolean>(false);
+  const [emailNotifLoading, setEmailNotifLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase.from("app_settings" as any) as any)
+        .select("value")
+        .eq("key", "cleaner_email_notifications_enabled")
+        .maybeSingle();
+      setEmailNotifEnabled(String(data?.value ?? "false").toLowerCase() === "true");
+    })();
+  }, []);
+
+  const toggleEmailNotifications = async (next: boolean) => {
+    setEmailNotifLoading(true);
+    try {
+      const { error } = await (supabase.from("app_settings" as any) as any).upsert(
+        { key: "cleaner_email_notifications_enabled", value: String(next), updated_at: new Date().toISOString() },
+        { onConflict: "key" }
+      );
+      if (error) throw error;
+      setEmailNotifEnabled(next);
+      toast({ title: next ? "Cleaner emails enabled" : "Cleaner emails disabled" });
+    } catch (err: any) {
+      toast({ title: "Failed to update setting", description: err?.message, variant: "destructive" });
+    } finally {
+      setEmailNotifLoading(false);
+    }
+  };
+
 
   const fetchCleaners = async () => {
     const { data } = await supabase.from("cleaners" as any).select("*").order("name");
