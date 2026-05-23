@@ -232,6 +232,16 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
     return { total, unassigned };
   }, [tasks]);
 
+  const tasksByCleaner = useMemo(() => {
+    const byCleaner: Record<string, number> = {};
+    for (const t of tasks) {
+      if (t.assigned_cleaner_id && t.status !== "unassigned") {
+        byCleaner[t.assigned_cleaner_id] = (byCleaner[t.assigned_cleaner_id] || 0) + 1;
+      }
+    }
+    return byCleaner;
+  }, [tasks]);
+
   useEffect(() => {
     onSummaryChange?.({ total: summary.total, unassigned: summary.unassigned });
   }, [summary.total, summary.unassigned, onSummaryChange]);
