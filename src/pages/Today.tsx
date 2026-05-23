@@ -1,13 +1,18 @@
 import { AppLayout } from "@/components/layout/AppLayout";
 import { format } from "date-fns";
 import { useTodayData } from "@/hooks/useTodayData";
-import { Sparkles, LogOut, LogIn, AlertTriangle, PoundSterling, CalendarCheck, BarChart3, Loader2, SprayCan } from "lucide-react";
+import { useTodayCleans } from "@/hooks/useTodayCleans";
+import { useTodayCleaningProgress } from "@/hooks/useTodayCleaningProgress";
+import { Sparkles, LogOut, LogIn, AlertTriangle, PoundSterling, CalendarCheck, BarChart3, Loader2, SprayCan, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { OpenIssuesSection } from "@/components/today/OpenIssuesSection";
+import { cn } from "@/lib/utils";
 
 export default function Today() {
   const { data, isLoading } = useTodayData();
+  const { data: cleans = [], isLoading: cleansLoading } = useTodayCleans();
+  const progress = useTodayCleaningProgress();
   const today = new Date();
 
   return (
