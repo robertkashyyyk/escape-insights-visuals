@@ -17,6 +17,7 @@ interface CleanTask {
   estimated_start_time: string | null;
   travel_time_from_previous_minutes: number | null;
   is_same_day_turnaround: boolean;
+  priority_level: number | null;
   checkout_time: string | null;
   checkin_time: string | null;
   cleaning_duration_minutes: number;
