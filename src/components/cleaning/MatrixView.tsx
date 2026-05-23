@@ -250,14 +250,37 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
     setActiveDragTaskId(String(e.active.id));
   };
 
+  const [pendingReassign, setPendingReassign] = useState<ReassignPending | null>(null);
+
   const handleDragEnd = async (e: DragEndEvent) => {
     setActiveDragTaskId(null);
     const taskId = String(e.active.id);
     const overId = e.over?.id ? String(e.over.id) : null;
     if (!overId) return;
     if (!overId.startsWith("cleaner:")) return;
-    const cleanerId = overId.slice("cleaner:".length);
-    await reassignTask(taskId, cleanerId === "unassigned" ? null : cleanerId);
+    const rawCleanerId = overId.slice("cleaner:".length);
+    const toCleanerId = rawCleanerId === "unassigned" ? null : rawCleanerId;
+
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    if ((task.assigned_cleaner_id ?? null) === toCleanerId) return; // no-op
+
+    const listing = listings.find(l => l.id === task.listing_id);
+    const fromCleaner = task.assigned_cleaner_id ? cleaners.find(c => c.id === task.assigned_cleaner_id) : null;
+    const toCleaner = toCleanerId ? cleaners.find(c => c.id === toCleanerId) : null;
+    const group = listing?.location_group || "Other";
+    const outsideArea = !!toCleaner && !(toCleaner.location_groups || []).includes(group);
+
+    setPendingReassign({
+      taskId,
+      fromCleanerName: fromCleaner?.name || "Unassigned",
+      toCleanerName: toCleaner?.name || "Unassigned",
+      toCleanerId,
+      propertyName: listing?.name || "—",
+      locationGroup: group,
+      date: parseISO(task.scheduled_date),
+      outsideArea,
+    });
   };
 
   const toggleGroup = (g: string) => {
