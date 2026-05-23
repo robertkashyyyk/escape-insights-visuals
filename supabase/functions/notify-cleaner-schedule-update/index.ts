@@ -32,6 +32,20 @@ Deno.serve(async (req) => {
     const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);
 
+    // Feature toggle — managers can disable cleaner emails from Settings
+    const { data: toggleRow } = await admin
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'cleaner_email_notifications_enabled')
+      .maybeSingle();
+    if (toggleRow && String(toggleRow.value).toLowerCase() !== 'true') {
+      return new Response(JSON.stringify({ sent: false, reason: 'notifications disabled' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+
+
     const { taskId } = await req.json();
     if (!taskId) {
       return new Response(JSON.stringify({ error: 'Missing taskId' }), {
