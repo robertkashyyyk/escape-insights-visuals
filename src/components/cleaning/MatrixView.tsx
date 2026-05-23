@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { addDays, format, isSameDay, parseISO, startOfWeek } from "date-fns";
 import {
   DndContext,
@@ -36,9 +36,10 @@ interface Props {
   weekAnchor?: Date;
   onWeekAnchorChange?: (d: Date) => void;
   hideWeekNav?: boolean;
+  onSummaryChange?: (s: { total: number; unassigned: number }) => void;
 }
 
-export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnchorChange, hideWeekNav }: Props) {
+export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnchorChange, hideWeekNav, onSummaryChange }: Props) {
   const [weekAnchorInternal, setWeekAnchorInternal] = useState<Date>(() => initialDate ?? new Date());
   const weekAnchor = weekAnchorProp ?? weekAnchorInternal;
   const setWeekAnchor = (updater: Date | ((d: Date) => Date)) => {
@@ -60,7 +61,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
 
   const {
     days, groupedListings, listings,
-    cleaners, tasks, reservations, holidays, isLoading, autoGenerating,
+    cleaners, tasks, reservations, reservationGuestMap, holidays, isLoading, autoGenerating,
     reassignTask, completeTask, undoComplete, removeTask, updateNotes, addManualClean,
   } = useMatrixSchedule(weekAnchor);
 
@@ -229,6 +230,10 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
     }
     return { total, byCleaner, unassigned };
   }, [tasks, isTaskVisible]);
+
+  useEffect(() => {
+    onSummaryChange?.({ total: summary.total, unassigned: summary.unassigned });
+  }, [summary.total, summary.unassigned, onSummaryChange]);
 
   const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) : null;
   const selectedListing = selectedTask ? listings.find(l => l.id === selectedTask.listing_id) : null;
@@ -583,6 +588,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                               dimmed={false}
                               isOrphanGap={isOrphan}
                               minStayNights={listing.min_stay_nights ?? 2}
+                              guestName={task?.reservation_id ? reservationGuestMap.get(task.reservation_id) : undefined}
                               onTaskClick={(id) => setSelectedTaskId(id)}
                               onAddClick={() => setAddCleanCell({ listing, date: d })}
                             />
@@ -685,7 +691,7 @@ function CleanerDropTarget({
 
 /* ── Single matrix cell ── */
 function MatrixCell({
-  date, listing, task, cleaners, isToday, isPast, dimmed, isOrphanGap, minStayNights, onTaskClick, onAddClick,
+  date, listing, task, cleaners, isToday, isPast, dimmed, isOrphanGap, minStayNights, guestName, onTaskClick, onAddClick,
 }: {
   date: Date;
   listing: MatrixListing;
@@ -696,6 +702,7 @@ function MatrixCell({
   dimmed: boolean;
   isOrphanGap?: boolean;
   minStayNights?: number;
+  guestName?: string;
   onTaskClick: (id: string) => void;
   onAddClick: () => void;
 }) {
@@ -757,7 +764,7 @@ function MatrixCell({
 
   const cell = (
     <div className={`${baseBorder} ${todayTint} ${pastClass} ${dimClass} p-1`}>
-      <DraggableCellInner task={task} cleaners={cleaners} onClick={() => onTaskClick(task.id)} />
+      <DraggableCellInner task={task} cleaners={cleaners} guestName={guestName} onClick={() => onTaskClick(task.id)} />
     </div>
   );
 
@@ -778,10 +785,11 @@ function MatrixCell({
 }
 
 function DraggableCellInner({
-  task, cleaners, onClick,
+  task, cleaners, guestName, onClick,
 }: {
   task: MatrixTask;
   cleaners: { id: string; name: string; color?: string | null }[];
+  guestName?: string;
   onClick: () => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id });
@@ -901,6 +909,9 @@ function DraggableCellInner({
       )}
       {isManual && !isUnassigned && (
         <div className="text-[9px] mt-0.5 opacity-80 capitalize truncate">{task.task_type}</div>
+      )}
+      {guestName && task.reservation_id && !isCompleted && (
+        <div className="text-[9px] opacity-70 truncate leading-tight">{guestName.split(/\s+/)[0]}</div>
       )}
     </button>
   );
