@@ -29,6 +29,7 @@ import { AddManualCleanModal } from "./AddManualCleanModal";
 import { shortenName } from "@/lib/shortenName";
 import { computeOrphanGapDates, orphanGapTooltip } from "@/lib/orphanGaps";
 import { Unlink2 } from "lucide-react";
+import { ReassignConfirmDialog, type ReassignPending } from "./ReassignConfirmDialog";
 
 interface Props {
   initialDate?: Date;
