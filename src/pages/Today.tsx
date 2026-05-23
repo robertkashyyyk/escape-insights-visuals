@@ -201,6 +201,142 @@ export default function Today() {
   );
 }
 
+function priorityBadgeClass(level: number | null) {
+  switch (level) {
+    case 0: return "border-red-500/50 text-red-400 bg-red-500/10";
+    case 1: return "border-amber-500/50 text-amber-400 bg-amber-500/10";
+    case 2: return "border-yellow-500/40 text-yellow-300 bg-yellow-500/10";
+    case 3: return "border-blue-500/40 text-blue-300 bg-blue-500/10";
+    default: return "border-border/40 text-muted-foreground";
+  }
+}
+
+function fmtTime(t: string | null) {
+  if (!t) return null;
+  const [h, m] = t.split(":").map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return format(d, "h:mmaaa").replace("AM", "am").replace("PM", "pm");
+}
+
+function fmtTimestamp(ts: string | null) {
+  if (!ts) return "";
+  return format(new Date(ts), "h:mmaaa").replace("AM", "am").replace("PM", "pm");
+}
+
+function TodayCleansSection({
+  cleans,
+  isLoading,
+  progress,
+}: {
+  cleans: import("@/hooks/useTodayCleans").TodayCleanRow[];
+  isLoading: boolean;
+  progress: { total: number; completed: number; unassigned: number };
+}) {
+  const outstanding = cleans.filter(c => c.status !== "completed");
+  const done = cleans.filter(c => c.status === "completed");
+  const fullyDone = progress.total > 0 && progress.completed >= progress.total;
+
+  return (
+    <section className="glass-card rounded-xl border border-border/30 overflow-hidden">
+      <div className="px-5 py-4 border-b border-border/20 flex items-center justify-between">
+        <h2 className="text-sm font-display font-semibold text-foreground uppercase tracking-wider">
+          Today's Cleans
+        </h2>
+        {progress.total > 0 && (
+          <span className={cn(
+            "text-xs tabular-nums font-medium",
+            fullyDone ? "text-green-400" : "text-amber-400"
+          )}>
+            {progress.completed} / {progress.total} complete
+          </span>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="px-5 py-8 text-center text-muted-foreground text-sm">Loading…</div>
+      ) : cleans.length === 0 ? (
+        <div className="px-5 py-8 text-center text-muted-foreground text-sm">
+          No cleans scheduled for today
+        </div>
+      ) : (
+        <>
+          <div className="divide-y divide-border/20">
+            {outstanding.map((c) => {
+              const isUnassigned = !c.assigned_cleaner_id;
+              const isP0 = c.priority_level === 0;
+              return (
+                <div
+                  key={c.id}
+                  className={cn(
+                    "flex items-center gap-3 px-5 py-3 border-l-2 transition-colors",
+                    isP0 ? "border-l-red-500 bg-red-500/5"
+                      : isUnassigned ? "border-l-amber-500 bg-amber-500/5"
+                      : "border-l-transparent hover:bg-secondary/30"
+                  )}
+                >
+                  <Badge
+                    variant="outline"
+                    className={cn("text-[10px] px-1.5 py-0 shrink-0", priorityBadgeClass(c.priority_level))}
+                  >
+                    P{c.priority_level ?? "—"}
+                  </Badge>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-foreground font-medium truncate">{c.listing_name}</p>
+                    <p className={cn(
+                      "text-xs truncate flex items-center gap-1",
+                      isUnassigned ? "text-amber-400" : "text-muted-foreground"
+                    )}>
+                      {isUnassigned && <AlertTriangle className="h-3 w-3" />}
+                      {c.cleaner_name ?? "Unassigned"}
+                    </p>
+                  </div>
+                  {c.checkout_time && (
+                    <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                      out {fmtTime(c.checkout_time)}
+                    </span>
+                  )}
+                  {c.is_same_day_turnaround && (
+                    <Badge className="bg-primary/15 text-primary border-primary/30 text-[10px] px-2 py-0.5 shrink-0">
+                      STO
+                    </Badge>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {done.length > 0 && (
+            <>
+              <div className="px-5 py-2 border-t border-b border-border/20 bg-secondary/20">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                  Completed
+                </span>
+              </div>
+              <div className="divide-y divide-border/10">
+                {done.map((c) => (
+                  <div key={c.id} className="flex items-center gap-3 px-5 py-2.5 opacity-60">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-muted-foreground truncate">{c.listing_name}</p>
+                      <p className="text-xs text-muted-foreground/70 truncate">
+                        {c.cleaner_name ?? "Unassigned"}
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted-foreground/70 tabular-nums shrink-0">
+                      {fmtTimestamp(c.completed_at)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 function StatChip({ label, value, icon, muted, alert }: { label: string; value: string; icon: React.ReactNode; muted?: boolean; alert?: boolean }) {
   return (
     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${
