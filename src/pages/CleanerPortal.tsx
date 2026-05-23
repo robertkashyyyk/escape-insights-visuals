@@ -111,7 +111,7 @@ export default function CleanerPortal() {
       .from("clean_tasks")
       .select(`
         id, status, route_order, estimated_start_time,
-        travel_time_from_previous_minutes, is_same_day_turnaround,
+        travel_time_from_previous_minutes, is_same_day_turnaround, priority_level,
         checkout_time, checkin_time, cleaning_duration_minutes,
         listing_id,
         listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms, latitude, longitude)
@@ -133,7 +133,7 @@ export default function CleanerPortal() {
       route_order: t.route_order,
       estimated_start_time: t.estimated_start_time,
       travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
-      is_same_day_turnaround: t.is_same_day_turnaround,
+      is_same_day_turnaround: t.is_same_day_turnaround, priority_level,
       priority_level: t.priority_level ?? null,
       checkout_time: t.checkout_time,
       checkin_time: t.checkin_time,
@@ -167,7 +167,7 @@ export default function CleanerPortal() {
       .from("clean_tasks")
       .select(`
         id, status, route_order, estimated_start_time,
-        travel_time_from_previous_minutes, is_same_day_turnaround,
+        travel_time_from_previous_minutes, is_same_day_turnaround, priority_level,
         checkout_time, checkin_time, cleaning_duration_minutes,
         listing_id,
         listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms, latitude, longitude)
@@ -189,7 +189,7 @@ export default function CleanerPortal() {
       .from("clean_tasks")
       .select(`
         id, status, route_order, estimated_start_time,
-        travel_time_from_previous_minutes, is_same_day_turnaround,
+        travel_time_from_previous_minutes, is_same_day_turnaround, priority_level,
         checkout_time, checkin_time, cleaning_duration_minutes,
         listing_id, created_at,
         listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms, latitude, longitude)
