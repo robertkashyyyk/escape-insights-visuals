@@ -36,9 +36,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchUserData = async (userId: string) => {
-    const [profileRes, roleRes] = await Promise.all([
+    const userDataPromise = Promise.all([
       supabase.from("profiles").select("*").eq("id", userId).single(),
       supabase.from("user_roles").select("role").eq("user_id", userId).single(),
+    ]);
+
+    const [profileRes, roleRes] = await Promise.race([
+      userDataPromise,
+      new Promise<never>((_, reject) => {
+        window.setTimeout(() => reject(new Error("Timed out loading user data")), 8000);
+      }),
     ]);
 
     setProfile((profileRes.data as Profile) ?? null);
