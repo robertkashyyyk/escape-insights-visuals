@@ -135,7 +135,6 @@ export default function CleanerPortal() {
       travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
       is_same_day_turnaround: t.is_same_day_turnaround,
       priority_level: t.priority_level ?? null,
-      priority_level: t.priority_level ?? null,
       checkout_time: t.checkout_time,
       checkin_time: t.checkin_time,
       cleaning_duration_minutes: t.cleaning_duration_minutes,
