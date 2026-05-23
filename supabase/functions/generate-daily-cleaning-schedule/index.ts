@@ -188,31 +188,34 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
   }
 
   if (isCurrentDayRefresh && arrivalListingIds.length > 0) {
-    // Only promote prior ORPHAN-GAP-FILL tasks (P3) — never a legitimate
-    // checkout-day clean (P1/P2). Promoting a checkout-day clean leaves a
-    // duplicate behind once the checkout day is regenerated, producing the
-    // bug where a property appears with cleans on two consecutive days.
+    // Promote ANY incomplete prior-day task for a listing with arrival today.
+    // Operational rule: the clean did not happen yesterday, so the active
+    // responsibility moves to today as P0. The prior-day row is repurposed
+    // (UPDATE moves scheduled_date to today) — never duplicated. If multiple
+    // prior tasks exist for the same listing, keep one and delete the rest so
+    // we never end up with consecutive-day duplicate active cleans.
     const { data: priorOpen } = await supabase
       .from("clean_tasks")
-      .select("id, listing_id, scheduled_date, status, override_assignment, assigned_cleaner_id, notes, priority_level, priority")
+      .select("id, listing_id, scheduled_date, status, override_assignment, assigned_cleaner_id, notes, priority_level, priority, source, reservation_id")
       .in("listing_id", arrivalListingIds)
       .lt("scheduled_date", targetDate)
-      .eq("priority_level", 3)
-      .not("status", "in", "(completed,cancelled)");
+      .not("status", "in", "(completed,done,cancelled)")
+      .order("scheduled_date", { ascending: false });
 
-    // Don't promote into a listing that already has a clean scheduled for
-    // today (would create two tasks for the same listing+day).
+    // Don't promote into a listing that already has a clean scheduled for today.
     const { data: existingToday } = await supabase
       .from("clean_tasks")
       .select("listing_id")
       .in("listing_id", arrivalListingIds)
       .eq("scheduled_date", targetDate);
     const haveToday = new Set((existingToday || []).map((r: any) => String(r.listing_id)));
+    const promotedListings = new Set<string>();
 
     for (const t of priorOpen || []) {
-      if (haveToday.has(String(t.listing_id))) {
-        // Already covered today — delete the redundant prior orphan rather
-        // than promoting it. Keeps the matrix clean.
+      const lid = String(t.listing_id);
+      if (haveToday.has(lid) || promotedListings.has(lid)) {
+        // Already covered today (or sibling just promoted) — delete the
+        // redundant prior task so no duplicate active cleans remain.
         await supabase.from("clean_tasks").delete().eq("id", t.id);
         continue;
       }
@@ -226,11 +229,12 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
           status: keepCleaner ? "scheduled" : "unassigned",
           assigned_cleaner_id: keepCleaner ? t.assigned_cleaner_id : null,
           estimated_start_time: null,
-          warning_reason: "Promoted from prior orphan-gap day — guest arriving today",
+          warning_reason: "Promoted from prior incomplete clean — property already vacant, guest arriving today",
           overloaded: false,
         })
         .eq("id", t.id);
-      haveToday.add(String(t.listing_id));
+      promotedListings.add(lid);
+      haveToday.add(lid);
     }
   }
 
