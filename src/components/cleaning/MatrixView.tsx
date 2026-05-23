@@ -723,7 +723,7 @@ function MatrixCell({
     return (
       <button
         onClick={onAddClick}
-        className={`group ${baseBorder} ${todayTint} flex items-center justify-center text-muted-foreground/0 hover:text-muted-foreground hover:bg-secondary/30 transition-colors min-h-[56px]`}
+        className={`group ${baseBorder} ${todayTint} ${pastClass} flex items-center justify-center text-muted-foreground/0 hover:text-muted-foreground hover:bg-secondary/30 transition-colors min-h-[56px]`}
         aria-label={`Add manual clean for ${listing.name} on ${format(date, "EEE d MMM")}`}
       >
         <Plus className="h-4 w-4 opacity-0 group-hover:opacity-60 transition-opacity" />
