@@ -222,21 +222,15 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
     return groups;
   }, [groupedListings, filterGroups, cleanerFilterActive, listingsWithVisibleTask, sortMode, taskGrid, todayStr, tasks, isTaskVisible, cleaners]);
 
-  // Summary
+  // Summary — always reflect raw week totals, independent of active filters
   const summary = useMemo(() => {
-    const visibleTasks = tasks.filter(isTaskVisible);
-    const total = visibleTasks.length;
-    const byCleaner: Record<string, number> = {};
+    const total = tasks.length;
     let unassigned = 0;
-    for (const t of visibleTasks) {
-      if (!t.assigned_cleaner_id || t.status === "unassigned") {
-        unassigned++;
-      } else {
-        byCleaner[t.assigned_cleaner_id] = (byCleaner[t.assigned_cleaner_id] || 0) + 1;
-      }
+    for (const t of tasks) {
+      if (!t.assigned_cleaner_id || t.status === "unassigned") unassigned++;
     }
-    return { total, byCleaner, unassigned };
-  }, [tasks, isTaskVisible]);
+    return { total, unassigned };
+  }, [tasks]);
 
   useEffect(() => {
     onSummaryChange?.({ total: summary.total, unassigned: summary.unassigned });
