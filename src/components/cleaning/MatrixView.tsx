@@ -222,21 +222,25 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
     return groups;
   }, [groupedListings, filterGroups, cleanerFilterActive, listingsWithVisibleTask, sortMode, taskGrid, todayStr, tasks, isTaskVisible, cleaners]);
 
-  // Summary
+  // Summary — always reflect raw week totals, independent of active filters
   const summary = useMemo(() => {
-    const visibleTasks = tasks.filter(isTaskVisible);
-    const total = visibleTasks.length;
-    const byCleaner: Record<string, number> = {};
+    const total = tasks.length;
     let unassigned = 0;
-    for (const t of visibleTasks) {
-      if (!t.assigned_cleaner_id || t.status === "unassigned") {
-        unassigned++;
-      } else {
+    for (const t of tasks) {
+      if (!t.assigned_cleaner_id || t.status === "unassigned") unassigned++;
+    }
+    return { total, unassigned };
+  }, [tasks]);
+
+  const tasksByCleaner = useMemo(() => {
+    const byCleaner: Record<string, number> = {};
+    for (const t of tasks) {
+      if (t.assigned_cleaner_id && t.status !== "unassigned") {
         byCleaner[t.assigned_cleaner_id] = (byCleaner[t.assigned_cleaner_id] || 0) + 1;
       }
     }
-    return { total, byCleaner, unassigned };
-  }, [tasks, isTaskVisible]);
+    return byCleaner;
+  }, [tasks]);
 
   useEffect(() => {
     onSummaryChange?.({ total: summary.total, unassigned: summary.unassigned });
@@ -502,7 +506,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                 key={c.id}
                 id={`cleaner:${c.id}`}
                 name={c.name}
-                count={summary.byCleaner[c.id] || 0}
+                count={tasksByCleaner[c.id] || 0}
                 color={getCleanerColor(c.id, c.name, c.color)}
                 isDragging={!!activeDragTaskId}
               />
