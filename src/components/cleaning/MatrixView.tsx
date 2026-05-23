@@ -674,13 +674,14 @@ function CleanerDropTarget({
 
 /* ── Single matrix cell ── */
 function MatrixCell({
-  date, listing, task, cleaners, isToday, dimmed, isOrphanGap, minStayNights, onTaskClick, onAddClick,
+  date, listing, task, cleaners, isToday, isPast, dimmed, isOrphanGap, minStayNights, onTaskClick, onAddClick,
 }: {
   date: Date;
   listing: MatrixListing;
   task: MatrixTask | undefined;
   cleaners: { id: string; name: string; location_groups?: string[] }[];
   isToday: boolean;
+  isPast?: boolean;
   dimmed: boolean;
   isOrphanGap?: boolean;
   minStayNights?: number;
@@ -689,6 +690,9 @@ function MatrixCell({
 }) {
   const baseBorder = "border-r border-border/20 last:border-r-0";
   const todayTint = isToday ? "bg-amber-500/[0.04]" : "";
+  const pastClass = isPast
+    ? "relative opacity-60 after:content-[''] after:absolute after:inset-x-1 after:top-1/2 after:h-px after:bg-foreground/30 after:rotate-[-8deg] after:pointer-events-none"
+    : "";
   const dimClass = dimmed ? "opacity-25" : "";
 
   if (!task) {
