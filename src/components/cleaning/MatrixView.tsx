@@ -522,7 +522,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                         key={d.toISOString()}
                         className={`px-3 py-2 text-center text-[11px] font-medium border-r border-border/20 last:border-r-0 ${
                           isTodayCol ? "bg-amber-500/10 text-amber-300" : "text-muted-foreground"
-                        } ${isPast ? "line-through opacity-60" : ""}`}
+                        } ${isPast ? "opacity-60" : ""}`}
                       >
                         <div>{format(d, "EEE")}</div>
                         <div className="text-foreground tabular-nums text-sm font-display font-semibold mt-0.5">
