@@ -25,6 +25,7 @@ import {
   MANUAL_CLEAN_COLOR,
 } from "@/lib/cleanerColors";
 import { TaskDetailPanel } from "./TaskDetailPanel";
+import { PropertyInfoDrawer } from "./PropertyInfoDrawer";
 import { AddManualCleanModal } from "./AddManualCleanModal";
 import { shortenName } from "@/lib/shortenName";
 import { computeOrphanGapDates, orphanGapTooltip } from "@/lib/orphanGaps";
@@ -48,6 +49,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
     else setWeekAnchorInternal(next);
   };
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [addCleanCell, setAddCleanCell] = useState<{ listing: MatrixListing; date: Date } | null>(null);
   const [filterGroups, setFilterGroups] = useState<Set<string>>(new Set());
   const [filterCleaners, setFilterCleaners] = useState<Set<string>>(new Set()); // empty = all; "unassigned" = unassigned tasks
@@ -580,17 +582,21 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                         className="grid grid-cols-[200px_repeat(7,minmax(110px,1fr))] border-b border-border/20 hover:bg-secondary/10 transition-colors min-h-[56px]"
                       >
                         {/* Property name (sticky col) */}
-                        <div className="px-3 py-2 border-r border-border/30 sticky left-0 bg-card/80 backdrop-blur-sm z-10 flex flex-col justify-center">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPropertyId(listing.id)}
+                          className="px-3 py-2 border-r border-border/30 sticky left-0 bg-card/80 backdrop-blur-sm z-10 flex flex-col justify-center text-left hover:bg-secondary/40 transition-colors cursor-pointer"
+                          title={`Open ${listing.name} info`}
+                        >
                           <p
-                            className="text-xs font-medium text-foreground leading-tight truncate"
-                            title={listing.name}
+                            className="text-xs font-medium text-foreground leading-tight truncate hover:text-amber-400 transition-colors"
                           >
                             {shortenName(listing.name)}
                           </p>
                           {listing.location_group && (
                             <span className="text-[9px] text-muted-foreground/70 mt-0.5">{listing.location_group}</span>
                           )}
-                        </div>
+                        </button>
 
                         {days.map(d => {
                           const ds = format(d, "yyyy-MM-dd");
@@ -658,6 +664,11 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
         onUndoComplete={undoComplete}
         onRemove={removeTask}
         onSaveNotes={updateNotes}
+      />
+
+      <PropertyInfoDrawer
+        listingId={selectedPropertyId}
+        onOpenChange={(o) => !o && setSelectedPropertyId(null)}
       />
 
       <AddManualCleanModal
@@ -788,9 +799,28 @@ function MatrixCell({
     }
   }
 
+  const orphanTip = orphanGapTooltip(minStayNights ?? 2);
   const cell = (
-    <div className={`${baseBorder} ${todayTint} ${pastClass} ${dimClass} p-1`}>
+    <div className={`relative ${baseBorder} ${todayTint} ${pastClass} ${dimClass} p-1`}>
       <DraggableCellInner task={task} cleaners={cleaners} guestName={guestName} onClick={() => onTaskClick(task.id)} />
+      {isOrphanGap && (
+        <TooltipProvider delayDuration={150}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                className="absolute bottom-0.5 left-0.5 z-10 flex items-center gap-0.5 px-1 rounded bg-amber-500 text-black text-[8px] font-bold tracking-wide border border-white/60 pointer-events-auto leading-3"
+                aria-label={orphanTip}
+              >
+                <Unlink2 className="h-2 w-2" />
+                ORPHAN
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[220px] text-xs">
+              {orphanTip} — clean still required, but no booking that night.
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
     </div>
   );
 
