@@ -702,7 +702,7 @@ function MatrixCell({
   const baseBorder = "border-r border-border/20 last:border-r-0";
   const todayTint = isToday ? "bg-amber-500/[0.04]" : "";
   const pastClass = isPast
-    ? "relative opacity-60 after:content-[''] after:absolute after:inset-x-1 after:top-1/2 after:h-px after:bg-foreground/30 after:rotate-[-8deg] after:pointer-events-none"
+    ? "opacity-60"
     : "";
   const dimClass = dimmed ? "opacity-25" : "";
 
