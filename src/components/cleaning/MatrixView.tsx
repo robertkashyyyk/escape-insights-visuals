@@ -637,6 +637,17 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
         holidays={holidays}
         onSubmit={addManualClean}
       />
+
+      <ReassignConfirmDialog
+        pending={pendingReassign}
+        onCancel={() => setPendingReassign(null)}
+        onConfirm={async () => {
+          if (!pendingReassign) return;
+          const { taskId, toCleanerId } = pendingReassign;
+          setPendingReassign(null);
+          await reassignTask(taskId, toCleanerId);
+        }}
+      />
     </div>
   );
 }
