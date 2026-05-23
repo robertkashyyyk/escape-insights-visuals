@@ -184,7 +184,8 @@ export function useMatrixSchedule(weekAnchor: Date) {
   }, [qc, weekStartStr, weekEndStr]);
 
   // Lazy auto-generate: if the user navigates to a current/future week that has
-  // zero tasks but reservations exist, kick off generation automatically.
+  // confirmed checkouts with no matching clean task (by reservation_id or
+  // listing+date), kick off generation automatically to top up the partial week.
   // Visible to caller via `autoGenerating` so the UI can show a spinner.
   const [autoGenerating, setAutoGenerating] = useState(false);
   const inFlightRef = useRef<Set<string>>(new Set());
