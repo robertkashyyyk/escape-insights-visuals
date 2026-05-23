@@ -192,13 +192,23 @@ export function useMatrixSchedule(weekAnchor: Date) {
 
   useEffect(() => {
     if (tasksLoading) return;
-    if (tasks.length > 0) return;
     const todayStr = format(new Date(), "yyyy-MM-dd");
     if (weekEndStr < todayStr) return;
-    const hasCheckoutsInWeek = reservations.some(
-      (r) => r.check_out >= weekStartStr && r.check_out <= weekEndStr
+
+    const coveredReservationIds = new Set(
+      tasks.map(t => t.reservation_id).filter(Boolean) as string[]
     );
-    if (!hasCheckoutsInWeek) return;
+    const coveredListingDates = new Set(
+      tasks.map(t => `${t.listing_id}_${t.scheduled_date}`)
+    );
+    const uncoveredCheckouts = reservations.filter(
+      r =>
+        r.check_out >= weekStartStr &&
+        r.check_out <= weekEndStr &&
+        !coveredReservationIds.has(r.id) &&
+        !coveredListingDates.has(`${r.listing_id}_${r.check_out}`)
+    );
+    if (uncoveredCheckouts.length === 0) return;
 
     // Skip if already in flight or successfully generated in the last 60s
     if (inFlightRef.current.has(weekStartStr)) return;
@@ -397,10 +407,15 @@ export function useMatrixSchedule(weekAnchor: Date) {
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [listings]);
 
+  const reservationGuestMap = useMemo(
+    () => new Map(reservations.map(r => [r.id, r.guest_name])),
+    [reservations]
+  );
+
   return {
     weekStart, weekEnd, days,
     listings, groupedListings,
-    cleaners, tasks, reservations, holidays,
+    cleaners, tasks, reservations, reservationGuestMap, holidays,
     isLoading: listingsLoading || tasksLoading,
     autoGenerating,
     reassignTask, completeTask, undoComplete, removeTask, updateNotes, addManualClean,
