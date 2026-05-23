@@ -35,8 +35,9 @@ export function ReassignConfirmDialog({ pending, onCancel, onConfirm }: Props) {
     if (pending) setStage("primary");
   }, [pending]);
 
-  const handleFirstConfirm = async () => {
+  const handleFirstConfirm = async (e: React.MouseEvent) => {
     if (pending?.outsideArea && pending.toCleanerId) {
+      e.preventDefault();
       setStage("warn");
     } else {
       await onConfirm();
