@@ -98,10 +98,12 @@ Deno.serve(async (req) => {
   try {
     let targetDate: string | null = null;
     let daysAhead = 0;
+    let targetListingId: string | null = null;
     try {
       const body = await req.json();
       if (body?.date) targetDate = body.date;
       if (typeof body?.days_ahead === "number") daysAhead = body.days_ahead;
+      if (typeof body?.listing_id === "string" && body.listing_id) targetListingId = body.listing_id;
     } catch {
       // no body
     }
@@ -127,7 +129,7 @@ Deno.serve(async (req) => {
     const perDayResults: Array<{ date: string; created: number; unassigned: number }> = [];
 
     for (const targetDate of dates) {
-      const { created, unassigned } = await processDate(supabase, targetDate);
+      const { created, unassigned } = await processDate(supabase, targetDate, targetListingId);
       grandTotalCreated += created;
       grandTotalUnassigned += unassigned;
       perDayResults.push({ date: targetDate, created, unassigned });
@@ -167,7 +169,10 @@ Deno.serve(async (req) => {
   }
 });
 
-async function processDate(supabase: any, targetDate: string): Promise<{ created: number; unassigned: number }> {
+async function processDate(supabase: any, targetDate: string, targetListingId: string | null = null): Promise<{ created: number; unassigned: number }> {
+  // Optional fast path: when a specific listing_id is provided, restrict processing
+  // to that one listing. Used by the reactive same-day allocation trigger.
+  const restrictTo = (id: string) => !targetListingId || String(id) === targetListingId;
   const targetDayOfWeek = DAY_NAMES[new Date(targetDate + "T12:00:00Z").getDay()];
 
   // 0. P0 PROMOTION: only on the actual current day. Future week regeneration
@@ -325,7 +330,7 @@ async function processDate(supabase: any, targetDate: string): Promise<{ created
   const rawListingIds: string[] = Array.from(new Set([
     ...((checkouts || []).map((r: any) => String(r.listing_id))),
     ...orphanListingIds,
-  ]));
+  ])).filter(restrictTo);
   if (rawListingIds.length === 0 && (orphanUnassigned || []).length === 0) {
     return { created: 0, unassigned: 0 };
   }
