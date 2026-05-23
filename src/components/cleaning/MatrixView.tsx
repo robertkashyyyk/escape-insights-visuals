@@ -704,7 +704,7 @@ function MatrixCell({
             <TooltipTrigger asChild>
               <button
                 onClick={onAddClick}
-                className={`group ${baseBorder} ${todayTint} flex items-center justify-center min-h-[56px] p-1`}
+                className={`group ${baseBorder} ${todayTint} ${pastClass} flex items-center justify-center min-h-[56px] p-1`}
                 aria-label={tip}
               >
                 <div className="orphan-gap orphan-gap-hover w-full h-full min-h-[44px] flex items-center justify-center gap-1 text-[10px] font-medium text-amber-500/90 dark:text-amber-300/90 transition-all">
