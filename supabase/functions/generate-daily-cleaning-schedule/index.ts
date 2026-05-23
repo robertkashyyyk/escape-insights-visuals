@@ -330,7 +330,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
   const rawListingIds: string[] = Array.from(new Set([
     ...((checkouts || []).map((r: any) => String(r.listing_id))),
     ...orphanListingIds,
-  ]));
+  ])).filter(restrictTo);
   if (rawListingIds.length === 0 && (orphanUnassigned || []).length === 0) {
     return { created: 0, unassigned: 0 };
   }
