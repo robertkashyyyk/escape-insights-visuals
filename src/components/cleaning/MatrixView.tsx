@@ -506,7 +506,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                 key={c.id}
                 id={`cleaner:${c.id}`}
                 name={c.name}
-                count={summary.byCleaner[c.id] || 0}
+                count={tasksByCleaner[c.id] || 0}
                 color={getCleanerColor(c.id, c.name, c.color)}
                 isDragging={!!activeDragTaskId}
               />
