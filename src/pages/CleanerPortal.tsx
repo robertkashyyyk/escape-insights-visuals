@@ -467,6 +467,14 @@ export default function CleanerPortal() {
                             : ""
                         }`}
                       >
+                        {task.priority_level === 0 && (
+                          <span
+                            className="inline-flex items-center gap-1 mb-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 border border-amber-500/30"
+                            title="Property already vacant — pre-11am clean possible"
+                          >
+                            <Sunrise className="h-3 w-3" /> EARLY START
+                          </span>
+                        )}
                         <div className="flex items-start gap-3">
                           <div className="mt-1 shrink-0">
                             {isComplete ? (
@@ -490,15 +498,6 @@ export default function CleanerPortal() {
                             {task.location_group && (
                               <span className="inline-block mt-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-primary/15 text-primary">
                                 {task.location_group}
-                              </span>
-                            )}
-
-                            {task.priority_level === 0 && (
-                              <span
-                                className="inline-flex items-center gap-1 mt-1.5 ml-1.5 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600"
-                                title="Property already vacant — pre-11am clean possible"
-                              >
-                                <Sunrise className="h-3 w-3" /> EARLY START
                               </span>
                             )}
 

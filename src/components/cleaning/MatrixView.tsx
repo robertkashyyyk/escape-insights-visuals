@@ -893,7 +893,7 @@ function DraggableCellInner({
             <span className="text-[10px] tabular-nums truncate">{checkout}</span>
           )}
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="absolute top-0.5 right-0.5 flex items-center gap-1">
           {isP0 && (
             <span
               className="flex items-center justify-center h-4 w-4 rounded bg-amber-500 text-black border border-white/60"
@@ -904,7 +904,7 @@ function DraggableCellInner({
           )}
           {isSameDayTA && (
             <span
-              className="text-[9px] font-bold px-1 rounded bg-red-600 text-white tracking-wide border border-white/60"
+              className="text-[9px] font-bold px-1 rounded bg-red-600 text-white tracking-wide border border-white/60 leading-4"
               title="Same-day turnaround"
             >
               STO
@@ -912,7 +912,7 @@ function DraggableCellInner({
           )}
           {task.overloaded && (
             <span
-              className="text-[9px] font-bold px-1 rounded bg-amber-500 text-black tracking-wide"
+              className="text-[9px] font-bold px-1 rounded bg-amber-500 text-black tracking-wide leading-4"
               title={task.warning_reason ?? "Overloaded — only eligible cleaner for nearby cluster"}
             >
               ⚠
@@ -920,7 +920,7 @@ function DraggableCellInner({
           )}
           {task.override_assignment && (
             <span
-              className="text-[9px] font-bold px-1 rounded bg-red-600 text-white tracking-wide"
+              className="text-[9px] font-bold px-1 rounded bg-red-600 text-white tracking-wide leading-4"
               title={task.warning_reason ?? "Manual override — cleaner marked unavailable"}
             >
               !
