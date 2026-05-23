@@ -1,61 +1,75 @@
-## 1. Why we have "duplicates" and "unlinked"
+# Cleaning Matrix — 7 Fixes
 
-After a deeper look, the real story is cleaner than the earlier breakdown suggested. **All 45 "missing"-link bookings actually have a clean on that listing+date — it's just linked to a different reservation row.** Almost every case follows one pattern:
+## Fix 1 — Smarter auto-schedule guard
+**File:** `src/hooks/useMatrixSchedule.ts` (the lazy-generate `useEffect`, ~lines 193-230)
 
-- A guest first appears as an **inquiry** (e.g. Craig, 30 May → Ernie's Den).
-- The auto-clean trigger fires on the inquiry and creates a clean.
-- The guest later converts (or another guest books the same night) and a **confirmed** reservation lands on the same listing + checkout date.
-- The trigger sees a clean already exists for that listing+date and refuses to create another — but it never re-points the `reservation_id` to the confirmed booking, so the confirmed one looks "unlinked".
+Replace the `if (tasks.length > 0) return;` early-exit with a coverage check:
 
-So the two numbers were really one bug: **inquiries are being given cleans**. The user has already stated inquiries should never get a clean.
+- Build `coveredReservationIds = new Set(tasks.map(t => t.reservation_id).filter(Boolean))`.
+- Build `coveredListingDates = new Set(tasks.map(t => \`${t.listing_id}_${t.scheduled_date}\`))`.
+- Compute `uncoveredCheckouts` = confirmed reservations whose `check_out` falls in `[weekStartStr, weekEndStr]` and that are NOT in `coveredReservationIds` AND whose `${listing_id}_${check_out}` is NOT in `coveredListingDates`.
+- Only fire the invoke if `uncoveredCheckouts.length > 0`.
 
-**Fix (data + trigger):**
-- Migration to update `auto_create_clean_from_reservation` so it skips `inquiry` status (in addition to cancelled/declined/expired).
-- One-off backfill: for every clean currently linked to an inquiry where a confirmed sibling exists on the same listing+checkout date, re-point `reservation_id` to the confirmed booking. Then delete any non-manual clean that is still linked to an inquiry with no confirmed sibling.
+Keep the existing `inFlightRef` and 60s `recentSuccessRef` cooldown — they still guard against loops. Edge function is already idempotent.
 
-After this: every confirmed future booking is linked 1:1, inquiries stay off the schedule (as intended), and the only remaining "duplicates" would be genuine same-day double-bookings (currently 2 — Hilltop Views 30 Jun, Harbour Heights 13 Jul), which legitimately share one clean.
+## Fix 2 — Hide day-nav pill in Matrix view
+**File:** `src/pages/CleaningSchedule.tsx` (lines ~147-168)
 
-## 2. Matrix View — cross out past days
+Wrap the `‹ Today ›` pill + the "Back to Today" link in `{viewMode !== "matrix" && (...)}` so they only render in Day/Week mode.
 
-In `src/components/cleaning/MatrixView.tsx`, for any cell whose date is **strictly before today**:
-- Apply `opacity-60` to the whole cell.
-- Add a diagonal strikethrough overlay (a thin `bg-foreground/20` line via a pseudo-element / absolutely-positioned div rotated 45°) so the cell is clearly "in the past" but contents stay readable.
-- Day-column headers for past dates get `line-through text-muted-foreground`.
+## Fix 3 — Guest first name in cells
+**Files:** `src/hooks/useMatrixSchedule.ts`, `src/components/cleaning/MatrixView.tsx`
 
-Today and future dates render unchanged.
+- Hook: add `reservationGuestMap = useMemo(() => new Map(reservations.map(r => [r.id, r.guest_name])), [reservations])` to the return value (reservations already loaded).
+- `MatrixView`: destructure `reservationGuestMap` from hook, thread it down through `MatrixCell` → `DraggableCellInner` as a `guestName?: string` prop derived per task via `task.reservation_id ? reservationGuestMap.get(task.reservation_id) : undefined`.
+- In `DraggableCellInner`: when `task.reservation_id` and `task.status !== "completed"` and a guest name exists, render below the cleaner initial:
+  ```tsx
+  <div className="text-[9px] opacity-70 truncate">{guestName.split(/\s+/)[0]}</div>
+  ```
 
-## 3. Matrix drag-and-drop — confirmation flow
+## Fix 4 — Dynamic Regenerate button label
+**File:** `src/pages/CleaningSchedule.tsx` (lines ~120-141)
 
-Currently a drop instantly writes `assigned_cleaner_id`. Replace with a two-stage confirm:
-
-**Primary dialog** (always shown on drop):
+In the IIFE that builds the regenerate button label, when `isMatrixScope` is true set:
 ```
-Reassign clean?
-  Original cleaner : <name>      (or "Unassigned")
-  New cleaner      : <name>
-  Property         : <listing name>
-  Location group   : <listing.location_group>
-  Date             : <scheduled_date>
-[Cancel]  [Confirm]
+label = `Regenerate ${format(matrixWeekStart, "d MMM")} – ${format(addDays(matrixWeekStart, 6), "d MMM")}`
 ```
+Keep the existing "Generating..." while `isRegenerating`. Day view label unchanged.
 
-**Secondary dialog** (only if the new cleaner's `location_groups` array does NOT include the listing's `location_group`):
-```
-Outside cleaner's area
-  <Cleaner> doesn't cover "<location group>".
-  This is outside their normal patch — are you really sure?
-[Cancel]  [Confirm anyway]
-```
+## Fix 5 — Rename floating "NOW" → "This Week"
+**File:** `src/pages/CleaningSchedule.tsx` (lines ~263-272)
 
-Only after the final Confirm do we run the existing update. Cancel at any stage = no DB write, card snaps back.
+Change the middle floating button:
+- Text: `This Week` instead of `NOW`.
+- Class: `h-9 w-9 rounded-full hover:bg-secondary text-[10px] font-bold` → `h-9 px-2 rounded-full hover:bg-secondary text-[10px] font-bold`.
+- Keep `title="Back to current week"` and `disabled={matrixIsCurrentWeek}`.
 
-### Technical detail
-- New component `src/components/cleaning/ReassignConfirmDialog.tsx` using existing shadcn `AlertDialog`.
-- `MatrixView.tsx` `onDrop` handler: instead of calling the mutation, stash `{ taskId, fromCleanerId, toCleanerId, listing, date }` in local state and open the dialog. Dialog reads cleaner names from already-loaded `cleaners` and listing.location_group from the task's listing; runs the mutation on Confirm.
-- Suitability check: `cleaner.location_groups?.includes(listing.location_group)` — if false, after primary confirm, open the secondary warning before committing.
+## Fix 6 — Weekly coverage summary in matrix nav bar
+**Files:** `src/components/cleaning/MatrixView.tsx`, `src/pages/CleaningSchedule.tsx`
 
-## Files
+- `MatrixView`: add an optional prop `onSummaryChange?: (s: { total: number; unassigned: number }) => void`. After the existing `summary` `useMemo`, add a `useEffect` that calls `onSummaryChange?.({ total: summary.total, unassigned: summary.unassigned })` when those values change.
+- `CleaningSchedule`: hold `const [matrixSummary, setMatrixSummary] = useState<{ total: number; unassigned: number } | null>(null)`, pass `onSummaryChange={setMatrixSummary}` to `<MatrixView>`.
+- After the date-range `<span>` in the inline matrix nav (line ~209-211), render:
+  ```tsx
+  {matrixSummary && (
+    <span className="text-xs tabular-nums">
+      <span className="text-muted-foreground">{matrixSummary.total} cleans</span>
+      <span className={matrixSummary.unassigned > 0 ? "text-amber-400 ml-2" : "text-muted-foreground ml-2"}>
+        · {matrixSummary.unassigned > 0 ? `⚠ ${matrixSummary.unassigned} unassigned` : "all assigned"}
+      </span>
+    </span>
+  )}
+  ```
 
-- `supabase/migrations/<new>.sql` — trigger fix + backfill (one migration).
-- `src/components/cleaning/MatrixView.tsx` — past-day styling, replace drop handler.
-- `src/components/cleaning/ReassignConfirmDialog.tsx` — new.
+## Fix 7 — Add `source` to edge-function insert rows
+**File:** `supabase/functions/generate-daily-cleaning-schedule/index.ts` (line ~887, inside the `toInsert.map` row builder)
+
+Add `source: t.source ?? "hostaway",` to the inserted row object so auto-generated tasks are correctly tagged.
+
+---
+
+## Technical notes
+- All fixes are surgical edits — no schema changes, no new files.
+- The edge function change (Fix 7) deploys automatically; no SQL migration needed.
+- Fix 1's `uncoveredCheckouts` calc uses already-loaded data — no extra queries.
+- Fix 6 uses a callback rather than lifting the summary computation, so MatrixView stays the source of truth for what counts as "visible".
