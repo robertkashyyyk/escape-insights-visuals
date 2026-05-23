@@ -503,14 +503,14 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                     return (
                       <div
                         key={d.toISOString()}
-                        className={`px-3 py-2 text-center text-[11px] font-medium border-r border-border/20 last:border-r-0 ${
+                        className={`px-2 py-2 text-center text-[11px] font-medium border-r border-border/20 last:border-r-0 ${
                           isTodayCol ? "bg-amber-500/10 text-amber-300" : "text-muted-foreground"
                         } ${isPast ? "opacity-60 line-through decoration-foreground/50" : ""}`}
                       >
-                        <div>{format(d, "EEE")}</div>
-                        <div className="text-foreground tabular-nums text-sm font-display font-semibold mt-0.5">
+                        <span className="uppercase tracking-wider">{format(d, "EEE")}</span>
+                        <span className="ml-1.5 text-foreground tabular-nums text-sm font-display font-semibold">
                           {format(d, "d")}
-                        </div>
+                        </span>
                       </div>
                     );
                   })}
