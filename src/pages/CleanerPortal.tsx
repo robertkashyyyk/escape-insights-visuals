@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag } from "lucide-react";
+import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag, Sunrise } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
