@@ -30,10 +30,11 @@ export function useTodayCleaningProgress() {
   });
 
   useEffect(() => {
-    const channel = supabase
-      .channel(`today-cleaning-progress-${todayStr}`)
+    const topic = `today-cleaning-progress-${todayStr}-${Math.random().toString(36).slice(2)}`;
+    const channel = supabase.channel(topic);
+    channel
       .on(
-        "postgres_changes",
+        "postgres_changes" as any,
         {
           event: "*",
           schema: "public",
