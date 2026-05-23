@@ -169,7 +169,10 @@ Deno.serve(async (req) => {
   }
 });
 
-async function processDate(supabase: any, targetDate: string): Promise<{ created: number; unassigned: number }> {
+async function processDate(supabase: any, targetDate: string, targetListingId: string | null = null): Promise<{ created: number; unassigned: number }> {
+  // Optional fast path: when a specific listing_id is provided, restrict processing
+  // to that one listing. Used by the reactive same-day allocation trigger.
+  const restrictTo = (id: string) => !targetListingId || String(id) === targetListingId;
   const targetDayOfWeek = DAY_NAMES[new Date(targetDate + "T12:00:00Z").getDay()];
 
   // 0. P0 PROMOTION: only on the actual current day. Future week regeneration
