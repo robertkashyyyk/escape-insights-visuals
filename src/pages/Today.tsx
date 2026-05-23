@@ -96,6 +96,9 @@ export default function Today() {
               </div>
             </section>
 
+            {/* Today's Cleans */}
+            <TodayCleansSection cleans={cleans} isLoading={cleansLoading} progress={progress} />
+
             {/* Open Issues (only renders when there are any) */}
             <OpenIssuesSection />
 
