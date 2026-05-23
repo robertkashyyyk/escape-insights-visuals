@@ -238,7 +238,7 @@ export function useMatrixSchedule(weekAnchor: Date) {
         setAutoGenerating(false);
       }
     })();
-  }, [tasksLoading, tasks.length, reservations, weekStartStr, weekEndStr, qc, toast]);
+  }, [tasksLoading, tasks, reservations, weekStartStr, weekEndStr, qc, toast]);
 
   // Mutations
   const reassignTask = useCallback(async (taskId: string, cleanerId: string | null, override?: { reason: string }) => {
