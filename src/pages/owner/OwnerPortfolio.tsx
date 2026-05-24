@@ -53,6 +53,7 @@ export default function OwnerPortfolio() {
   const [periodType, setPeriodType] = useState<OwnerPeriodType>("Year");
   const [periodRef, setPeriodRef] = useState<Date>(now);
   const [dateMode, setDateMode] = useState<OwnerDateMode>("check_in");
+  const [drawerProperty, setDrawerProperty] = useState<OwnerProperty | null>(null);
   const { data, isLoading } = useOwnerPortalData(periodType, periodRef, dateMode);
 
   const canGoForward = (() => {
