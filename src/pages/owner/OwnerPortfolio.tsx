@@ -110,6 +110,24 @@ export default function OwnerPortfolio() {
           </p>
         </div>
 
+        {/* Data freshness + duplicate notice */}
+        {(lastSyncAt || duplicatesDroppedCount > 0) && (
+          <div className="flex flex-wrap items-center gap-3 text-[11px] -mt-4">
+            {lastSyncAt && (
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <RefreshCw className="h-3 w-3" />
+                Data synced from Hostaway {formatDistanceToNow(parseISO(lastSyncAt), { addSuffix: true })}
+              </span>
+            )}
+            {duplicatesDroppedCount > 0 && (
+              <span className="flex items-center gap-1.5 text-amber-500">
+                <AlertTriangle className="h-3 w-3" />
+                {duplicatesDroppedCount} duplicate {duplicatesDroppedCount === 1 ? "reservation" : "reservations"} from Hostaway excluded in this period — open any property to review.
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Period Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           {/* Period Type Toggle */}
