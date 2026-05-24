@@ -6,7 +6,7 @@ import {
   startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   startOfQuarter, endOfQuarter, startOfYear, endOfYear,
   subYears, addWeeks, addMonths, addQuarters, addYears,
-  format, isFuture, min as dateMin
+  format, isFuture
 } from "date-fns";
 import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
@@ -97,18 +97,16 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
   const today = now.toISOString().slice(0, 10);
 
   const { from: periodStart, to: periodEnd } = getPeriodRange(periodType, periodRef);
-  const effectiveEnd = dateMin([periodEnd, now]);
-  const periodDays = Math.max(1, Math.floor((effectiveEnd.getTime() - periodStart.getTime()) / 86400000) + 1);
+  const periodDays = Math.max(1, Math.floor((periodEnd.getTime() - periodStart.getTime()) / 86400000) + 1);
 
   const prevPeriodStart = subYears(periodStart, 1);
   const prevPeriodEnd = subYears(periodEnd, 1);
-  const prevEffectiveEnd = dateMin([prevPeriodEnd, subYears(effectiveEnd, 1)]);
-  const prevPeriodDays = Math.max(1, Math.floor((prevEffectiveEnd.getTime() - prevPeriodStart.getTime()) / 86400000) + 1);
+  const prevPeriodDays = Math.max(1, Math.floor((prevPeriodEnd.getTime() - prevPeriodStart.getTime()) / 86400000) + 1);
 
   const periodStartStr = periodStart.toISOString().slice(0, 10);
-  const effectiveEndStr = effectiveEnd.toISOString().slice(0, 10);
+  const periodEndStr = periodEnd.toISOString().slice(0, 10);
   const prevStartStr = prevPeriodStart.toISOString().slice(0, 10);
-  const prevEffectiveEndStr = prevEffectiveEnd.toISOString().slice(0, 10);
+  const prevEndStr = prevPeriodEnd.toISOString().slice(0, 10);
 
   const useCreatedDate = dateMode === "created";
 
@@ -129,9 +127,17 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
       const owner = ownerRes.data?.[0];
       const listingIds = listings.map((l) => l.id);
 
-      // Count non-bundle listings for occupancy denominator
-      const nonBundleListings = listings.filter(l => !(l as any).is_bundle);
-      const nonBundleCount = Math.max(1, nonBundleListings.length);
+      // Build bundle → components map (listing_id → { components: [{listing_id, split_pct}] })
+      const bundlesById = new Map<string, Array<{ listing_id: string; split_pct: number }>>();
+      listings.forEach((l: any) => {
+        if (l.is_bundle && Array.isArray(l.bundle_components)) {
+          bundlesById.set(l.id, l.bundle_components);
+        }
+      });
+
+      // Non-bundle listings only (we hide bundle cards entirely)
+      const componentListings = listings.filter((l: any) => !l.is_bundle);
+      const nonBundleCount = Math.max(1, componentListings.length);
 
       let reservations: any[] = [];
       if (listingIds.length > 0) {
@@ -143,6 +149,21 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
         reservations = data || [];
       }
 
+      // Expand bundle reservations into virtual per-component reservations.
+      // Each component gets full nights/bookings but revenue is split by split_pct.
+      type ExpandedRes = any & { _listing_id: string; _revenue_factor: number };
+      const expanded: ExpandedRes[] = [];
+      reservations.forEach((r) => {
+        const bundleComps = bundlesById.get(r.listing_id);
+        if (bundleComps && bundleComps.length > 0) {
+          bundleComps.forEach((c) => {
+            expanded.push({ ...r, _listing_id: c.listing_id, _revenue_factor: (c.split_pct ?? (100 / bundleComps.length)) / 100 });
+          });
+        } else {
+          expanded.push({ ...r, _listing_id: r.listing_id, _revenue_factor: 1 });
+        }
+      });
+
       const inPeriod = (r: any, rangeStart: string, rangeEnd: string) => {
         if (useCreatedDate) {
           const rd = r.reservation_date;
@@ -153,87 +174,63 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
 
       const currentYear = now.getFullYear();
 
-      const properties: OwnerProperty[] = listings.map((l) => {
-        const isBundle = !!(l as any).is_bundle;
-        const propRes = reservations.filter((r) => r.listing_id === l.id && r.status !== "cancelled");
+      const properties: OwnerProperty[] = componentListings.map((l) => {
+        const propRes = expanded.filter((r) => r._listing_id === l.id && r.status !== "cancelled");
 
-        const thisPeriodRes = propRes.filter((r) => inPeriod(r, periodStartStr, effectiveEndStr));
-        const prevPeriodRes = propRes.filter((r) => inPeriod(r, prevStartStr, prevEffectiveEndStr));
+        const thisPeriodRes = propRes.filter((r) => inPeriod(r, periodStartStr, periodEndStr));
+        const prevPeriodRes = propRes.filter((r) => inPeriod(r, prevStartStr, prevEndStr));
 
-        const revenueThisYear = thisPeriodRes.reduce((s, r) => s + getNetRevenue(r), 0);
-        const revenuePrevYear = prevPeriodRes.reduce((s, r) => s + getNetRevenue(r), 0);
+        const revenueThisYear = thisPeriodRes.reduce((s, r) => s + getNetRevenue(r) * r._revenue_factor, 0);
+        const revenuePrevYear = prevPeriodRes.reduce((s, r) => s + getNetRevenue(r) * r._revenue_factor, 0);
 
         const monthlyRevenue = Array.from({ length: 12 }, (_, m) =>
-          propRes.filter((r) => r.year === currentYear && r.month === m + 1).reduce((s, r) => s + getNetRevenue(r), 0)
+          propRes.filter((r) => r.year === currentYear && r.month === m + 1).reduce((s, r) => s + getNetRevenue(r) * r._revenue_factor, 0)
         );
 
-        // Nights calculation
         let totalNights = 0;
-        let nightsBooked = 0;
         thisPeriodRes.forEach((r) => {
           const ci = new Date(r.check_in);
           const co = new Date(r.check_out);
-          const fullNights = Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 86400000));
-
-          if (useCreatedDate) {
-            // In booking date mode, count full stay nights
-            totalNights += fullNights;
-            nightsBooked += fullNights;
-          } else {
-            // In check-in mode, clip to period
-            const start = ci < periodStart ? periodStart : ci;
-            const end = co > effectiveEnd ? effectiveEnd : co;
-            const clipped = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 86400000));
-            nightsBooked += clipped;
-            totalNights += fullNights;
-          }
+          totalNights += Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 86400000));
         });
 
-        // Occupancy: for booking date mode, use full nights / (periodDays * 1 property)
-        // Allow > 100% in booking date mode
-        const occupancyPct = useCreatedDate
-          ? (nightsBooked / periodDays) * 100
-          : Math.min(100, (nightsBooked / periodDays) * 100);
-
+        const occupancyPct = Math.min(100, (totalNights / periodDays) * 100);
         const adr = totalNights > 0 ? revenueThisYear / totalNights : 0;
         const totalBookings = thisPeriodRes.length;
         const upcomingCount = propRes.filter((r) => r.check_in >= today).length;
 
         return {
           id: l.id, name: l.name, location_group: l.location_group, bedrooms: l.bedrooms,
-          isBundle,
+          isBundle: false,
           revenueThisYear, revenuePrevYear, occupancyPct, adr, totalNights, totalBookings, monthlyRevenue, upcomingCount
         };
       });
 
-      // Aggregate KPIs
-      const allThisPeriod = reservations.filter((r) => r.status !== "cancelled" && inPeriod(r, periodStartStr, effectiveEndStr));
-      const allPrevPeriod = reservations.filter((r) => r.status !== "cancelled" && inPeriod(r, prevStartStr, prevEffectiveEndStr));
+      // Aggregate KPIs (use original reservations, not expanded — bundle stays counted once)
+      const allThisPeriod = reservations.filter((r) => r.status !== "cancelled" && inPeriod(r, periodStartStr, periodEndStr));
+      const allPrevPeriod = reservations.filter((r) => r.status !== "cancelled" && inPeriod(r, prevStartStr, prevEndStr));
 
       const totalRevenue = allThisPeriod.reduce((s, r) => s + getNetRevenue(r), 0);
       const prevYearRevenue = allPrevPeriod.reduce((s, r) => s + getNetRevenue(r), 0);
 
-      // Aggregate occupancy using non-bundle count
-      let totalNightsBooked = 0;
       let totalNightsAll = 0;
       allThisPeriod.forEach((r) => {
         const ci = new Date(r.check_in);
         const co = new Date(r.check_out);
-        const fullNights = Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 86400000));
-        totalNightsAll += fullNights;
-        if (useCreatedDate) {
-          totalNightsBooked += fullNights;
-        } else {
-          const start = ci < periodStart ? periodStart : ci;
-          const end = co > effectiveEnd ? effectiveEnd : co;
-          totalNightsBooked += Math.max(0, Math.floor((end.getTime() - start.getTime()) / 86400000));
-        }
+        totalNightsAll += Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 86400000));
       });
 
-      const occupancy = useCreatedDate
-        ? (totalNightsBooked / (periodDays * nonBundleCount)) * 100
-        : Math.min(100, (totalNightsBooked / (periodDays * nonBundleCount)) * 100);
+      // Bundle stays block all components — count each bundle night × component count for occupancy
+      let bookedRoomNights = 0;
+      allThisPeriod.forEach((r) => {
+        const ci = new Date(r.check_in);
+        const co = new Date(r.check_out);
+        const nights = Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 86400000));
+        const comps = bundlesById.get(r.listing_id);
+        bookedRoomNights += nights * (comps && comps.length > 0 ? comps.length : 1);
+      });
 
+      const occupancy = Math.min(100, (bookedRoomNights / (periodDays * nonBundleCount)) * 100);
       const adr = totalNightsAll > 0 ? totalRevenue / totalNightsAll : 0;
 
       const prevTotalNights = allPrevPeriod.reduce((s, r) => {
@@ -243,16 +240,16 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
       }, 0);
       const prevYearAdr = prevTotalNights > 0 ? prevYearRevenue / prevTotalNights : 0;
 
-      // Prev year occupancy
-      let prevNightsBooked = 0;
+      let prevBookedRoomNights = 0;
       allPrevPeriod.forEach((r) => {
         const ci = new Date(r.check_in);
         const co = new Date(r.check_out);
-        const start = ci < prevPeriodStart ? prevPeriodStart : ci;
-        const end = co > prevEffectiveEnd ? prevEffectiveEnd : co;
-        prevNightsBooked += Math.max(0, Math.floor((end.getTime() - start.getTime()) / 86400000));
+        const nights = Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 86400000));
+        const comps = bundlesById.get(r.listing_id);
+        prevBookedRoomNights += nights * (comps && comps.length > 0 ? comps.length : 1);
       });
-      const prevYearOccupancy = nonBundleCount > 0 ? Math.min(100, (prevNightsBooked / (prevPeriodDays * nonBundleCount)) * 100) : 0;
+      const prevYearOccupancy = nonBundleCount > 0 ? Math.min(100, (prevBookedRoomNights / (prevPeriodDays * nonBundleCount)) * 100) : 0;
+
 
       const kpis: OwnerKpis = {
         totalRevenue,
