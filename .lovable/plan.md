@@ -1,75 +1,56 @@
-# Cleaning Matrix — 7 Fixes
+## Goal
 
-## Fix 1 — Smarter auto-schedule guard
-**File:** `src/hooks/useMatrixSchedule.ts` (the lazy-generate `useEffect`, ~lines 193-230)
+Make every number on `/owner` defensible against the underlying reservations table. Today the headers don't tie to the property cards, occupancy can exceed 100%, and overlapping/duplicate Hostaway rows quietly inflate counts.
 
-Replace the `if (tasks.length > 0) return;` early-exit with a coverage check:
+## Root causes I found in the data
 
-- Build `coveredReservationIds = new Set(tasks.map(t => t.reservation_id).filter(Boolean))`.
-- Build `coveredListingDates = new Set(tasks.map(t => \`${t.listing_id}_${t.scheduled_date}\`))`.
-- Compute `uncoveredCheckouts` = confirmed reservations whose `check_out` falls in `[weekStartStr, weekEndStr]` and that are NOT in `coveredReservationIds` AND whose `${listing_id}_${check_out}` is NOT in `coveredListingDates`.
-- Only fire the invoke if `uncoveredCheckouts.length > 0`.
+1. **Aggregate vs cards mismatch (1 booking / 4 nights off in May).** Header KPIs use raw reservations (bundle counted once). Property cards use expanded reservations (bundle counted on each component). The sum will always differ by `(components − 1) × bundle stays`.
+2. **Duplicate / overlapping reservations on the same listing.** Lily's Pad has Mark 1–4 May *and* Shannon 2–4 May on the same unit (both `status='confirmed'`). Likely a Hostaway sync artefact (channel duplicate, owner block, or pending→confirmed dupe). Currently both count, which is why Lily shows 31 nights / 100% in a 31-day month.
+3. **Nights are summed literally, not clipped to the period.** A reservation 30 Apr → 2 May contributes 2 nights to the May card even though only 1 night is in May. Same at month edges and across years.
+4. **No visibility for the owner.** They can't see *which* reservations make up the numbers, so when something looks off there's no way to verify.
 
-Keep the existing `inFlightRef` and 60s `recentSuccessRef` cooldown — they still guard against loops. Edge function is already idempotent.
+## What I'll change
 
-## Fix 2 — Hide day-nav pill in Matrix view
-**File:** `src/pages/CleaningSchedule.tsx` (lines ~147-168)
+### A. One source of truth for both views (`src/hooks/useOwnerPortalData.ts`)
+- Build a single `expandedReservations` list (bundle → components, revenue split by `split_pct`).
+- Header KPIs and property cards both aggregate from the **same** expanded list. They will tie by construction. Header bookings will go up slightly (each bundle stay counts as 1 per component) — this matches what the owner sees on the cards.
 
-Wrap the `‹ Today ›` pill + the "Back to Today" link in `{viewMode !== "matrix" && (...)}` so they only render in Day/Week mode.
+### B. Dedupe overlapping reservations per listing
+- For each listing, sort confirmed reservations by `check_in`. If two share the same dates ±1 day on the same listing, keep the one with the higher `total_amount` (real booking) and drop the other (likely sync dupe). Log dropped ones in dev console.
+- This will collapse Lily's Mark/Shannon and Holly/Holly Johnston pairs.
 
-## Fix 3 — Guest first name in cells
-**Files:** `src/hooks/useMatrixSchedule.ts`, `src/components/cleaning/MatrixView.tsx`
+### C. Clip nights to the visible period
+- `nightsInPeriod = max(0, min(check_out, periodEnd+1) − max(check_in, periodStart))`.
+- Stops cross-month bleed (Laura 30 Apr → 2 May = 1 night in May, not 2).
+- Occupancy denominator stays `periodDays × componentListings.length`; with clipped nights it can no longer exceed 100% via overlap.
 
-- Hook: add `reservationGuestMap = useMemo(() => new Map(reservations.map(r => [r.id, r.guest_name])), [reservations])` to the return value (reservations already loaded).
-- `MatrixView`: destructure `reservationGuestMap` from hook, thread it down through `MatrixCell` → `DraggableCellInner` as a `guestName?: string` prop derived per task via `task.reservation_id ? reservationGuestMap.get(task.reservation_id) : undefined`.
-- In `DraggableCellInner`: when `task.reservation_id` and `task.status !== "completed"` and a guest name exists, render below the cleaner initial:
-  ```tsx
-  <div className="text-[9px] opacity-70 truncate">{guestName.split(/\s+/)[0]}</div>
-  ```
+### D. Status hygiene
+- Filter at SQL level: `status='confirmed'` only (already done) **and** exclude any with `total_amount IS NULL OR total_amount = 0` from revenue, but keep their nights (with a dev warning). Prevents free/blocked stays from polluting ADR.
 
-## Fix 4 — Dynamic Regenerate button label
-**File:** `src/pages/CleaningSchedule.tsx` (lines ~120-141)
+### E. Transparency: "View reservations" drawer per property
+- Small link under each property card → opens a drawer listing every reservation that made up that card's numbers for the selected period, with: guest, dates, nights-in-period, revenue (and `× factor` for bundle splits), source platform, and a "duplicate of" badge for ones we dropped.
+- The owner can sanity-check the numbers themselves. This is the most important trust-rebuilding piece.
 
-In the IIFE that builds the regenerate button label, when `isMatrixScope` is true set:
-```
-label = `Regenerate ${format(matrixWeekStart, "d MMM")} – ${format(addDays(matrixWeekStart, 6), "d MMM")}`
-```
-Keep the existing "Generating..." while `isRegenerating`. Day view label unchanged.
+### F. "Last synced" + sanity banner
+- Show the most recent `sync_logs.completed_at` at the top of `/owner` so the owner knows how fresh the data is.
+- If we detected & dropped duplicates for this owner in the current period, show a small amber note: *"3 duplicate reservations from Hostaway were excluded — view details"*.
 
-## Fix 5 — Rename floating "NOW" → "This Week"
-**File:** `src/pages/CleaningSchedule.tsx` (lines ~263-272)
+## What I will not touch in this pass
 
-Change the middle floating button:
-- Text: `This Week` instead of `NOW`.
-- Class: `h-9 w-9 rounded-full hover:bg-secondary text-[10px] font-bold` → `h-9 px-2 rounded-full hover:bg-secondary text-[10px] font-bold`.
-- Keep `title="Back to current week"` and `disabled={matrixIsCurrentWeek}`.
+- The underlying Hostaway sync (the duplicates come from upstream — fixing there is a separate, larger task).
+- Statements / payouts maths.
+- The other internal dashboards (Today, Pricing, etc.) — they have their own hooks.
 
-## Fix 6 — Weekly coverage summary in matrix nav bar
-**Files:** `src/components/cleaning/MatrixView.tsx`, `src/pages/CleaningSchedule.tsx`
+## Files changed
 
-- `MatrixView`: add an optional prop `onSummaryChange?: (s: { total: number; unassigned: number }) => void`. After the existing `summary` `useMemo`, add a `useEffect` that calls `onSummaryChange?.({ total: summary.total, unassigned: summary.unassigned })` when those values change.
-- `CleaningSchedule`: hold `const [matrixSummary, setMatrixSummary] = useState<{ total: number; unassigned: number } | null>(null)`, pass `onSummaryChange={setMatrixSummary}` to `<MatrixView>`.
-- After the date-range `<span>` in the inline matrix nav (line ~209-211), render:
-  ```tsx
-  {matrixSummary && (
-    <span className="text-xs tabular-nums">
-      <span className="text-muted-foreground">{matrixSummary.total} cleans</span>
-      <span className={matrixSummary.unassigned > 0 ? "text-amber-400 ml-2" : "text-muted-foreground ml-2"}>
-        · {matrixSummary.unassigned > 0 ? `⚠ ${matrixSummary.unassigned} unassigned` : "all assigned"}
-      </span>
-    </span>
-  )}
-  ```
+- `src/hooks/useOwnerPortalData.ts` — single-source aggregation, dedupe, clip-to-period.
+- `src/pages/OwnerPortal.tsx` (or wherever the cards render) — add "View reservations" link + sanity banner.
+- New: `src/components/owner/OwnerReservationsDrawer.tsx` — drawer with per-card reservation list.
 
-## Fix 7 — Add `source` to edge-function insert rows
-**File:** `supabase/functions/generate-daily-cleaning-schedule/index.ts` (line ~887, inside the `toInsert.map` row builder)
+## Verification before I hand it back
 
-Add `source: t.source ?? "hostaway",` to the inserted row object so auto-generated tasks are correctly tagged.
-
----
-
-## Technical notes
-- All fixes are surgical edits — no schema changes, no new files.
-- The edge function change (Fix 7) deploys automatically; no SQL migration needed.
-- Fix 1's `uncoveredCheckouts` calc uses already-loaded data — no extra queries.
-- Fix 6 uses a callback rather than lifting the summary computation, so MatrixView stays the source of truth for what counts as "visible".
+For May 2026 / Kashyyyk I'll print and check:
+- Header bookings = Ernie + Lily + Mabel cards (exactly).
+- Lily occupancy ≤ 100%, nights ≤ 31.
+- Drawer for Lily lists 9 (or 8 after dedupe) confirmed stays + Luke's bundle stay, with nights-in-period summing to the card's nights.
+- Header nights = sum of card nights.
