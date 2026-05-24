@@ -85,7 +85,7 @@ export default function OwnerPortfolio() {
     );
   }
 
-  const { owner, properties, kpis } = data || { properties: [], kpis: null, currentYear: now.getFullYear() };
+  const { owner, properties, kpis, lastSyncAt, duplicatesDroppedCount } = (data as any) || { properties: [], kpis: null, currentYear: now.getFullYear(), lastSyncAt: null, duplicatesDroppedCount: 0 };
   const firstName = owner?.name?.split(" ")[0] || "there";
   const todayStr = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
