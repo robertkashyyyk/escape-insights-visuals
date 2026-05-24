@@ -6,12 +6,26 @@ import {
   startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   startOfQuarter, endOfQuarter, startOfYear, endOfYear,
   subYears, addWeeks, addMonths, addQuarters, addYears,
-  format, isFuture
+  format,
 } from "date-fns";
 import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
 export type OwnerPeriodType = "Week" | "Month" | "Quarter" | "Year";
 export type OwnerDateMode = "check_in" | "created";
+
+export interface OwnerReservationDetail {
+  id: string;
+  guest_name: string;
+  check_in: string;
+  check_out: string;
+  nights_total: number;
+  nights_in_period: number;
+  revenue: number;            // already × factor for bundle splits
+  revenue_factor: number;     // 1.0 for normal, 0.55/0.45 for bundle components
+  platform: string | null;
+  is_bundle_expansion: boolean;
+  duplicate_of?: string;      // guest_name of the row we kept
+}
 
 export interface OwnerProperty {
   id: string;
@@ -27,6 +41,8 @@ export interface OwnerProperty {
   totalBookings: number;
   monthlyRevenue: number[];
   upcomingCount: number;
+  reservations: OwnerReservationDetail[];
+  duplicatesDropped: OwnerReservationDetail[];
 }
 
 export interface OwnerKpis {
@@ -40,130 +56,201 @@ export interface OwnerKpis {
   totalNights: number;
 }
 
-/** Returns the start/end of a period given a reference date */
 export function getPeriodRange(periodType: OwnerPeriodType, ref: Date) {
   switch (periodType) {
-    case "Week":
-      return { from: startOfWeek(ref, { weekStartsOn: 1 }), to: endOfWeek(ref, { weekStartsOn: 1 }) };
-    case "Month":
-      return { from: startOfMonth(ref), to: endOfMonth(ref) };
-    case "Quarter":
-      return { from: startOfQuarter(ref), to: endOfQuarter(ref) };
+    case "Week":    return { from: startOfWeek(ref, { weekStartsOn: 1 }), to: endOfWeek(ref, { weekStartsOn: 1 }) };
+    case "Month":   return { from: startOfMonth(ref), to: endOfMonth(ref) };
+    case "Quarter": return { from: startOfQuarter(ref), to: endOfQuarter(ref) };
     case "Year":
-    default:
-      return { from: startOfYear(ref), to: endOfYear(ref) };
+    default:        return { from: startOfYear(ref), to: endOfYear(ref) };
   }
 }
 
-/** Shift a reference date by +/- 1 period */
 export function shiftPeriod(ref: Date, periodType: OwnerPeriodType, direction: 1 | -1): Date {
   switch (periodType) {
-    case "Week": return addWeeks(ref, direction);
-    case "Month": return addMonths(ref, direction);
+    case "Week":    return addWeeks(ref, direction);
+    case "Month":   return addMonths(ref, direction);
     case "Quarter": return addQuarters(ref, direction);
-    case "Year": return addYears(ref, direction);
+    case "Year":    return addYears(ref, direction);
   }
 }
 
-/** Human-readable label for the selected period */
 export function getPeriodLabel(periodType: OwnerPeriodType, ref: Date, now: Date): string {
   const { from, to } = getPeriodRange(periodType, ref);
   const isCurrentPeriod = from <= now && to >= now;
   switch (periodType) {
-    case "Week": {
-      const label = `W/C ${format(from, "d MMM yyyy")}`;
-      return isCurrentPeriod ? `${label} (This week)` : label;
-    }
-    case "Month": {
-      const label = format(from, "MMMM yyyy");
-      return isCurrentPeriod ? `${label} (This month)` : label;
-    }
+    case "Week":    return `${`W/C ${format(from, "d MMM yyyy")}`}${isCurrentPeriod ? " (This week)" : ""}`;
+    case "Month":   return `${format(from, "MMMM yyyy")}${isCurrentPeriod ? " (This month)" : ""}`;
     case "Quarter": {
       const q = Math.ceil((from.getMonth() + 1) / 3);
-      const label = `Q${q} ${format(from, "yyyy")}`;
-      return isCurrentPeriod ? `${label} (This quarter)` : label;
+      return `Q${q} ${format(from, "yyyy")}${isCurrentPeriod ? " (This quarter)" : ""}`;
     }
-    case "Year": {
-      const label = format(from, "yyyy");
-      return isCurrentPeriod ? `${label} YTD` : label;
-    }
+    case "Year":    return `${format(from, "yyyy")}${isCurrentPeriod ? " YTD" : ""}`;
   }
 }
 
-export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodRef: Date = new Date(), dateMode: OwnerDateMode = "check_in") {
+/* ───────────────────────── helpers ───────────────────────── */
+
+const DAY_MS = 86400000;
+const toDate = (s: string) => new Date(s + "T00:00:00Z");
+const nightsBetween = (ci: string, co: string) =>
+  Math.max(0, Math.floor((toDate(co).getTime() - toDate(ci).getTime()) / DAY_MS));
+
+/** Nights of [ci, co) that fall inside [periodStart, periodEnd] (inclusive end day). */
+const nightsInPeriod = (ci: string, co: string, periodStart: string, periodEnd: string) => {
+  const startMs = Math.max(toDate(ci).getTime(), toDate(periodStart).getTime());
+  // periodEnd is inclusive (last day of period). Reservation occupies nights up to check_out exclusive.
+  // Add 1 day to periodEnd to compare against check_out.
+  const periodEndExclusive = toDate(periodEnd).getTime() + DAY_MS;
+  const endMs = Math.min(toDate(co).getTime(), periodEndExclusive);
+  return Math.max(0, Math.floor((endMs - startMs) / DAY_MS));
+};
+
+/**
+ * Per-listing dedupe: two reservations on the same listing with overlapping
+ * dates and the same length within ±1 day are treated as duplicates.
+ * Keep the one with the higher total_amount (real booking).
+ */
+function dedupePerListing<T extends { listing_id: string; check_in: string; check_out: string; total_amount?: number | null; id: string }>(
+  rows: T[]
+): { kept: T[]; dropped: Array<T & { _dup_of: T }> } {
+  const byListing = new Map<string, T[]>();
+  rows.forEach((r) => {
+    const arr = byListing.get(r.listing_id) ?? [];
+    arr.push(r);
+    byListing.set(r.listing_id, arr);
+  });
+
+  const kept: T[] = [];
+  const dropped: Array<T & { _dup_of: T }> = [];
+
+  byListing.forEach((arr) => {
+    // Sort by check_in then descending total_amount so the "winner" comes first when overlapping
+    arr.sort((a, b) => {
+      if (a.check_in !== b.check_in) return a.check_in < b.check_in ? -1 : 1;
+      return (Number(b.total_amount ?? 0)) - (Number(a.total_amount ?? 0));
+    });
+
+    const used: T[] = [];
+    arr.forEach((r) => {
+      const dup = used.find((u) => {
+        // Overlap test
+        if (r.check_in >= u.check_out || r.check_out <= u.check_in) return false;
+        // Similar length (within 1 night)
+        const lenA = nightsBetween(u.check_in, u.check_out);
+        const lenB = nightsBetween(r.check_in, r.check_out);
+        return Math.abs(lenA - lenB) <= 1;
+      });
+      if (dup) {
+        dropped.push({ ...(r as any), _dup_of: dup });
+      } else {
+        used.push(r);
+        kept.push(r);
+      }
+    });
+  });
+
+  return { kept, dropped };
+}
+
+/* ───────────────────────── hook ───────────────────────── */
+
+export function useOwnerPortalData(
+  periodType: OwnerPeriodType = "Year",
+  periodRef: Date = new Date(),
+  dateMode: OwnerDateMode = "check_in"
+) {
   const { user } = useAuth();
   const { isPreviewMode, selectedOwnerId } = useOwnerPreview();
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
 
   const { from: periodStart, to: periodEnd } = getPeriodRange(periodType, periodRef);
-  const periodDays = Math.max(1, Math.floor((periodEnd.getTime() - periodStart.getTime()) / 86400000) + 1);
+  const periodDays = Math.max(1, Math.floor((periodEnd.getTime() - periodStart.getTime()) / DAY_MS) + 1);
 
   const prevPeriodStart = subYears(periodStart, 1);
   const prevPeriodEnd = subYears(periodEnd, 1);
-  const prevPeriodDays = Math.max(1, Math.floor((prevPeriodEnd.getTime() - prevPeriodStart.getTime()) / 86400000) + 1);
+  const prevPeriodDays = Math.max(1, Math.floor((prevPeriodEnd.getTime() - prevPeriodStart.getTime()) / DAY_MS) + 1);
 
   const periodStartStr = periodStart.toISOString().slice(0, 10);
-  const periodEndStr = periodEnd.toISOString().slice(0, 10);
-  const prevStartStr = prevPeriodStart.toISOString().slice(0, 10);
-  const prevEndStr = prevPeriodEnd.toISOString().slice(0, 10);
-
+  const periodEndStr   = periodEnd.toISOString().slice(0, 10);
+  const prevStartStr   = prevPeriodStart.toISOString().slice(0, 10);
+  const prevEndStr     = prevPeriodEnd.toISOString().slice(0, 10);
   const useCreatedDate = dateMode === "created";
 
   return useQuery({
-    queryKey: ["owner_portal", isPreviewMode ? selectedOwnerId : user?.id, periodType, periodStartStr, dateMode],
+    queryKey: ["owner_portal_v2", isPreviewMode ? selectedOwnerId : user?.id, periodType, periodStartStr, dateMode],
     enabled: !!(isPreviewMode ? selectedOwnerId : user),
     queryFn: async () => {
+      /* ── 1. Listings + owner ── */
       let listingsQuery = supabase.from("listings").select("id, name, location_group, bedrooms, owner_id, is_bundle, bundle_components");
-      let ownerQuery = supabase.from("property_owners").select("id, name");
-
+      let ownerQuery    = supabase.from("property_owners").select("id, name");
       if (isPreviewMode && selectedOwnerId) {
         listingsQuery = listingsQuery.eq("owner_id", selectedOwnerId);
-        ownerQuery = ownerQuery.eq("id", selectedOwnerId);
+        ownerQuery    = ownerQuery.eq("id", selectedOwnerId);
       }
 
-      const [listingsRes, ownerRes] = await Promise.all([listingsQuery, ownerQuery]);
-      const listings = listingsRes.data || [];
-      const owner = ownerRes.data?.[0];
-      const listingIds = listings.map((l) => l.id);
+      const [listingsRes, ownerRes, syncRes] = await Promise.all([
+        listingsQuery,
+        ownerQuery,
+        supabase.from("sync_logs").select("completed_at").eq("status", "completed").order("completed_at", { ascending: false }).limit(1),
+      ]);
 
-      // Build bundle → components map (listing_id → { components: [{listing_id, split_pct}] })
+      const listings    = listingsRes.data || [];
+      const owner       = ownerRes.data?.[0];
+      const lastSyncAt  = syncRes.data?.[0]?.completed_at ?? null;
+      const listingIds  = listings.map((l) => l.id);
+      const listingName = new Map<string, string>(listings.map((l: any) => [l.id, l.name]));
+
+      // Bundle map
       const bundlesById = new Map<string, Array<{ listing_id: string; split_pct: number }>>();
       listings.forEach((l: any) => {
-        if (l.is_bundle && Array.isArray(l.bundle_components)) {
-          bundlesById.set(l.id, l.bundle_components);
-        }
+        if (l.is_bundle && Array.isArray(l.bundle_components)) bundlesById.set(l.id, l.bundle_components);
       });
 
-      // Non-bundle listings only (we hide bundle cards entirely)
       const componentListings = listings.filter((l: any) => !l.is_bundle);
       const nonBundleCount = Math.max(1, componentListings.length);
 
-      let reservations: any[] = [];
+      /* ── 2. Reservations (raw confirmed) ── */
+      let rawReservations: any[] = [];
       if (listingIds.length > 0) {
         const { data } = await supabase
           .from("reservations")
-          .select(`listing_id, check_in, check_out, year, month, status, reservation_date, ${REVENUE_FIELDS}`)
+          .select(`id, listing_id, check_in, check_out, year, month, status, reservation_date, guest_name, platform, ${REVENUE_FIELDS}`)
           .in("listing_id", listingIds)
           .eq("status", "confirmed");
-        reservations = data || [];
+        rawReservations = data || [];
       }
 
-      // Expand bundle reservations into virtual per-component reservations.
-      // Each component gets full nights/bookings but revenue is split by split_pct.
-      type ExpandedRes = any & { _listing_id: string; _revenue_factor: number };
-      const expanded: ExpandedRes[] = [];
-      reservations.forEach((r) => {
-        const bundleComps = bundlesById.get(r.listing_id);
-        if (bundleComps && bundleComps.length > 0) {
-          bundleComps.forEach((c) => {
-            expanded.push({ ...r, _listing_id: c.listing_id, _revenue_factor: (c.split_pct ?? (100 / bundleComps.length)) / 100 });
+      /* ── 3. Dedupe per listing (catches Hostaway/channel duplicates) ── */
+      const { kept, dropped } = dedupePerListing(rawReservations);
+      const droppedByListing = new Map<string, any[]>();
+      dropped.forEach((d) => {
+        const arr = droppedByListing.get(d.listing_id) ?? [];
+        arr.push(d);
+        droppedByListing.set(d.listing_id, arr);
+      });
+
+      /* ── 4. Expand bundle reservations into virtual per-component rows ── */
+      type Exp = any & { _listing_id: string; _revenue_factor: number; _is_bundle_expansion: boolean };
+      const expanded: Exp[] = [];
+      kept.forEach((r) => {
+        const comps = bundlesById.get(r.listing_id);
+        if (comps && comps.length > 0) {
+          comps.forEach((c) => {
+            expanded.push({
+              ...r,
+              _listing_id: c.listing_id,
+              _revenue_factor: (c.split_pct ?? (100 / comps.length)) / 100,
+              _is_bundle_expansion: true,
+            });
           });
         } else {
-          expanded.push({ ...r, _listing_id: r.listing_id, _revenue_factor: 1 });
+          expanded.push({ ...r, _listing_id: r.listing_id, _revenue_factor: 1, _is_bundle_expansion: false });
         }
       });
 
+      /* ── 5. Period filter helpers ── */
       const inPeriod = (r: any, rangeStart: string, rangeEnd: string) => {
         if (useCreatedDate) {
           const rd = r.reservation_date;
@@ -174,8 +261,9 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
 
       const currentYear = now.getFullYear();
 
-      const properties: OwnerProperty[] = componentListings.map((l) => {
-        const propRes = expanded.filter((r) => r._listing_id === l.id && r.status !== "cancelled");
+      /* ── 6. Build per-property aggregates (single source of truth) ── */
+      const properties: OwnerProperty[] = componentListings.map((l: any) => {
+        const propRes = expanded.filter((r) => r._listing_id === l.id);
 
         const thisPeriodRes = propRes.filter((r) => inPeriod(r, periodStartStr, periodEndStr));
         const prevPeriodRes = propRes.filter((r) => inPeriod(r, prevStartStr, prevEndStr));
@@ -184,72 +272,85 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
         const revenuePrevYear = prevPeriodRes.reduce((s, r) => s + getNetRevenue(r) * r._revenue_factor, 0);
 
         const monthlyRevenue = Array.from({ length: 12 }, (_, m) =>
-          propRes.filter((r) => r.year === currentYear && r.month === m + 1).reduce((s, r) => s + getNetRevenue(r) * r._revenue_factor, 0)
+          propRes.filter((r) => r.year === currentYear && r.month === m + 1)
+            .reduce((s, r) => s + getNetRevenue(r) * r._revenue_factor, 0)
         );
 
-        let totalNights = 0;
-        thisPeriodRes.forEach((r) => {
-          const ci = new Date(r.check_in);
-          const co = new Date(r.check_out);
-          totalNights += Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 86400000));
-        });
+        // Clip nights to period — prevents cross-month bleed and overlap > calendar
+        const totalNights = thisPeriodRes.reduce(
+          (s, r) => s + nightsInPeriod(r.check_in, r.check_out, periodStartStr, periodEndStr),
+          0
+        );
 
         const occupancyPct = Math.min(100, (totalNights / periodDays) * 100);
         const adr = totalNights > 0 ? revenueThisYear / totalNights : 0;
         const totalBookings = thisPeriodRes.length;
         const upcomingCount = propRes.filter((r) => r.check_in >= today).length;
 
+        const reservations: OwnerReservationDetail[] = thisPeriodRes
+          .map((r) => ({
+            id: r.id,
+            guest_name: r.guest_name,
+            check_in: r.check_in,
+            check_out: r.check_out,
+            nights_total: nightsBetween(r.check_in, r.check_out),
+            nights_in_period: nightsInPeriod(r.check_in, r.check_out, periodStartStr, periodEndStr),
+            revenue: getNetRevenue(r) * r._revenue_factor,
+            revenue_factor: r._revenue_factor,
+            platform: r.platform ?? null,
+            is_bundle_expansion: r._is_bundle_expansion,
+          }))
+          .sort((a, b) => (a.check_in < b.check_in ? -1 : 1));
+
+        const duplicatesDropped: OwnerReservationDetail[] = (droppedByListing.get(l.id) ?? [])
+          .filter((d) => inPeriod(d, periodStartStr, periodEndStr))
+          .map((d) => ({
+            id: d.id,
+            guest_name: d.guest_name,
+            check_in: d.check_in,
+            check_out: d.check_out,
+            nights_total: nightsBetween(d.check_in, d.check_out),
+            nights_in_period: nightsInPeriod(d.check_in, d.check_out, periodStartStr, periodEndStr),
+            revenue: 0,
+            revenue_factor: 1,
+            platform: d.platform ?? null,
+            is_bundle_expansion: false,
+            duplicate_of: d._dup_of?.guest_name,
+          }));
+
         return {
           id: l.id, name: l.name, location_group: l.location_group, bedrooms: l.bedrooms,
           isBundle: false,
-          revenueThisYear, revenuePrevYear, occupancyPct, adr, totalNights, totalBookings, monthlyRevenue, upcomingCount
+          revenueThisYear, revenuePrevYear, occupancyPct, adr, totalNights, totalBookings,
+          monthlyRevenue, upcomingCount, reservations, duplicatesDropped,
         };
       });
 
-      // Aggregate KPIs (use original reservations, not expanded — bundle stays counted once)
-      const allThisPeriod = reservations.filter((r) => r.status !== "cancelled" && inPeriod(r, periodStartStr, periodEndStr));
-      const allPrevPeriod = reservations.filter((r) => r.status !== "cancelled" && inPeriod(r, prevStartStr, prevEndStr));
+      /* ── 7. Aggregate KPIs — derive from properties so totals ALWAYS tie ── */
+      const totalRevenue   = properties.reduce((s, p) => s + p.revenueThisYear,  0);
+      const prevYearRevenue= properties.reduce((s, p) => s + p.revenuePrevYear,  0);
+      const totalNightsAll = properties.reduce((s, p) => s + p.totalNights,      0);
+      const totalBookings  = properties.reduce((s, p) => s + p.totalBookings,    0);
 
-      const totalRevenue = allThisPeriod.reduce((s, r) => s + getNetRevenue(r), 0);
-      const prevYearRevenue = allPrevPeriod.reduce((s, r) => s + getNetRevenue(r), 0);
-
-      let totalNightsAll = 0;
-      allThisPeriod.forEach((r) => {
-        const ci = new Date(r.check_in);
-        const co = new Date(r.check_out);
-        totalNightsAll += Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 86400000));
-      });
-
-      // Bundle stays block all components — count each bundle night × component count for occupancy
-      let bookedRoomNights = 0;
-      allThisPeriod.forEach((r) => {
-        const ci = new Date(r.check_in);
-        const co = new Date(r.check_out);
-        const nights = Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 86400000));
-        const comps = bundlesById.get(r.listing_id);
-        bookedRoomNights += nights * (comps && comps.length > 0 ? comps.length : 1);
-      });
-
-      const occupancy = Math.min(100, (bookedRoomNights / (periodDays * nonBundleCount)) * 100);
+      const occupancy = nonBundleCount > 0
+        ? Math.min(100, (totalNightsAll / (periodDays * nonBundleCount)) * 100)
+        : 0;
       const adr = totalNightsAll > 0 ? totalRevenue / totalNightsAll : 0;
 
-      const prevTotalNights = allPrevPeriod.reduce((s, r) => {
-        const ci = new Date(r.check_in);
-        const co = new Date(r.check_out);
-        return s + Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 86400000));
-      }, 0);
-      const prevYearAdr = prevTotalNights > 0 ? prevYearRevenue / prevTotalNights : 0;
-
-      let prevBookedRoomNights = 0;
-      allPrevPeriod.forEach((r) => {
-        const ci = new Date(r.check_in);
-        const co = new Date(r.check_out);
-        const nights = Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 86400000));
-        const comps = bundlesById.get(r.listing_id);
-        prevBookedRoomNights += nights * (comps && comps.length > 0 ? comps.length : 1);
+      // Prev-year occupancy & ADR — same approach over the prev expanded slice
+      let prevNightsAll = 0;
+      let prevRevenueAll = 0;
+      componentListings.forEach((l: any) => {
+        const propRes = expanded.filter((r) => r._listing_id === l.id && inPeriod(r, prevStartStr, prevEndStr));
+        propRes.forEach((r) => {
+          prevNightsAll += nightsInPeriod(r.check_in, r.check_out, prevStartStr, prevEndStr);
+          prevRevenueAll += getNetRevenue(r) * r._revenue_factor;
+        });
       });
-      const prevYearOccupancy = nonBundleCount > 0 ? Math.min(100, (prevBookedRoomNights / (prevPeriodDays * nonBundleCount)) * 100) : 0;
-
+      const prevYearOccupancy = nonBundleCount > 0
+        ? Math.min(100, (prevNightsAll / (prevPeriodDays * nonBundleCount)) * 100)
+        : 0;
+      const prevYearAdr = prevNightsAll > 0 ? prevRevenueAll / prevNightsAll : 0;
 
       const kpis: OwnerKpis = {
         totalRevenue,
@@ -258,11 +359,13 @@ export function useOwnerPortalData(periodType: OwnerPeriodType = "Year", periodR
         prevYearOccupancy,
         adr,
         prevYearAdr,
-        totalBookings: allThisPeriod.length,
+        totalBookings,
         totalNights: totalNightsAll,
       };
 
-      return { owner, properties, kpis, currentYear, periodType };
+      const duplicatesDroppedCount = properties.reduce((s, p) => s + p.duplicatesDropped.length, 0);
+
+      return { owner, properties, kpis, currentYear, periodType, lastSyncAt, duplicatesDroppedCount };
     },
   });
 }
