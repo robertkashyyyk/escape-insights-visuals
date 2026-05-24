@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { OwnerLayout } from "@/components/layout/OwnerLayout";
-import { useOwnerPortalData, type OwnerPeriodType, type OwnerDateMode, getPeriodLabel, getPeriodRange, shiftPeriod } from "@/hooks/useOwnerPortalData";
+import { useOwnerPortalData, type OwnerPeriodType, type OwnerDateMode, type OwnerProperty, getPeriodLabel, getPeriodRange, shiftPeriod } from "@/hooks/useOwnerPortalData";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PoundSterling, Percent, BedDouble, TrendingUp, TrendingDown, CalendarDays, ChevronLeft, ChevronRight, BookOpen, Moon, CalendarCheck, MapPin } from "lucide-react";
-import { isFuture, startOfWeek, startOfMonth, startOfQuarter, startOfYear } from "date-fns";
+import { PoundSterling, Percent, BedDouble, TrendingUp, TrendingDown, CalendarDays, ChevronLeft, ChevronRight, BookOpen, Moon, CalendarCheck, MapPin, ListTree, AlertTriangle, RefreshCw } from "lucide-react";
+import { isFuture, formatDistanceToNow, parseISO } from "date-fns";
 import { OwnerLocalAreaTab } from "@/components/amenities/OwnerLocalAreaTab";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { OwnerReservationsDrawer } from "@/components/owners/OwnerReservationsDrawer";
 
 const fmt = (n: number) => `£${n.toLocaleString("en-GB", { maximumFractionDigits: 0 })}`;
 
@@ -52,6 +53,7 @@ export default function OwnerPortfolio() {
   const [periodType, setPeriodType] = useState<OwnerPeriodType>("Year");
   const [periodRef, setPeriodRef] = useState<Date>(now);
   const [dateMode, setDateMode] = useState<OwnerDateMode>("check_in");
+  const [drawerProperty, setDrawerProperty] = useState<OwnerProperty | null>(null);
   const { data, isLoading } = useOwnerPortalData(periodType, periodRef, dateMode);
 
   const canGoForward = (() => {
@@ -83,7 +85,7 @@ export default function OwnerPortfolio() {
     );
   }
 
-  const { owner, properties, kpis } = data || { properties: [], kpis: null, currentYear: now.getFullYear() };
+  const { owner, properties, kpis, lastSyncAt, duplicatesDroppedCount } = (data as any) || { properties: [], kpis: null, currentYear: now.getFullYear(), lastSyncAt: null, duplicatesDroppedCount: 0 };
   const firstName = owner?.name?.split(" ")[0] || "there";
   const todayStr = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
@@ -107,6 +109,24 @@ export default function OwnerPortfolio() {
             Here is how your portfolio is performing. · {todayStr}
           </p>
         </div>
+
+        {/* Data freshness + duplicate notice */}
+        {(lastSyncAt || duplicatesDroppedCount > 0) && (
+          <div className="flex flex-wrap items-center gap-3 text-[11px] -mt-4">
+            {lastSyncAt && (
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <RefreshCw className="h-3 w-3" />
+                Data synced from Hostaway {formatDistanceToNow(parseISO(lastSyncAt), { addSuffix: true })}
+              </span>
+            )}
+            {duplicatesDroppedCount > 0 && (
+              <span className="flex items-center gap-1.5 text-amber-500">
+                <AlertTriangle className="h-3 w-3" />
+                {duplicatesDroppedCount} duplicate {duplicatesDroppedCount === 1 ? "reservation" : "reservations"} from Hostaway excluded in this period — open any property to review.
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Period Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -272,6 +292,21 @@ export default function OwnerPortfolio() {
                       </div>
                     )}
 
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/20">
+                      <button
+                        onClick={() => setDrawerProperty(p)}
+                        className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        <ListTree className="h-3 w-3" />
+                        View {p.totalBookings} {p.totalBookings === 1 ? "reservation" : "reservations"}
+                        {p.duplicatesDropped.length > 0 && (
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 border-amber-500/40 text-amber-500 ml-1">
+                            {p.duplicatesDropped.length} dup
+                          </Badge>
+                        )}
+                      </button>
+                    </div>
+
                     <Collapsible>
                       <CollapsibleTrigger className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
                         <MapPin className="h-3 w-3" /> Local area
@@ -287,6 +322,12 @@ export default function OwnerPortfolio() {
           )}
         </div>
       </div>
+
+      <OwnerReservationsDrawer
+        property={drawerProperty}
+        periodLabel={label}
+        onClose={() => setDrawerProperty(null)}
+      />
     </OwnerLayout>
   );
 }
