@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { OwnerLayout } from "@/components/layout/OwnerLayout";
-import { useOwnerPortalData, type OwnerPeriodType, type OwnerDateMode, getPeriodLabel, getPeriodRange, shiftPeriod } from "@/hooks/useOwnerPortalData";
+import { useOwnerPortalData, type OwnerPeriodType, type OwnerDateMode, type OwnerProperty, getPeriodLabel, getPeriodRange, shiftPeriod } from "@/hooks/useOwnerPortalData";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PoundSterling, Percent, BedDouble, TrendingUp, TrendingDown, CalendarDays, ChevronLeft, ChevronRight, BookOpen, Moon, CalendarCheck, MapPin } from "lucide-react";
-import { isFuture, startOfWeek, startOfMonth, startOfQuarter, startOfYear } from "date-fns";
+import { PoundSterling, Percent, BedDouble, TrendingUp, TrendingDown, CalendarDays, ChevronLeft, ChevronRight, BookOpen, Moon, CalendarCheck, MapPin, ListTree, AlertTriangle, RefreshCw } from "lucide-react";
+import { isFuture, formatDistanceToNow, parseISO } from "date-fns";
 import { OwnerLocalAreaTab } from "@/components/amenities/OwnerLocalAreaTab";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { OwnerReservationsDrawer } from "@/components/owners/OwnerReservationsDrawer";
 
 const fmt = (n: number) => `£${n.toLocaleString("en-GB", { maximumFractionDigits: 0 })}`;
 
