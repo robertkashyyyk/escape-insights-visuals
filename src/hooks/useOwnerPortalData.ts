@@ -6,7 +6,7 @@ import {
   startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   startOfQuarter, endOfQuarter, startOfYear, endOfYear,
   subYears, addWeeks, addMonths, addQuarters, addYears,
-  format, isFuture, min as dateMin
+  format, isFuture
 } from "date-fns";
 import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
