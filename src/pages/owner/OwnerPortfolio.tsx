@@ -292,6 +292,21 @@ export default function OwnerPortfolio() {
                       </div>
                     )}
 
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/20">
+                      <button
+                        onClick={() => setDrawerProperty(p)}
+                        className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        <ListTree className="h-3 w-3" />
+                        View {p.totalBookings} {p.totalBookings === 1 ? "reservation" : "reservations"}
+                        {p.duplicatesDropped.length > 0 && (
+                          <Badge variant="outline" className="text-[9px] px-1 py-0 border-amber-500/40 text-amber-500 ml-1">
+                            {p.duplicatesDropped.length} dup
+                          </Badge>
+                        )}
+                      </button>
+                    </div>
+
                     <Collapsible>
                       <CollapsibleTrigger className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
                         <MapPin className="h-3 w-3" /> Local area
@@ -307,6 +322,12 @@ export default function OwnerPortfolio() {
           )}
         </div>
       </div>
+
+      <OwnerReservationsDrawer
+        property={drawerProperty}
+        periodLabel={label}
+        onClose={() => setDrawerProperty(null)}
+      />
     </OwnerLayout>
   );
 }
