@@ -223,7 +223,7 @@ export function useMatrixSchedule(weekAnchor: Date) {
     // Skip if already in flight or successfully generated in the last 60s
     if (inFlightRef.current.has(weekStartStr)) return;
     const lastOk = recentSuccessRef.current.get(weekStartStr);
-    if (lastOk && Date.now() - lastOk < 60_000) return;
+    if (lastOk && Date.now() - lastOk < AUTO_GEN_DEDUPE_MS) return;
 
     inFlightRef.current.add(weekStartStr);
     setAutoGenerating(true);
