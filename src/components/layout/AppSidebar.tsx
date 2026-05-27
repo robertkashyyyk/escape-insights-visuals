@@ -344,20 +344,39 @@ export function AppSidebar() {
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
+                {(!role || role === "super") && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to="/settings/team"
+                        end
+                        className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                          location.pathname === "/settings/team"
+                            ? "bg-primary/10 text-primary"
+                            : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                        }`}
+                        activeClassName=""
+                      >
+                        <Users className={`h-[18px] w-[18px] shrink-0 ${location.pathname === "/settings/team" ? "text-primary" : ""}`} />
+                        {!collapsed && <span>Team & Users</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
                     <NavLink
-                      to="/settings/team"
+                      to="/settings/clean-reset"
                       end
                       className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                        location.pathname === "/settings/team"
+                        location.pathname === "/settings/clean-reset"
                           ? "bg-primary/10 text-primary"
                           : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                       }`}
                       activeClassName=""
                     >
-                      <Users className={`h-[18px] w-[18px] shrink-0 ${location.pathname === "/settings/team" ? "text-primary" : ""}`} />
-                      {!collapsed && <span>Team & Users</span>}
+                      <Brush className={`h-[18px] w-[18px] shrink-0 ${location.pathname === "/settings/clean-reset" ? "text-primary" : ""}`} />
+                      {!collapsed && <span>Clean Reset</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
