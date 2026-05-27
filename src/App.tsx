@@ -41,6 +41,7 @@ import PropertyKnowledge from "./pages/PropertyKnowledge";
 import PropertyKnowledgeDetail from "./pages/PropertyKnowledgeDetail";
 import Amenities from "./pages/Amenities";
 import GuestPortal from "./pages/GuestPortal";
+import CleanReset from "./pages/CleanReset";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -87,6 +88,7 @@ const App = () => (
             <Route path="/management" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ManagementRevenue /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute requiredRoles={["super"]}><SettingsPage /></ProtectedRoute>} />
             <Route path="/settings/team" element={<ProtectedRoute requiredRoles={["super"]}><TeamManagement /></ProtectedRoute>} />
+            <Route path="/settings/clean-reset" element={<ProtectedRoute requiredRoles={["super", "senior", "admin"]}><CleanReset /></ProtectedRoute>} />
             <Route path="/sync-health" element={<ProtectedRoute requiredRoles={["super", "senior"]}><SyncHealth /></ProtectedRoute>} />
             <Route path="/operations/schedule" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><CleaningSchedule /></ProtectedRoute>} />
             <Route path="/operations/cleaning" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><CleaningSchedule /></ProtectedRoute>} />

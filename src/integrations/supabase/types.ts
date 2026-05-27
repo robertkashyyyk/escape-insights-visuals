@@ -216,6 +216,39 @@ export type Database = {
           },
         ]
       }
+      clean_state_resets: {
+        Row: {
+          id: string
+          listing_id: string
+          new_state: string
+          note: string | null
+          previous_state: string | null
+          reason: string | null
+          reset_at: string
+          reset_by: string | null
+        }
+        Insert: {
+          id?: string
+          listing_id: string
+          new_state: string
+          note?: string | null
+          previous_state?: string | null
+          reason?: string | null
+          reset_at?: string
+          reset_by?: string | null
+        }
+        Update: {
+          id?: string
+          listing_id?: string
+          new_state?: string
+          note?: string | null
+          previous_state?: string | null
+          reason?: string | null
+          reset_at?: string
+          reset_by?: string | null
+        }
+        Relationships: []
+      }
       clean_tasks: {
         Row: {
           assigned_cleaner_id: string | null
