@@ -14,6 +14,7 @@ import { Settings, Plug, SprayCan, PoundSterling, User, RotateCcw } from "lucide
 export default function SettingsPage() {
   const { role } = useAuth();
   const canCleanReset = role === "super" || role === "senior" || role === "admin";
+  return (
     <AppLayout>
       <div className="p-4 md:p-6 lg:p-8 space-y-6">
         <div>
