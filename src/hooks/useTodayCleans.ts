@@ -27,6 +27,7 @@ export function useTodayCleans() {
           "id, status, assigned_cleaner_id, completed_at, priority_level, checkout_time, checkin_time, is_same_day_turnaround, listings(name), cleaners(name)"
         )
         .eq("scheduled_date", todayStr)
+        .not("status", "in", "(cancelled,canceled)")
         .order("priority_level", { ascending: true, nullsFirst: false })
         .order("checkout_time", { ascending: true, nullsFirst: false });
       return ((data || []) as any[]).map((r) => ({
