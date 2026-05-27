@@ -41,6 +41,7 @@ import PropertyKnowledge from "./pages/PropertyKnowledge";
 import PropertyKnowledgeDetail from "./pages/PropertyKnowledgeDetail";
 import Amenities from "./pages/Amenities";
 import GuestPortal from "./pages/GuestPortal";
+import CleanReset from "./pages/CleanReset";
 
 const queryClient = new QueryClient({
   defaultOptions: {
