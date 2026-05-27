@@ -7,9 +7,13 @@ import { CleanersSettings } from "@/components/settings/CleanersSettings";
 import { FinanceSettings } from "@/components/settings/FinanceSettings";
 import { AccountSettings } from "@/components/settings/AccountSettings";
 import { InviteUserForm } from "@/components/settings/InviteUserForm";
-import { Settings, Plug, SprayCan, PoundSterling, User } from "lucide-react";
+import CleanReset from "@/pages/CleanReset";
+import { useAuth } from "@/contexts/AuthContext";
+import { Settings, Plug, SprayCan, PoundSterling, User, RotateCcw } from "lucide-react";
 
 export default function SettingsPage() {
+  const { role } = useAuth();
+  const canCleanReset = role === "super" || role === "senior" || role === "admin";
   return (
     <AppLayout>
       <div className="p-4 md:p-6 lg:p-8 space-y-6">
@@ -35,6 +39,11 @@ export default function SettingsPage() {
             <TabsTrigger value="account" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               <User className="h-3.5 w-3.5" />Account
             </TabsTrigger>
+            {canCleanReset && (
+              <TabsTrigger value="clean-reset" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+                <RotateCcw className="h-3.5 w-3.5" />Clean Reset
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="general">
@@ -56,6 +65,9 @@ export default function SettingsPage() {
               </div>
             </div>
           </TabsContent>
+          {canCleanReset && (
+            <TabsContent value="clean-reset"><CleanReset embedded /></TabsContent>
+          )}
         </Tabs>
       </div>
     </AppLayout>
