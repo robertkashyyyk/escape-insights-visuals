@@ -432,6 +432,8 @@ export default function CleanReset() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </AppLayout>
+    </>
   );
+
+  return embedded ? body : <AppLayout>{body}</AppLayout>;
 }
