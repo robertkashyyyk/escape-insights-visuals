@@ -340,7 +340,7 @@ export function AppSidebar() {
         })}
 
         {/* Settings */}
-        {(!role || role === "super") && (
+        {(!role || role === "super" || role === "senior" || role === "admin") && (
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
