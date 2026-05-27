@@ -183,8 +183,37 @@ export function useMatrixSchedule(weekAnchor: Date) {
     };
   }, [qc, weekStartStr, weekEndStr]);
 
-  // The matrix must never generate tasks on mount, refresh, focus, or tab changes.
-  // Generation is reserved for the explicit Regenerate button in CleaningSchedule.
+  // Auto-generate is throttled to once per hour per visible week via localStorage.
+  // The timestamp persists across refresh, tab switches, and remounts so re-entering
+  // the page within the window reuses existing tasks without re-invoking the function.
+  const AUTO_GEN_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+  const autoGenStorageKey = `matrix-autogen:${weekStartStr}`;
+  useEffect(() => {
+    if (listingsLoading || tasksLoading) return;
+    let cancelled = false;
+    try {
+      const last = Number(localStorage.getItem(autoGenStorageKey) || 0);
+      if (Date.now() - last < AUTO_GEN_WINDOW_MS) return;
+      // Mark immediately to prevent concurrent invocations from parallel mounts.
+      localStorage.setItem(autoGenStorageKey, String(Date.now()));
+      (async () => {
+        try {
+          await supabase.functions.invoke("generate-daily-cleaning-schedule", {
+            body: { date: weekStartStr, days_ahead: 7 },
+          });
+          if (cancelled) return;
+          qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
+        } catch {
+          // Roll back the throttle on failure so the next visit can retry.
+          localStorage.removeItem(autoGenStorageKey);
+        }
+      })();
+    } catch {
+      // localStorage unavailable — skip auto-gen rather than spam the function.
+    }
+    return () => { cancelled = true; };
+  }, [listingsLoading, tasksLoading, weekStartStr, weekEndStr, autoGenStorageKey, qc]);
+
   const autoGenerating = false;
 
   // Mutations
