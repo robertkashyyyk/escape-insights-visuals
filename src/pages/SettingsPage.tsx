@@ -65,6 +65,9 @@ export default function SettingsPage() {
               </div>
             </div>
           </TabsContent>
+          {canCleanReset && (
+            <TabsContent value="clean-reset"><CleanReset embedded /></TabsContent>
+          )}
         </Tabs>
       </div>
     </AppLayout>
