@@ -46,7 +46,7 @@ const REASONS = [
 
 type Filter = "all" | "clean" | "dirty" | "unknown" | "checkout_today" | "checkin_today";
 
-export default function CleanReset() {
+export default function CleanReset({ embedded = false }: { embedded?: boolean } = {}) {
   const { user } = useAuth();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
