@@ -62,6 +62,8 @@ export interface MatrixReservation {
   check_out_time: string | null;
 }
 
+const CANCELLED_TASK_STATUSES = new Set(["cancelled", "canceled"]);
+
 export function useMatrixSchedule(weekAnchor: Date) {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -133,8 +135,11 @@ export function useMatrixSchedule(weekAnchor: Date) {
         .from("clean_tasks" as any)
         .select("*")
         .gte("scheduled_date", weekStartStr)
-        .lte("scheduled_date", weekEndStr);
-      return (data || []) as unknown as MatrixTask[];
+        .lte("scheduled_date", weekEndStr)
+        .not("status", "in", "(cancelled,canceled)");
+      return ((data || []) as unknown as MatrixTask[]).filter(
+        (task) => !CANCELLED_TASK_STATUSES.has((task.status || "").toLowerCase())
+      );
     },
   });
 

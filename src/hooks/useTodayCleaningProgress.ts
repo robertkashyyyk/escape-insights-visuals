@@ -20,7 +20,8 @@ export function useTodayCleaningProgress() {
       const { data } = await supabase
         .from("clean_tasks" as any)
         .select("id, status, assigned_cleaner_id")
-        .eq("scheduled_date", todayStr);
+        .eq("scheduled_date", todayStr)
+        .not("status", "in", "(cancelled,canceled)");
       const rows = (data || []) as any[];
       const total = rows.length;
       const completed = rows.filter(r => r.status === "completed").length;
