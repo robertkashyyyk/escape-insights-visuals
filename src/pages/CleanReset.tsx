@@ -440,6 +440,28 @@ export default function CleanReset({ embedded = false }: { embedded?: boolean } 
               <label className="text-xs font-medium text-muted-foreground">Note (optional)</label>
               <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Add context for the audit log…" rows={3} />
             </div>
+            {dialog?.newState === "clean" && (() => {
+              const openToday = dialog.listings.filter((l) => l.hasScheduledCleanOpen && l.nextCheckOut !== todayStr);
+              const checkoutToday = dialog.listings.filter((l) => l.sameDayCheckoutToday);
+              if (openToday.length === 0 && checkoutToday.length === 0) return null;
+              return (
+                <div className="rounded-md border border-border/40 bg-secondary/30 p-3 space-y-2">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <Checkbox checked={cancelTodayTask} onCheckedChange={(v) => setCancelTodayTask(!!v)} className="mt-0.5" />
+                    <div className="text-xs">
+                      <div className="font-medium text-foreground">Also cancel today's pending clean task</div>
+                      <div className="text-muted-foreground mt-0.5">Marks any open task scheduled for today as cancelled for the selected propert{dialog.listings.length === 1 ? "y" : "ies"}.</div>
+                    </div>
+                  </label>
+                  {checkoutToday.length > 0 && cancelTodayTask && (
+                    <div className="text-[11px] text-amber-300 flex items-start gap-1.5 pl-6">
+                      <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                      <span>{checkoutToday.length} {checkoutToday.length === 1 ? "property has" : "properties have"} a checkout today — cleaning will still be required after the guest leaves.</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
 
           <DialogFooter>
