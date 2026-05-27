@@ -271,6 +271,7 @@ export default function CleanReset() {
   const allVisibleSelected = filtered.length > 0 && filtered.every((r) => selected.has(r.id));
 
   const body = (
+    <>
       <div className={embedded ? "space-y-6" : "p-4 md:p-6 lg:p-8 space-y-6"}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
