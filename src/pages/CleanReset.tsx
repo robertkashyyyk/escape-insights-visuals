@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,6 +49,7 @@ type Filter = "all" | "clean" | "dirty" | "unknown" | "checkout_today" | "checki
 
 export default function CleanReset({ embedded = false }: { embedded?: boolean } = {}) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -80,7 +82,7 @@ export default function CleanReset({ embedded = false }: { embedded?: boolean } 
           supabase
             .from("clean_tasks")
             .select("listing_id, scheduled_date, status")
-            .not("status", "in", "(completed,done,cancelled)")
+            .not("status", "in", "(completed,done,cancelled,canceled)")
             .gte("scheduled_date", todayStr),
           supabase
             .from("reservations")
@@ -242,11 +244,17 @@ export default function CleanReset({ embedded = false }: { embedded?: boolean } 
           .update({ status: "cancelled" } as any)
           .in("listing_id", listingIds)
           .eq("scheduled_date", todayStr)
-          .not("status", "in", "(completed,done,cancelled)")
+          .not("status", "in", "(completed,done,cancelled,canceled)")
           .select("id");
         if (cErr) throw cErr;
         cancelledCount = cancelled?.length || 0;
       }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["matrix-tasks"] }),
+        queryClient.invalidateQueries({ queryKey: ["today-cleans"] }),
+        queryClient.invalidateQueries({ queryKey: ["today-cleaning-progress"] }),
+      ]);
 
       toast.success(
         `${listings.length} ${listings.length === 1 ? "property" : "properties"} marked ${newState}` +
