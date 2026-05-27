@@ -471,7 +471,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     .from("clean_tasks")
     .select("assigned_cleaner_id, cleaning_duration_minutes, travel_time_from_previous_minutes")
     .eq("scheduled_date", targetDate)
-    .not("status", "eq", "cancelled");
+    .not("status", "in", "(cancelled,canceled)");
 
   const cleanerScheduledMinutes: Record<string, number> = {};
   const cleanerRegionCount: Record<string, Record<string, number>> = {};
@@ -498,7 +498,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     .select("assigned_cleaner_id, listing_id, scheduled_date")
     .gte("scheduled_date", windowStart)
     .lt("scheduled_date", targetDate)
-    .not("status", "eq", "cancelled");
+    .not("status", "in", "(cancelled,canceled)");
 
   // listing_id -> location_group lookup (use already-loaded listings + fetch unknowns)
   const listingGroupCache = new Map<string, string>();
@@ -574,7 +574,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
   const newTasks: TaskInfo[] = [];
   const plannedListingDate = new Set<string>();
 
-  for (const r of checkouts || []) {
+  for (const r of activeCheckoutsForGeneration) {
     const key = `${r.id}_${targetDate}`;
     if (existingSet.has(key)) continue;
 
@@ -638,7 +638,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
 
   // 7b. Add pre-existing unassigned tasks into the allocation pool so they get re-evaluated.
   // Orphan-promoted carryovers (set above) will arrive here as priority_level=0 (P0).
-  for (const orphan of orphanUnassigned || []) {
+  for (const orphan of activeOrphanUnassigned) {
     const listing = listingMap.get(String(orphan.listing_id));
     if (!listing) continue;
     // Trust an explicit priority_level on the row; otherwise infer from priority text.
