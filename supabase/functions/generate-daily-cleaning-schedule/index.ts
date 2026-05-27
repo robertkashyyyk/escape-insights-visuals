@@ -998,3 +998,9 @@ function todayLondon(): string {
   const londonStr = now.toLocaleDateString("en-CA", { timeZone: "Europe/London" });
   return londonStr;
 }
+
+function nextDateIso(date: string): string {
+  const d = new Date(date + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 1);
+  return `${d.toISOString().slice(0, 10)}T00:00:00+00:00`;
+}
