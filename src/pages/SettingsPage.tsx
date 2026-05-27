@@ -12,7 +12,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Settings, Plug, SprayCan, PoundSterling, User, RotateCcw } from "lucide-react";
 
 export default function SettingsPage() {
-  return (
+  const { role } = useAuth();
+  const canCleanReset = role === "super" || role === "senior" || role === "admin";
     <AppLayout>
       <div className="p-4 md:p-6 lg:p-8 space-y-6">
         <div>
