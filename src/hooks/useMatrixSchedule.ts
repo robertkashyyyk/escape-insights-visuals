@@ -4,6 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfWeek } from "date-fns";
 
+
+// Module-level dedupe state — persists across component unmount/remount so
+// navigating away from the matrix and back doesn't retrigger auto-generation.
+const _matrixInFlight: Set<string> = new Set();
+const _matrixRecentSuccess: Map<string, number> = new Map();
+// Bump the dedupe window so quick tab/route navigation doesn't re-fire.
+const AUTO_GEN_DEDUPE_MS = 10 * 60 * 1000; // 10 minutes
+
 export interface MatrixListing {
   id: string;
   name: string;
@@ -188,8 +196,9 @@ export function useMatrixSchedule(weekAnchor: Date) {
   // listing+date), kick off generation automatically to top up the partial week.
   // Visible to caller via `autoGenerating` so the UI can show a spinner.
   const [autoGenerating, setAutoGenerating] = useState(false);
-  const inFlightRef = useRef<Set<string>>(new Set());
-  const recentSuccessRef = useRef<Map<string, number>>(new Map());
+  // Module-level so dedupe survives component unmount/remount (tab switches, route nav)
+  const inFlightRef = { current: _matrixInFlight };
+  const recentSuccessRef = { current: _matrixRecentSuccess };
 
   useEffect(() => {
     if (tasksLoading) return;
@@ -214,7 +223,7 @@ export function useMatrixSchedule(weekAnchor: Date) {
     // Skip if already in flight or successfully generated in the last 60s
     if (inFlightRef.current.has(weekStartStr)) return;
     const lastOk = recentSuccessRef.current.get(weekStartStr);
-    if (lastOk && Date.now() - lastOk < 60_000) return;
+    if (lastOk && Date.now() - lastOk < AUTO_GEN_DEDUPE_MS) return;
 
     inFlightRef.current.add(weekStartStr);
     setAutoGenerating(true);
