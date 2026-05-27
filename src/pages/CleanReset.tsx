@@ -233,7 +233,25 @@ export default function CleanReset({ embedded = false }: { embedded?: boolean } 
         if (error) throw error;
       }
 
-      toast.success(`${listings.length} ${listings.length === 1 ? "property" : "properties"} marked ${newState}`);
+      // Optionally cancel today's open clean task for the affected listings
+      let cancelledCount = 0;
+      if (cancelTodayTask && newState === "clean") {
+        const listingIds = listings.map((l) => l.id);
+        const { data: cancelled, error: cErr } = await supabase
+          .from("clean_tasks")
+          .update({ status: "cancelled" } as any)
+          .in("listing_id", listingIds)
+          .eq("scheduled_date", todayStr)
+          .not("status", "in", "(completed,done,cancelled)")
+          .select("id");
+        if (cErr) throw cErr;
+        cancelledCount = cancelled?.length || 0;
+      }
+
+      toast.success(
+        `${listings.length} ${listings.length === 1 ? "property" : "properties"} marked ${newState}` +
+          (cancelledCount ? ` · ${cancelledCount} open task${cancelledCount === 1 ? "" : "s"} cancelled` : "")
+      );
       setDialog(null);
       setSelected(new Set());
       await load();
