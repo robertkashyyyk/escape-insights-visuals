@@ -1,16 +1,8 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfWeek } from "date-fns";
-
-
-// Module-level dedupe state — persists across component unmount/remount so
-// navigating away from the matrix and back doesn't retrigger auto-generation.
-const _matrixInFlight: Set<string> = new Set();
-const _matrixRecentSuccess: Map<string, number> = new Map();
-// Bump the dedupe window so quick tab/route navigation doesn't re-fire.
-const AUTO_GEN_DEDUPE_MS = 10 * 60 * 1000; // 10 minutes
 
 export interface MatrixListing {
   id: string;
@@ -191,63 +183,9 @@ export function useMatrixSchedule(weekAnchor: Date) {
     };
   }, [qc, weekStartStr, weekEndStr]);
 
-  // Lazy auto-generate: if the user navigates to a current/future week that has
-  // confirmed checkouts with no matching clean task (by reservation_id or
-  // listing+date), kick off generation automatically to top up the partial week.
-  // Visible to caller via `autoGenerating` so the UI can show a spinner.
-  const [autoGenerating, setAutoGenerating] = useState(false);
-  // Module-level so dedupe survives component unmount/remount (tab switches, route nav)
-  const inFlightRef = { current: _matrixInFlight };
-  const recentSuccessRef = { current: _matrixRecentSuccess };
-
-  useEffect(() => {
-    if (tasksLoading) return;
-    const todayStr = format(new Date(), "yyyy-MM-dd");
-    if (weekEndStr < todayStr) return;
-
-    const coveredReservationIds = new Set(
-      tasks.map(t => t.reservation_id).filter(Boolean) as string[]
-    );
-    const coveredListingDates = new Set(
-      tasks.map(t => `${t.listing_id}_${t.scheduled_date}`)
-    );
-    const uncoveredCheckouts = reservations.filter(
-      r =>
-        r.check_out >= weekStartStr &&
-        r.check_out <= weekEndStr &&
-        !coveredReservationIds.has(r.id) &&
-        !coveredListingDates.has(`${r.listing_id}_${r.check_out}`)
-    );
-    if (uncoveredCheckouts.length === 0) return;
-
-    // Skip if already in flight or successfully generated in the last 60s
-    if (inFlightRef.current.has(weekStartStr)) return;
-    const lastOk = recentSuccessRef.current.get(weekStartStr);
-    if (lastOk && Date.now() - lastOk < AUTO_GEN_DEDUPE_MS) return;
-
-    inFlightRef.current.add(weekStartStr);
-    setAutoGenerating(true);
-
-    (async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke("generate-daily-cleaning-schedule", {
-          body: { date: weekStartStr, days_ahead: 7 },
-        });
-        if (error) throw error;
-        recentSuccessRef.current.set(weekStartStr, Date.now());
-        const created = (data as any)?.tasks_created ?? (data as any)?.tasksCreated ?? (data as any)?.created ?? null;
-        if (created != null && created > 0) {
-          toast({ title: "Week populated", description: `${created} clean${created === 1 ? "" : "s"} auto-scheduled` });
-        }
-        await qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
-      } catch (e) {
-        console.warn("Auto-generate cleaning schedule failed", e);
-      } finally {
-        inFlightRef.current.delete(weekStartStr);
-        setAutoGenerating(false);
-      }
-    })();
-  }, [tasksLoading, tasks, reservations, weekStartStr, weekEndStr, qc, toast]);
+  // The matrix must never generate tasks on mount, refresh, focus, or tab changes.
+  // Generation is reserved for the explicit Regenerate button in CleaningSchedule.
+  const autoGenerating = false;
 
   // Mutations
   const reassignTask = useCallback(async (taskId: string, cleanerId: string | null, override?: { reason: string }) => {
