@@ -7,7 +7,9 @@ import { CleanersSettings } from "@/components/settings/CleanersSettings";
 import { FinanceSettings } from "@/components/settings/FinanceSettings";
 import { AccountSettings } from "@/components/settings/AccountSettings";
 import { InviteUserForm } from "@/components/settings/InviteUserForm";
-import { Settings, Plug, SprayCan, PoundSterling, User } from "lucide-react";
+import CleanReset from "@/pages/CleanReset";
+import { useAuth } from "@/contexts/AuthContext";
+import { Settings, Plug, SprayCan, PoundSterling, User, RotateCcw } from "lucide-react";
 
 export default function SettingsPage() {
   return (
