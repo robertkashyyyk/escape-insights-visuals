@@ -195,13 +195,13 @@ export default function CleanReset({ embedded = false }: { embedded?: boolean } 
   };
 
   const openSingle = (row: Row, newState: "clean" | "dirty") => {
-    setReason(REASONS[0]); setNote("");
+    setReason(REASONS[0]); setNote(""); setCancelTodayTask(false);
     setDialog({ listings: [row], newState });
   };
   const openBulk = (newState: "clean" | "dirty") => {
     const list = rows.filter((r) => selected.has(r.id));
     if (list.length === 0) return;
-    setReason(REASONS[0]); setNote("");
+    setReason(REASONS[0]); setNote(""); setCancelTodayTask(false);
     setDialog({ listings: list, newState });
   };
 
