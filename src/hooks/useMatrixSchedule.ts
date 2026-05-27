@@ -188,8 +188,9 @@ export function useMatrixSchedule(weekAnchor: Date) {
   // listing+date), kick off generation automatically to top up the partial week.
   // Visible to caller via `autoGenerating` so the UI can show a spinner.
   const [autoGenerating, setAutoGenerating] = useState(false);
-  const inFlightRef = useRef<Set<string>>(new Set());
-  const recentSuccessRef = useRef<Map<string, number>>(new Map());
+  // Module-level so dedupe survives component unmount/remount (tab switches, route nav)
+  const inFlightRef = { current: _matrixInFlight };
+  const recentSuccessRef = { current: _matrixRecentSuccess };
 
   useEffect(() => {
     if (tasksLoading) return;
