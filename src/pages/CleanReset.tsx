@@ -270,9 +270,8 @@ export default function CleanReset() {
 
   const allVisibleSelected = filtered.length > 0 && filtered.every((r) => selected.has(r.id));
 
-  return (
-    <AppLayout>
-      <div className="p-4 md:p-6 lg:p-8 space-y-6">
+  const body = (
+      <div className={embedded ? "space-y-6" : "p-4 md:p-6 lg:p-8 space-y-6"}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h2 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
