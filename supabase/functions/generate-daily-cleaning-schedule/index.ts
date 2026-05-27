@@ -84,6 +84,7 @@ interface CleanerInfo {
 const CLUSTER_RADIUS_KM = 8; // ~5 miles
 const CLUSTER_SOFT_MAX = 3;  // 1–3 → one cleaner; 4+ → split
 const ROLLING_WINDOW_DAYS = 28;
+const CANCELLED_TASK_STATUSES = "(completed,done,cancelled,canceled)";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -175,6 +176,14 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
   const restrictTo = (id: string) => !targetListingId || String(id) === targetListingId;
   const targetDayOfWeek = DAY_NAMES[new Date(targetDate + "T12:00:00Z").getDay()];
 
+  const { data: cleanResetsRaw } = await supabase
+    .from("clean_state_resets")
+    .select("listing_id")
+    .eq("new_state", "clean")
+    .gte("reset_at", `${targetDate}T00:00:00+00:00`)
+    .lt("reset_at", nextDateIso(targetDate));
+  const manuallyCleanedToday = new Set((cleanResetsRaw || []).map((r: any) => String(r.listing_id)));
+
   // 0. P0 PROMOTION: only on the actual current day. Future week regeneration
   // must keep cleans on checkout day; the early-morning refresh promotes them
   // to P0 only if they are still incomplete on arrival day.
@@ -204,7 +213,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
       .select("id, listing_id, scheduled_date, status, override_assignment, assigned_cleaner_id, notes, priority_level, priority, source, reservation_id")
       .in("listing_id", arrivalListingIds)
       .lt("scheduled_date", targetDate)
-      .not("status", "in", "(completed,done,cancelled)")
+      .not("status", "in", CANCELLED_TASK_STATUSES)
       .order("scheduled_date", { ascending: false });
 
     // Don't promote into a listing that already has a clean scheduled for today.
@@ -257,7 +266,8 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     .select("id, listing_id")
     .eq("check_out", targetDate)
     .eq("status", "confirmed");
-  const healReservationIds = (healCheckouts || []).map((r: any) => String(r.id));
+  const activeCheckouts = (healCheckouts || []).filter((r: any) => !manuallyCleanedToday.has(String(r.listing_id)));
+  const healReservationIds = activeCheckouts.map((r: any) => String(r.id));
   if (!isCurrentDayRefresh && healReservationIds.length > 0) {
     const { data: futureP0Rows } = await supabase
       .from("clean_tasks")
@@ -265,7 +275,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
       .in("reservation_id", healReservationIds)
       .gt("scheduled_date", targetDate)
       .eq("priority_level", 0)
-      .not("status", "in", "(completed,done,cancelled)")
+      .not("status", "in", CANCELLED_TASK_STATUSES)
       .eq("override_assignment", false);
 
     const movedListingIds = Array.from(new Set((futureP0Rows || []).map((t: any) => String(t.listing_id))));
@@ -316,22 +326,29 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     .eq("check_out", targetDate)
     .eq("status", "confirmed");
   if (coErr) throw coErr;
+  const activeCheckoutsForGeneration = (checkouts || []).filter(
+    (r: any) => !manuallyCleanedToday.has(String(r.listing_id))
+  );
 
   // 1b. Get any pre-existing unassigned tasks for this date — these need re-assignment too
   const { data: orphanUnassigned } = await supabase
     .from("clean_tasks")
     .select("id, listing_id, reservation_id, scheduled_date, priority, priority_level, cleaning_duration_minutes, checkout_time, checkin_time, is_same_day_turnaround, source, warning_reason")
     .eq("scheduled_date", targetDate)
-    .eq("status", "unassigned");
+      .eq("status", "unassigned");
 
-  const orphanListingIds = (orphanUnassigned || []).map((t: any) => String(t.listing_id));
+  const activeOrphanUnassigned = (orphanUnassigned || []).filter(
+    (t: any) => !manuallyCleanedToday.has(String(t.listing_id))
+  );
+
+  const orphanListingIds = activeOrphanUnassigned.map((t: any) => String(t.listing_id));
 
   // 2. Get listings (including bundles so we can expand components)
   const rawListingIds: string[] = Array.from(new Set([
-    ...((checkouts || []).map((r: any) => String(r.listing_id))),
+    ...(activeCheckoutsForGeneration.map((r: any) => String(r.listing_id))),
     ...orphanListingIds,
   ])).filter(restrictTo);
-  if (rawListingIds.length === 0 && (orphanUnassigned || []).length === 0) {
+  if (rawListingIds.length === 0 && activeOrphanUnassigned.length === 0) {
     return { created: 0, unassigned: 0 };
   }
 
