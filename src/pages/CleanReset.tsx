@@ -56,6 +56,7 @@ export default function CleanReset({ embedded = false }: { embedded?: boolean } 
   const [dialog, setDialog] = useState<null | { listings: Row[]; newState: "clean" | "dirty" }>(null);
   const [reason, setReason] = useState(REASONS[0]);
   const [note, setNote] = useState("");
+  const [cancelTodayTask, setCancelTodayTask] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
