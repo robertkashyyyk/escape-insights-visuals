@@ -39,6 +39,11 @@ export default function SettingsPage() {
             <TabsTrigger value="account" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               <User className="h-3.5 w-3.5" />Account
             </TabsTrigger>
+            {canCleanReset && (
+              <TabsTrigger value="clean-reset" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+                <RotateCcw className="h-3.5 w-3.5" />Clean Reset
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="general">
