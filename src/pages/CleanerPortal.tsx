@@ -151,6 +151,7 @@ export default function CleanerPortal() {
       .lte("scheduled_date", rangeEndStr)
       .not("status", "in", "(cancelled,canceled)")
       .order("scheduled_date", { ascending: true })
+      .order("priority_level", { ascending: true, nullsFirst: false })
       .order("estimated_start_time", { ascending: true, nullsFirst: false });
     return data ?? [];
   };
@@ -361,6 +362,8 @@ export default function CleanerPortal() {
   };
 
   const visibleTasks = tasks.filter((t) => isInPeriod(t.scheduled_date, activePeriod));
+  const isReadOnlyPeriod = activePeriod !== "today";
+
 
   // Capacity is computed against today only (working day metric)
   const todayTasks = tasks.filter((t) => t.scheduled_date === todayStr);
@@ -524,12 +527,26 @@ export default function CleanerPortal() {
                   const canStart = task.status === "scheduled" || task.status === "unassigned";
                   const isConfirming = confirmingId === task.id;
                   const prev = idx > 0 ? visibleTasks[idx - 1] : null;
-                  const km = prev ? distanceKm(prev.latitude, prev.longitude, task.latitude, task.longitude) : null;
-                  const mins = prev ? travelMinutes(prev.latitude, prev.longitude, task.latitude, task.longitude) : null;
+                  const sameDayAsPrev = prev && prev.scheduled_date === task.scheduled_date;
+                  const km = sameDayAsPrev ? distanceKm(prev!.latitude, prev!.longitude, task.latitude, task.longitude) : null;
+                  const mins = sameDayAsPrev ? travelMinutes(prev!.latitude, prev!.longitude, task.latitude, task.longitude) : null;
                   const proposed = proposedCleanTime(task);
+                  const showDateHeader = activePeriod !== "today" && (!prev || prev.scheduled_date !== task.scheduled_date);
+                  const taskDate = parseISO(task.scheduled_date);
 
                   return (
                     <div key={task.id}>
+                      {showDateHeader && (
+                        <div className="mt-3 mb-2 first:mt-0">
+                          <div className="flex items-center gap-2">
+                            <div className="h-px flex-1 bg-border/40" />
+                            <span className="text-xs font-semibold uppercase tracking-wider text-primary px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
+                              {format(taskDate, "EEE d MMM")}
+                            </span>
+                            <div className="h-px flex-1 bg-border/40" />
+                          </div>
+                        </div>
+                      )}
                       {idx === 0 && cleaner && activePeriod === "today" && (
                         <div className="flex items-center justify-center py-2">
                           <span className="text-xs text-muted-foreground">
@@ -537,7 +554,7 @@ export default function CleanerPortal() {
                           </span>
                         </div>
                       )}
-                      {idx > 0 && (
+                      {idx > 0 && sameDayAsPrev && (
                         <div className="flex flex-col items-center justify-center py-2 gap-0.5">
                           <span className="text-xs text-muted-foreground">
                             🚗 ~{task.travel_time_from_previous_minutes ?? mins} min travel
@@ -549,6 +566,7 @@ export default function CleanerPortal() {
                           )}
                         </div>
                       )}
+
 
                       <motion.div
                         layout
@@ -616,90 +634,102 @@ export default function CleanerPortal() {
                               )}
                             </div>
 
-                            {/* Start Job */}
-                            {canStart && (
-                              <button
-                                onClick={() => handleStartJob(task)}
-                                disabled={startingId === task.id || isPreviewMode}
-                                className={`w-full mt-4 min-h-[48px] rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 ${
-                                  isPreviewMode
-                                    ? "bg-muted text-muted-foreground cursor-not-allowed"
-                                    : "bg-primary text-primary-foreground"
-                                }`}
-                              >
-                                {startingId === task.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <>
-                                    <Play className="h-4 w-4" />
-                                    Start Job
-                                  </>
-                                )}
-                              </button>
-                            )}
-
-                            {/* Mark Complete / Confirm */}
-                            {!isComplete && (
-                              <div className={canStart ? "mt-2" : "mt-4"}>
-                                {!isConfirming ? (
-                                  <motion.button
-                                    onClick={() => requestConfirmComplete(task.id)}
-                                    disabled={completingId === task.id || isPreviewMode}
-                                    className={`w-full min-h-[48px] rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-300 active:scale-[0.98] disabled:opacity-50 ${
+                            {isReadOnlyPeriod ? (
+                              <div className="mt-4 rounded-lg border border-border/40 bg-muted/30 px-3 py-2.5 text-center">
+                                <p className="text-xs font-medium text-muted-foreground">
+                                  <Eye className="h-3.5 w-3.5 inline -mt-0.5 mr-1" />
+                                  View only — actions unlock on {format(taskDate, "EEE d MMM")}
+                                </p>
+                              </div>
+                            ) : (
+                              <>
+                                {/* Start Job */}
+                                {canStart && (
+                                  <button
+                                    onClick={() => handleStartJob(task)}
+                                    disabled={startingId === task.id || isPreviewMode}
+                                    className={`w-full mt-4 min-h-[48px] rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 ${
                                       isPreviewMode
                                         ? "bg-muted text-muted-foreground cursor-not-allowed"
-                                        : "bg-success text-primary-foreground"
+                                        : "bg-primary text-primary-foreground"
                                     }`}
-                                    whileTap={isPreviewMode ? undefined : { scale: 0.98 }}
                                   >
-                                    {completingId === task.id ? (
+                                    {startingId === task.id ? (
                                       <Loader2 className="h-4 w-4 animate-spin" />
                                     ) : (
                                       <>
-                                        <Check className="h-4 w-4" />
-                                        {isPreviewMode ? "Mark Complete (disabled in preview)" : "Mark Complete"}
+                                        <Play className="h-4 w-4" />
+                                        Start Job
                                       </>
                                     )}
-                                  </motion.button>
-                                ) : (
-                                  <motion.div
-                                    initial={{ opacity: 0, y: -4 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="flex gap-2"
-                                  >
-                                    <button
-                                      onClick={() => handleMarkComplete(task)}
-                                      disabled={completingId === task.id}
-                                      className="flex-1 min-h-[48px] rounded-lg font-semibold text-sm flex items-center justify-center gap-2 bg-success text-primary-foreground active:scale-[0.98] disabled:opacity-50"
-                                    >
-                                      {completingId === task.id ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : (
-                                        <>
-                                          <Check className="h-4 w-4" />
-                                          Yes, confirm
-                                        </>
-                                      )}
-                                    </button>
-                                    <button
-                                      onClick={cancelConfirm}
-                                      className="flex-1 min-h-[48px] rounded-lg font-semibold text-sm flex items-center justify-center gap-2 bg-muted text-muted-foreground active:scale-[0.98]"
-                                    >
-                                      <X className="h-4 w-4" />
-                                      Cancel
-                                    </button>
-                                  </motion.div>
+                                  </button>
                                 )}
-                              </div>
+
+                                {/* Mark Complete / Confirm */}
+                                {!isComplete && (
+                                  <div className={canStart ? "mt-2" : "mt-4"}>
+                                    {!isConfirming ? (
+                                      <motion.button
+                                        onClick={() => requestConfirmComplete(task.id)}
+                                        disabled={completingId === task.id || isPreviewMode}
+                                        className={`w-full min-h-[48px] rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-300 active:scale-[0.98] disabled:opacity-50 ${
+                                          isPreviewMode
+                                            ? "bg-muted text-muted-foreground cursor-not-allowed"
+                                            : "bg-success text-primary-foreground"
+                                        }`}
+                                        whileTap={isPreviewMode ? undefined : { scale: 0.98 }}
+                                      >
+                                        {completingId === task.id ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <>
+                                            <Check className="h-4 w-4" />
+                                            {isPreviewMode ? "Mark Complete (disabled in preview)" : "Mark Complete"}
+                                          </>
+                                        )}
+                                      </motion.button>
+                                    ) : (
+                                      <motion.div
+                                        initial={{ opacity: 0, y: -4 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="flex gap-2"
+                                      >
+                                        <button
+                                          onClick={() => handleMarkComplete(task)}
+                                          disabled={completingId === task.id}
+                                          className="flex-1 min-h-[48px] rounded-lg font-semibold text-sm flex items-center justify-center gap-2 bg-success text-primary-foreground active:scale-[0.98] disabled:opacity-50"
+                                        >
+                                          {completingId === task.id ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                          ) : (
+                                            <>
+                                              <Check className="h-4 w-4" />
+                                              Yes, confirm
+                                            </>
+                                          )}
+                                        </button>
+                                        <button
+                                          onClick={cancelConfirm}
+                                          className="flex-1 min-h-[48px] rounded-lg font-semibold text-sm flex items-center justify-center gap-2 bg-muted text-muted-foreground active:scale-[0.98]"
+                                        >
+                                          <X className="h-4 w-4" />
+                                          Cancel
+                                        </button>
+                                      </motion.div>
+                                    )}
+                                  </div>
+                                )}
+
+                                <button
+                                  onClick={() => isPreviewMode ? toast.info("Preview mode — actions disabled") : setFlagTask(task)}
+                                  className="w-full mt-2 min-h-[44px] rounded-lg border border-destructive/30 text-destructive text-sm font-medium flex items-center justify-center gap-2 hover:bg-destructive/10 transition-colors"
+                                >
+                                  <Flag className="h-3.5 w-3.5" />
+                                  Flag an Issue
+                                </button>
+                              </>
                             )}
 
-                            <button
-                              onClick={() => isPreviewMode ? toast.info("Preview mode — actions disabled") : setFlagTask(task)}
-                              className="w-full mt-2 min-h-[44px] rounded-lg border border-destructive/30 text-destructive text-sm font-medium flex items-center justify-center gap-2 hover:bg-destructive/10 transition-colors"
-                            >
-                              <Flag className="h-3.5 w-3.5" />
-                              Flag an Issue
-                            </button>
                           </div>
                         </div>
                       </motion.div>
