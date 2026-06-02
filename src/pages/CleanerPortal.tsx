@@ -78,6 +78,7 @@ export default function CleanerPortal() {
   const [startingId, setStartingId] = useState<string | null>(null);
   const [flagTask, setFlagTask] = useState<CleanTask | null>(null);
   const [activePeriod, setActivePeriod] = useState<PeriodKey>("today");
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const pageLoadTime = useRef(new Date().toISOString());
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isCleaner = (role as string) === "cleaner";
@@ -361,9 +362,36 @@ export default function CleanerPortal() {
     next_week: tasks.filter((t) => isInPeriod(t.scheduled_date, "next_week")).length,
   };
 
-  const visibleTasks = tasks.filter((t) => isInPeriod(t.scheduled_date, activePeriod));
-  const isReadOnlyPeriod = activePeriod !== "today";
+  const isWeekPeriod = activePeriod === "rest_week" || activePeriod === "next_week";
+  const showDayPicker = isWeekPeriod && !selectedDay;
 
+  const periodTasks = tasks.filter((t) => isInPeriod(t.scheduled_date, activePeriod));
+  const visibleTasks = selectedDay
+    ? periodTasks.filter((t) => t.scheduled_date === selectedDay)
+    : isWeekPeriod
+      ? []
+      : periodTasks;
+  const isReadOnlyPeriod = activePeriod !== "today" && (!selectedDay || selectedDay !== todayStr);
+
+  // Build day buckets for the day-picker view
+  const dayBuckets: { date: string; total: number; sto: number }[] = (() => {
+    if (!isWeekPeriod) return [];
+    const map = new Map<string, { date: string; total: number; sto: number }>();
+    const start = activePeriod === "rest_week" ? addDays(today, 2) : nextWeekStart;
+    const end = activePeriod === "rest_week" ? thisWeekEnd : nextWeekEnd;
+    for (let d = start; d <= end; d = addDays(d, 1)) {
+      const key = format(d, "yyyy-MM-dd");
+      map.set(key, { date: key, total: 0, sto: 0 });
+    }
+    periodTasks.forEach((t) => {
+      const bucket = map.get(t.scheduled_date);
+      if (bucket) {
+        bucket.total += 1;
+        if (t.is_same_day_turnaround) bucket.sto += 1;
+      }
+    });
+    return Array.from(map.values());
+  })();
 
   // Capacity is computed against today only (working day metric)
   const todayTasks = tasks.filter((t) => t.scheduled_date === todayStr);
@@ -383,6 +411,7 @@ export default function CleanerPortal() {
   const periodBanner =
     activePeriod === "today" ? "TODAY"
     : activePeriod === "tomorrow" ? "TOMORROW"
+    : selectedDay ? format(parseISO(selectedDay), "EEE d MMM").toUpperCase()
     : activePeriod === "rest_week" ? `WEEK OF ${format(startOfWeek(today, { weekStartsOn: 1 }), "d MMM")}`
     : `NEXT WEEK · ${format(nextWeekStart, "d MMM")}`;
 
@@ -475,13 +504,13 @@ export default function CleanerPortal() {
             label="Today"
             count={counts.today}
             active={activePeriod === "today"}
-            onClick={() => setActivePeriod("today")}
+            onClick={() => { setActivePeriod("today"); setSelectedDay(null); }}
             fullWidth
           />
           <div className="grid grid-cols-3 gap-2">
-            <PeriodCard label="Tomorrow" count={counts.tomorrow} active={activePeriod === "tomorrow"} onClick={() => setActivePeriod("tomorrow")} />
-            <PeriodCard label="Rest of Week" count={counts.rest_week} active={activePeriod === "rest_week"} onClick={() => setActivePeriod("rest_week")} />
-            <PeriodCard label="Next Week" count={counts.next_week} active={activePeriod === "next_week"} onClick={() => setActivePeriod("next_week")} />
+            <PeriodCard label="Tomorrow" count={counts.tomorrow} active={activePeriod === "tomorrow"} onClick={() => { setActivePeriod("tomorrow"); setSelectedDay(null); }} />
+            <PeriodCard label="Rest of Week" count={counts.rest_week} active={activePeriod === "rest_week"} onClick={() => { setActivePeriod("rest_week"); setSelectedDay(null); }} />
+            <PeriodCard label="Next Week" count={counts.next_week} active={activePeriod === "next_week"} onClick={() => { setActivePeriod("next_week"); setSelectedDay(null); }} />
           </div>
         </div>
 
@@ -493,11 +522,60 @@ export default function CleanerPortal() {
           </div>
         </div>
 
+        {selectedDay && isWeekPeriod && (
+          <div className="px-4 mt-3">
+            <button
+              onClick={() => setSelectedDay(null)}
+              className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+            >
+              ← Back to {activePeriod === "rest_week" ? "rest of week" : "next week"}
+            </button>
+          </div>
+        )}
+
         {/* Content */}
         <div className="flex-1 px-4 pt-4 pb-8" style={{ paddingBottom: "env(safe-area-inset-bottom, 2rem)" }}>
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : showDayPicker ? (
+            <div className="space-y-2">
+              {dayBuckets.map((b) => {
+                const d = parseISO(b.date);
+                const isEmpty = b.total === 0;
+                return (
+                  <button
+                    key={b.date}
+                    onClick={() => !isEmpty && setSelectedDay(b.date)}
+                    disabled={isEmpty}
+                    className={`w-full min-h-[72px] rounded-xl px-4 py-3 flex items-center justify-between transition-all active:scale-[0.98] ${
+                      isEmpty
+                        ? "bg-muted/30 border border-border/30 opacity-50 cursor-not-allowed"
+                        : "bg-card border border-border/40 hover:border-primary/50 hover:bg-primary/5"
+                    }`}
+                  >
+                    <div className="text-left">
+                      <p className="font-display font-bold text-foreground text-lg leading-tight">
+                        {format(d, "EEEE")}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{format(d, "d MMMM")}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {b.sto > 0 && (
+                        <span className="text-xs font-semibold px-2 py-1 rounded-full bg-destructive/15 text-destructive border border-destructive/30">
+                          {b.sto} STO
+                        </span>
+                      )}
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                        isEmpty ? "bg-muted text-muted-foreground" : "bg-primary/15 text-primary"
+                      }`}>
+                        {b.total} {b.total === 1 ? "job" : "jobs"}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           ) : visibleTasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-20 px-6">
