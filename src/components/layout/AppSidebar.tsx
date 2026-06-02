@@ -3,7 +3,7 @@ import {
   Building2, Users, Briefcase, Settings, LogOut, Telescope,
   Gauge, Target, Sparkles, Home, ChevronRight, Brush, BookOpen,
   FileText, Link, UserSearch, Mail, Send, Megaphone, ClipboardList,
-  Eye, Sun, Moon, MapPin,
+  Eye, Sun, Moon, MapPin, Wrench, Receipt,
   LucideIcon,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
