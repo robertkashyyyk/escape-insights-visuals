@@ -174,11 +174,33 @@ export function useMatrixSchedule(weekAnchor: Date) {
           filter: `scheduled_date=gte.${weekStartStr}`,
         },
         (payload: any) => {
-          // Secondary client-side guard for the upper bound (Realtime filters
-          // only support a single predicate per subscription).
           const row = payload.new ?? payload.old;
           const d = row?.scheduled_date as string | undefined;
           if (!d || d > weekEndStr) return;
+
+          // Silent in-place patch for status -> "completed" updates so the matrix
+          // does not flash/refetch when cleaners mark jobs done throughout the day.
+          if (
+            payload.eventType === "UPDATE" &&
+            payload.new?.status === "completed" &&
+            payload.old?.status !== "completed"
+          ) {
+            qc.setQueryData<MatrixTask[]>(
+              ["matrix-tasks", weekStartStr, weekEndStr],
+              (prev) =>
+                prev?.map((t) =>
+                  t.id === payload.new.id
+                    ? {
+                        ...t,
+                        status: "completed",
+                        completed_at: payload.new.completed_at ?? t.completed_at,
+                      }
+                    : t
+                ) ?? prev
+            );
+            return;
+          }
+
           qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
         }
       )
