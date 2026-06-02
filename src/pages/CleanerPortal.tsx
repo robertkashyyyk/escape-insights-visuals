@@ -362,9 +362,36 @@ export default function CleanerPortal() {
     next_week: tasks.filter((t) => isInPeriod(t.scheduled_date, "next_week")).length,
   };
 
-  const visibleTasks = tasks.filter((t) => isInPeriod(t.scheduled_date, activePeriod));
-  const isReadOnlyPeriod = activePeriod !== "today";
+  const isWeekPeriod = activePeriod === "rest_week" || activePeriod === "next_week";
+  const showDayPicker = isWeekPeriod && !selectedDay;
 
+  const periodTasks = tasks.filter((t) => isInPeriod(t.scheduled_date, activePeriod));
+  const visibleTasks = selectedDay
+    ? periodTasks.filter((t) => t.scheduled_date === selectedDay)
+    : isWeekPeriod
+      ? []
+      : periodTasks;
+  const isReadOnlyPeriod = activePeriod !== "today" && (!selectedDay || selectedDay !== todayStr);
+
+  // Build day buckets for the day-picker view
+  const dayBuckets = useMemo(() => {
+    if (!isWeekPeriod) return [] as { date: string; total: number; sto: number }[];
+    const map = new Map<string, { date: string; total: number; sto: number }>();
+    const start = activePeriod === "rest_week" ? addDays(today, 2) : nextWeekStart;
+    const end = activePeriod === "rest_week" ? thisWeekEnd : nextWeekEnd;
+    for (let d = start; d <= end; d = addDays(d, 1)) {
+      const key = format(d, "yyyy-MM-dd");
+      map.set(key, { date: key, total: 0, sto: 0 });
+    }
+    periodTasks.forEach((t) => {
+      const bucket = map.get(t.scheduled_date);
+      if (bucket) {
+        bucket.total += 1;
+        if (t.is_same_day_turnaround) bucket.sto += 1;
+      }
+    });
+    return Array.from(map.values());
+  }, [isWeekPeriod, activePeriod, periodTasks, today, thisWeekEnd, nextWeekStart, nextWeekEnd]);
 
   // Capacity is computed against today only (working day metric)
   const todayTasks = tasks.filter((t) => t.scheduled_date === todayStr);
@@ -384,6 +411,7 @@ export default function CleanerPortal() {
   const periodBanner =
     activePeriod === "today" ? "TODAY"
     : activePeriod === "tomorrow" ? "TOMORROW"
+    : selectedDay ? format(parseISO(selectedDay), "EEE d MMM").toUpperCase()
     : activePeriod === "rest_week" ? `WEEK OF ${format(startOfWeek(today, { weekStartsOn: 1 }), "d MMM")}`
     : `NEXT WEEK · ${format(nextWeekStart, "d MMM")}`;
 
