@@ -138,12 +138,21 @@ export type Database = {
         Row: {
           acknowledged_at: string | null
           acknowledged_by: string | null
+          claimed_at: string | null
+          claimed_by: string | null
           clean_task_id: string | null
+          completed_at: string | null
+          completed_by: string | null
+          completion_note: string | null
           created_at: string
           description: string
+          handoff_at: string | null
+          handoff_note: string | null
+          handoff_to: string | null
           id: string
           issue_type: string
           listing_id: string
+          maintenance_stage: string
           photo_paths: string[] | null
           reported_by_cleaner_id: string | null
           reported_by_user_id: string | null
@@ -157,12 +166,21 @@ export type Database = {
         Insert: {
           acknowledged_at?: string | null
           acknowledged_by?: string | null
+          claimed_at?: string | null
+          claimed_by?: string | null
           clean_task_id?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          completion_note?: string | null
           created_at?: string
           description: string
+          handoff_at?: string | null
+          handoff_note?: string | null
+          handoff_to?: string | null
           id?: string
           issue_type: string
           listing_id: string
+          maintenance_stage?: string
           photo_paths?: string[] | null
           reported_by_cleaner_id?: string | null
           reported_by_user_id?: string | null
@@ -176,12 +194,21 @@ export type Database = {
         Update: {
           acknowledged_at?: string | null
           acknowledged_by?: string | null
+          claimed_at?: string | null
+          claimed_by?: string | null
           clean_task_id?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          completion_note?: string | null
           created_at?: string
           description?: string
+          handoff_at?: string | null
+          handoff_note?: string | null
+          handoff_to?: string | null
           id?: string
           issue_type?: string
           listing_id?: string
+          maintenance_stage?: string
           photo_paths?: string[] | null
           reported_by_cleaner_id?: string | null
           reported_by_user_id?: string | null
@@ -465,6 +492,161 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           workload_share?: Json | null
+        }
+        Relationships: []
+      }
+      expense_consumables: {
+        Row: {
+          allocation_type: string
+          created_at: string
+          id: string
+          listing_id: string | null
+          notes: string | null
+          payer: string
+          purchase_date: string
+          purchased_by_name: string | null
+          purchased_by_user_id: string | null
+          receipt_path: string | null
+          receipt_value: number
+          region: string | null
+          reimbursed: boolean
+          reimbursed_at: string | null
+          supplier: string
+        }
+        Insert: {
+          allocation_type: string
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          notes?: string | null
+          payer: string
+          purchase_date: string
+          purchased_by_name?: string | null
+          purchased_by_user_id?: string | null
+          receipt_path?: string | null
+          receipt_value: number
+          region?: string | null
+          reimbursed?: boolean
+          reimbursed_at?: string | null
+          supplier: string
+        }
+        Update: {
+          allocation_type?: string
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          notes?: string | null
+          payer?: string
+          purchase_date?: string
+          purchased_by_name?: string | null
+          purchased_by_user_id?: string | null
+          receipt_path?: string | null
+          receipt_value?: number
+          region?: string | null
+          reimbursed?: boolean
+          reimbursed_at?: string | null
+          supplier?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_consumables_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expense_laundry_allocations: {
+        Row: {
+          allocated_amount: number
+          allocation_pct: number
+          bedrooms: number
+          bill_id: string
+          bookings_in_period: number
+          created_at: string
+          id: string
+          listing_id: string
+          listing_name: string
+          rooms_let: number
+        }
+        Insert: {
+          allocated_amount?: number
+          allocation_pct?: number
+          bedrooms?: number
+          bill_id: string
+          bookings_in_period?: number
+          created_at?: string
+          id?: string
+          listing_id: string
+          listing_name: string
+          rooms_let?: number
+        }
+        Update: {
+          allocated_amount?: number
+          allocation_pct?: number
+          bedrooms?: number
+          bill_id?: string
+          bookings_in_period?: number
+          created_at?: string
+          id?: string
+          listing_id?: string
+          listing_name?: string
+          rooms_let?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_laundry_allocations_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "expense_laundry_bills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_laundry_allocations_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      expense_laundry_bills: {
+        Row: {
+          bill_date: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          period_end: string
+          period_start: string
+          receipt_path: string | null
+          supplier: string
+          total_amount: number
+        }
+        Insert: {
+          bill_date: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          period_end: string
+          period_start: string
+          receipt_path?: string | null
+          supplier?: string
+          total_amount: number
+        }
+        Update: {
+          bill_date?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          receipt_path?: string | null
+          supplier?: string
+          total_amount?: number
         }
         Relationships: []
       }
