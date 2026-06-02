@@ -504,13 +504,13 @@ export default function CleanerPortal() {
             label="Today"
             count={counts.today}
             active={activePeriod === "today"}
-            onClick={() => setActivePeriod("today")}
+            onClick={() => { setActivePeriod("today"); setSelectedDay(null); }}
             fullWidth
           />
           <div className="grid grid-cols-3 gap-2">
-            <PeriodCard label="Tomorrow" count={counts.tomorrow} active={activePeriod === "tomorrow"} onClick={() => setActivePeriod("tomorrow")} />
-            <PeriodCard label="Rest of Week" count={counts.rest_week} active={activePeriod === "rest_week"} onClick={() => setActivePeriod("rest_week")} />
-            <PeriodCard label="Next Week" count={counts.next_week} active={activePeriod === "next_week"} onClick={() => setActivePeriod("next_week")} />
+            <PeriodCard label="Tomorrow" count={counts.tomorrow} active={activePeriod === "tomorrow"} onClick={() => { setActivePeriod("tomorrow"); setSelectedDay(null); }} />
+            <PeriodCard label="Rest of Week" count={counts.rest_week} active={activePeriod === "rest_week"} onClick={() => { setActivePeriod("rest_week"); setSelectedDay(null); }} />
+            <PeriodCard label="Next Week" count={counts.next_week} active={activePeriod === "next_week"} onClick={() => { setActivePeriod("next_week"); setSelectedDay(null); }} />
           </div>
         </div>
 
