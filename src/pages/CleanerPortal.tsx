@@ -527,12 +527,26 @@ export default function CleanerPortal() {
                   const canStart = task.status === "scheduled" || task.status === "unassigned";
                   const isConfirming = confirmingId === task.id;
                   const prev = idx > 0 ? visibleTasks[idx - 1] : null;
-                  const km = prev ? distanceKm(prev.latitude, prev.longitude, task.latitude, task.longitude) : null;
-                  const mins = prev ? travelMinutes(prev.latitude, prev.longitude, task.latitude, task.longitude) : null;
+                  const sameDayAsPrev = prev && prev.scheduled_date === task.scheduled_date;
+                  const km = sameDayAsPrev ? distanceKm(prev!.latitude, prev!.longitude, task.latitude, task.longitude) : null;
+                  const mins = sameDayAsPrev ? travelMinutes(prev!.latitude, prev!.longitude, task.latitude, task.longitude) : null;
                   const proposed = proposedCleanTime(task);
+                  const showDateHeader = activePeriod !== "today" && (!prev || prev.scheduled_date !== task.scheduled_date);
+                  const taskDate = parseISO(task.scheduled_date);
 
                   return (
                     <div key={task.id}>
+                      {showDateHeader && (
+                        <div className="mt-3 mb-2 first:mt-0">
+                          <div className="flex items-center gap-2">
+                            <div className="h-px flex-1 bg-border/40" />
+                            <span className="text-xs font-semibold uppercase tracking-wider text-primary px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
+                              {format(taskDate, "EEE d MMM")}
+                            </span>
+                            <div className="h-px flex-1 bg-border/40" />
+                          </div>
+                        </div>
+                      )}
                       {idx === 0 && cleaner && activePeriod === "today" && (
                         <div className="flex items-center justify-center py-2">
                           <span className="text-xs text-muted-foreground">
@@ -540,7 +554,7 @@ export default function CleanerPortal() {
                           </span>
                         </div>
                       )}
-                      {idx > 0 && (
+                      {idx > 0 && sameDayAsPrev && (
                         <div className="flex flex-col items-center justify-center py-2 gap-0.5">
                           <span className="text-xs text-muted-foreground">
                             🚗 ~{task.travel_time_from_previous_minutes ?? mins} min travel
@@ -552,6 +566,7 @@ export default function CleanerPortal() {
                           )}
                         </div>
                       )}
+
 
                       <motion.div
                         layout
