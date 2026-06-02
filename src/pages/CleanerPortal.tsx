@@ -362,6 +362,8 @@ export default function CleanerPortal() {
   };
 
   const visibleTasks = tasks.filter((t) => isInPeriod(t.scheduled_date, activePeriod));
+  const isReadOnlyPeriod = activePeriod !== "today";
+
 
   // Capacity is computed against today only (working day metric)
   const todayTasks = tasks.filter((t) => t.scheduled_date === todayStr);
