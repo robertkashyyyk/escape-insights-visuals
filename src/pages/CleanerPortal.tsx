@@ -151,6 +151,7 @@ export default function CleanerPortal() {
       .lte("scheduled_date", rangeEndStr)
       .not("status", "in", "(cancelled,canceled)")
       .order("scheduled_date", { ascending: true })
+      .order("priority_level", { ascending: true, nullsFirst: false })
       .order("estimated_start_time", { ascending: true, nullsFirst: false });
     return data ?? [];
   };
