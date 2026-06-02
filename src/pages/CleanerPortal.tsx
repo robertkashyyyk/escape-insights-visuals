@@ -374,8 +374,8 @@ export default function CleanerPortal() {
   const isReadOnlyPeriod = activePeriod !== "today" && (!selectedDay || selectedDay !== todayStr);
 
   // Build day buckets for the day-picker view
-  const dayBuckets = useMemo(() => {
-    if (!isWeekPeriod) return [] as { date: string; total: number; sto: number }[];
+  const dayBuckets: { date: string; total: number; sto: number }[] = (() => {
+    if (!isWeekPeriod) return [];
     const map = new Map<string, { date: string; total: number; sto: number }>();
     const start = activePeriod === "rest_week" ? addDays(today, 2) : nextWeekStart;
     const end = activePeriod === "rest_week" ? thisWeekEnd : nextWeekEnd;
@@ -391,7 +391,7 @@ export default function CleanerPortal() {
       }
     });
     return Array.from(map.values());
-  }, [isWeekPeriod, activePeriod, periodTasks, today, thisWeekEnd, nextWeekStart, nextWeekEnd]);
+  })();
 
   // Capacity is computed against today only (working day metric)
   const todayTasks = tasks.filter((t) => t.scheduled_date === todayStr);
