@@ -3,7 +3,7 @@ import {
   Building2, Users, Briefcase, Settings, LogOut, Telescope,
   Gauge, Target, Sparkles, Home, ChevronRight, Brush, BookOpen,
   FileText, Link, UserSearch, Mail, Send, Megaphone, ClipboardList,
-  Eye, Sun, Moon, MapPin,
+  Eye, Sun, Moon, MapPin, Wrench, Receipt,
   LucideIcon,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
@@ -81,6 +81,7 @@ const sections: NavSection[] = [
     collapsible: true,
     items: [
       { title: "Cleaning Schedule", url: "/operations/schedule", icon: CalendarDays, roles: allRoles },
+      { title: "Maintenance", url: "/operations/maintenance", icon: Wrench, roles: allRoles },
       { title: "Cleaning Numbers", url: "/operations/numbers", icon: PoundSterling, roles: managementRoles },
       { title: "Property Knowledge", url: "/property-knowledge", icon: BookOpen, roles: allRoles },
       { title: "Amenities", url: "/amenities", icon: MapPin, roles: managementRoles },
@@ -91,6 +92,7 @@ const sections: NavSection[] = [
     collapsible: true,
     items: [
       { title: "Management Revenue", url: "/management", icon: Briefcase, roles: managementRoles },
+      { title: "Expenses", url: "/finance/expenses", icon: Receipt, roles: managementRoles },
       {
       title: "Owner Reports", url: "/owner-reports", icon: FileText, roles: managementRoles,
         children: [

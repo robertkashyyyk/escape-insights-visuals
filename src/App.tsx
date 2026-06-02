@@ -42,6 +42,8 @@ import PropertyKnowledgeDetail from "./pages/PropertyKnowledgeDetail";
 import Amenities from "./pages/Amenities";
 import GuestPortal from "./pages/GuestPortal";
 import CleanReset from "./pages/CleanReset";
+import MaintenanceQueue from "./pages/MaintenanceQueue";
+import ExpensesPage from "./pages/ExpensesPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -92,6 +94,8 @@ const App = () => (
             <Route path="/sync-health" element={<ProtectedRoute requiredRoles={["super", "senior"]}><SyncHealth /></ProtectedRoute>} />
             <Route path="/operations/schedule" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><CleaningSchedule /></ProtectedRoute>} />
             <Route path="/operations/cleaning" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><CleaningSchedule /></ProtectedRoute>} />
+            <Route path="/operations/maintenance" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><MaintenanceQueue /></ProtectedRoute>} />
+            <Route path="/finance/expenses" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ExpensesPage /></ProtectedRoute>} />
             <Route path="/operations/numbers" element={<ProtectedRoute requiredRoles={["super", "senior"]}><CleaningNumbers /></ProtectedRoute>} />
             <Route path="/property-knowledge" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PropertyKnowledge /></ProtectedRoute>} />
             <Route path="/property-knowledge/:listingId" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PropertyKnowledgeDetail /></ProtectedRoute>} />
