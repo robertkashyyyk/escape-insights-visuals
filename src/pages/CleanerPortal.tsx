@@ -78,6 +78,7 @@ export default function CleanerPortal() {
   const [startingId, setStartingId] = useState<string | null>(null);
   const [flagTask, setFlagTask] = useState<CleanTask | null>(null);
   const [activePeriod, setActivePeriod] = useState<PeriodKey>("today");
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const pageLoadTime = useRef(new Date().toISOString());
   const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isCleaner = (role as string) === "cleaner";
