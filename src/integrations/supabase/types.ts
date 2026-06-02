@@ -270,6 +270,7 @@ export type Database = {
           route_order: number | null
           scheduled_date: string
           source: string
+          started_at: string | null
           status: string
           task_type: string
           travel_time_from_previous_minutes: number | null
@@ -296,6 +297,7 @@ export type Database = {
           route_order?: number | null
           scheduled_date: string
           source?: string
+          started_at?: string | null
           status?: string
           task_type?: string
           travel_time_from_previous_minutes?: number | null
@@ -322,6 +324,7 @@ export type Database = {
           route_order?: number | null
           scheduled_date?: string
           source?: string
+          started_at?: string | null
           status?: string
           task_type?: string
           travel_time_from_previous_minutes?: number | null
