@@ -122,7 +122,7 @@ export function useMaintenanceQueue() {
   }, [qc]);
 
   const update = async (id: string, patch: Record<string, any>) => {
-    const { error } = await supabase.from("clean_issues").update(patch).eq("id", id);
+    const { error } = await (supabase.from("clean_issues") as any).update(patch).eq("id", id);
     if (error) throw error;
     qc.invalidateQueries({ queryKey: ["maintenance_queue"] });
   };
