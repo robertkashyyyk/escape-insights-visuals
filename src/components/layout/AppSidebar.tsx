@@ -92,6 +92,7 @@ const sections: NavSection[] = [
     collapsible: true,
     items: [
       { title: "Management Revenue", url: "/management", icon: Briefcase, roles: managementRoles },
+      { title: "Expenses", url: "/finance/expenses", icon: Receipt, roles: managementRoles },
       {
       title: "Owner Reports", url: "/owner-reports", icon: FileText, roles: managementRoles,
         children: [
