@@ -1206,6 +1206,7 @@ export type Database = {
           listing_id: string | null
           postpone_reason: string | null
           postponed_until: string | null
+          reservation_id: string | null
           scope: string
           source: string
           status: string
@@ -1228,6 +1229,7 @@ export type Database = {
           listing_id?: string | null
           postpone_reason?: string | null
           postponed_until?: string | null
+          reservation_id?: string | null
           scope?: string
           source?: string
           status?: string
@@ -1250,6 +1252,7 @@ export type Database = {
           listing_id?: string | null
           postpone_reason?: string | null
           postponed_until?: string | null
+          reservation_id?: string | null
           scope?: string
           source?: string
           status?: string
@@ -1270,6 +1273,13 @@ export type Database = {
             columns: ["listing_id"]
             isOneToOne: false
             referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_tasks_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
             referencedColumns: ["id"]
           },
         ]
@@ -2275,6 +2285,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      seasons: {
+        Row: {
+          created_at: string
+          display_order: number
+          end_day: number
+          end_month: number
+          id: string
+          name: string
+          spend_threshold: number
+          start_day: number
+          start_month: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          end_day: number
+          end_month: number
+          id?: string
+          name: string
+          spend_threshold?: number
+          start_day: number
+          start_month: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          end_day?: number
+          end_month?: number
+          id?: string
+          name?: string
+          spend_threshold?: number
+          start_day?: number
+          start_month?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
       sync_logs: {
         Row: {
