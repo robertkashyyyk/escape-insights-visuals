@@ -495,6 +495,30 @@ export type Database = {
         }
         Relationships: []
       }
+      communal_groups: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       expense_consumables: {
         Row: {
           allocation_type: string
@@ -661,8 +685,12 @@ export type Database = {
           bundle_components: Json | null
           city: string | null
           cleaning_duration_minutes: number | null
+          cleaning_fee: number | null
+          communal_group_id: string | null
+          communal_ratio_pct: number | null
           country: string | null
           created_at: string
+          deep_fee: number | null
           default_check_in_time: string | null
           default_check_out_time: string | null
           google_place_id: string | null
@@ -673,6 +701,7 @@ export type Database = {
           image_url: string | null
           is_bundle: boolean
           is_clean: boolean
+          is_communal: boolean
           latitude: number | null
           location_group: string | null
           longitude: number | null
@@ -705,8 +734,12 @@ export type Database = {
           bundle_components?: Json | null
           city?: string | null
           cleaning_duration_minutes?: number | null
+          cleaning_fee?: number | null
+          communal_group_id?: string | null
+          communal_ratio_pct?: number | null
           country?: string | null
           created_at?: string
+          deep_fee?: number | null
           default_check_in_time?: string | null
           default_check_out_time?: string | null
           google_place_id?: string | null
@@ -717,6 +750,7 @@ export type Database = {
           image_url?: string | null
           is_bundle?: boolean
           is_clean?: boolean
+          is_communal?: boolean
           latitude?: number | null
           location_group?: string | null
           longitude?: number | null
@@ -749,8 +783,12 @@ export type Database = {
           bundle_components?: Json | null
           city?: string | null
           cleaning_duration_minutes?: number | null
+          cleaning_fee?: number | null
+          communal_group_id?: string | null
+          communal_ratio_pct?: number | null
           country?: string | null
           created_at?: string
+          deep_fee?: number | null
           default_check_in_time?: string | null
           default_check_out_time?: string | null
           google_place_id?: string | null
@@ -761,6 +799,7 @@ export type Database = {
           image_url?: string | null
           is_bundle?: boolean
           is_clean?: boolean
+          is_communal?: boolean
           latitude?: number | null
           location_group?: string | null
           longitude?: number | null
@@ -784,6 +823,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "listings_communal_group_id_fkey"
+            columns: ["communal_group_id"]
+            isOneToOne: false
+            referencedRelation: "communal_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "listings_owner_id_fkey"
             columns: ["owner_id"]
@@ -1823,6 +1869,10 @@ export type Database = {
       cleaner_assigned_to_listing: {
         Args: { _listing_id: string; _user_id: string }
         Returns: boolean
+      }
+      communal_group_ratio_sum: {
+        Args: { p_group_id: string }
+        Returns: number
       }
       has_role: {
         Args: {
