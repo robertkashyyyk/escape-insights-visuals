@@ -8,9 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ArrowUpDown, ChevronLeft, ChevronRight, Package } from "lucide-react";
 import { differenceInDays, format, parseISO } from "date-fns";
 import { useLocationGroups } from "@/hooks/useLocationGroups";
+import { BookingRequestsDialog } from "@/components/requests/BookingRequestsDialog";
 
 type SortKey = "guest_name" | "property" | "check_in" | "check_out" | "nights" | "lead_time" | "amount" | "platform" | "status";
 type SortDir = "asc" | "desc";
@@ -42,8 +43,22 @@ export function ReservationsTable() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
+  const [reqDialog, setReqDialog] = useState<{ id: string; guest: string } | null>(null);
 
   const todayStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+
+  // Count of request lines per reservation (booking_requests is small), for the badge.
+  const { data: requestCounts = {} } = useQuery({
+    queryKey: ["booking_requests_counts"],
+    queryFn: async () => {
+      const { data } = await (supabase.from as any)("booking_requests").select("reservation_id");
+      const counts: Record<string, number> = {};
+      for (const row of (data ?? []) as { reservation_id: string }[]) {
+        counts[row.reservation_id] = (counts[row.reservation_id] ?? 0) + 1;
+      }
+      return counts;
+    },
+  });
 
   const { data: reservations, isLoading } = useQuery({
     queryKey: ["reservations_enhanced"],
@@ -289,12 +304,13 @@ export function ReservationsTable() {
                 <SortHeader label="Amount" sortKeyVal="amount" className="text-right" />
                 <SortHeader label="Platform" sortKeyVal="platform" />
                 <SortHeader label="Status" sortKeyVal="status" />
+                <TableHead className="text-center">Requests</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {pagedRows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">No reservations found</TableCell>
+                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8">No reservations found</TableCell>
                 </TableRow>
               )}
               {pagedRows.map((r) => (
@@ -329,6 +345,21 @@ export function ReservationsTable() {
                     <Badge variant="outline" className={`capitalize text-[10px] ${statusBadgeClass(r.status)}`}>
                       {r.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1 text-xs"
+                      onClick={() => setReqDialog({ id: r.id, guest: r.guest_name })}
+                    >
+                      <Package className="h-3.5 w-3.5" />
+                      {requestCounts[r.id] ? (
+                        <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">{requestCounts[r.id]}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">Add</span>
+                      )}
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -391,6 +422,13 @@ export function ReservationsTable() {
           </div>
         </div>
       )}
+
+      <BookingRequestsDialog
+        reservationId={reqDialog?.id ?? null}
+        guestName={reqDialog?.guest}
+        open={!!reqDialog}
+        onOpenChange={(o) => !o && setReqDialog(null)}
+      />
     </div>
   );
 }
