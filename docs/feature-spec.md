@@ -37,7 +37,7 @@ top of each section.
 | 2 | Requests + cleaner reminder | ✅ Built |
 | 3 | Laundry per-region rate | ✅ Built (owner-statement rollup pending statements feature) |
 | 4 | Consumables (+communal type) | ✅ Built (owner-statement rollup pending statements feature) |
-| 10 | Utilities expenses tab | ⏳ Planned |
+| 10 | Utilities expenses tab | ✅ Built |
 | 8 | Welcome Baskets / Seasons | ⏳ Planned |
 | 1 | Hostnote/Guestnote/Custom Field (Hostaway) | ⏳ Planned (gated on creds) |
 
@@ -128,10 +128,16 @@ UI: Consumable Rates config in the same Set Rates tab. Owners have RLS read on c
 > owner-readable via RLS, but `OwnerStatements.tsx` is currently a stub — line-iteming
 > these onto an owner invoice is deferred to the (separate) owner-statements feature.
 
-## 10. Expenses → "Utilities" tab — ⏳ Planned
+## 10. Expenses → "Utilities" tab — ✅ Built
 
-`UtilityExpense (type, date, value, [property + attribution_pct])`. Default even split
-across selected properties; ratios sum to 100%.
+Migration `20260603161312_utility_expenses.sql`: `utility_expenses` (type/date/value) +
+`utility_expense_allocations` (listing, attribution_pct, amount, denormalised
+expense_date). UI: Expenses → **Utilities** tab (`src/components/expenses/UtilitiesTab.tsx`)
+— type (with suggestions), date, value, multi-select properties, **even-split-by-default
+attribution that recalculates as properties change and is editable; hard-blocks save
+unless it totals 100%**. [DECISION taken] custom ratios editable; utilities stay
+independent of the Communal Ratio % (even-split default regardless of communal status).
+Feeds the owner-report **Utilities** card (now a real figure, no longer "—").
 
 ## 8. Settings → "Welcome Baskets" tab — ⏳ Planned
 

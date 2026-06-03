@@ -2285,6 +2285,84 @@ export type Database = {
         }
         Relationships: []
       }
+      utility_expense_allocations: {
+        Row: {
+          amount: number
+          attribution_pct: number
+          created_at: string
+          expense_date: string
+          id: string
+          listing_id: string
+          utility_expense_id: string
+        }
+        Insert: {
+          amount: number
+          attribution_pct: number
+          created_at?: string
+          expense_date: string
+          id?: string
+          listing_id: string
+          utility_expense_id: string
+        }
+        Update: {
+          amount?: number
+          attribution_pct?: number
+          created_at?: string
+          expense_date?: string
+          id?: string
+          listing_id?: string
+          utility_expense_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "utility_expense_allocations_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "utility_expense_allocations_utility_expense_id_fkey"
+            columns: ["utility_expense_id"]
+            isOneToOne: false
+            referencedRelation: "utility_expenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      utility_expenses: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expense_date: string
+          id: string
+          notes: string | null
+          type: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expense_date: string
+          id?: string
+          notes?: string | null
+          type: string
+          updated_at?: string
+          value: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expense_date?: string
+          id?: string
+          notes?: string | null
+          type?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       property_knowledge_cleaner: {
