@@ -11,6 +11,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { formatDistanceToNow, format } from "date-fns";
 import { Wrench, AlertTriangle, CheckCircle2, ArrowRightLeft, Clock, Package, Play } from "lucide-react";
 import { useMaintenanceQueue, MaintenanceIssue, MaintenanceStage } from "@/hooks/useMaintenanceQueue";
+import { MaintenanceTasksPanel } from "@/components/maintenance/MaintenanceTasksPanel";
 import { useAuth, useRole } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -299,6 +300,17 @@ export default function MaintenanceQueue() {
           <p className="text-muted-foreground mt-1">Property issues flagged by cleaners — claim, work, hand off, resolve.</p>
         </div>
 
+        <Tabs defaultValue="issues">
+          <TabsList>
+            <TabsTrigger value="issues">Issues</TabsTrigger>
+            <TabsTrigger value="tasks">Tasks</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="tasks" className="mt-4">
+            <MaintenanceTasksPanel properties={properties} />
+          </TabsContent>
+
+          <TabsContent value="issues" className="mt-4">
         <Tabs defaultValue="active">
           <TabsList>
             <TabsTrigger value="active">Active ({active.length})</TabsTrigger>
@@ -354,6 +366,8 @@ export default function MaintenanceQueue() {
                 </CardContent>
               </Card>
             ))}
+          </TabsContent>
+        </Tabs>
           </TabsContent>
         </Tabs>
       </div>

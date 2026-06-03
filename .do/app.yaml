@@ -1,0 +1,33 @@
+# DigitalOcean App Platform spec — Escape Grids web app (Vite SPA static site).
+#
+# Backend stays on Supabase (project pftqjrmdksrrpczhomln). The Supabase URL +
+# publishable/anon key are baked into the build (src/integrations/supabase/client.ts),
+# so no build-time secrets are required here — the anon key is public by design.
+#
+# Provision:   doctl apps create --spec .do/app.yaml
+# Update:      doctl apps update <app-id> --spec .do/app.yaml
+#
+# Deploys automatically on every push to `main`.
+name: escapegrids
+region: lon
+static_sites:
+  - name: web
+    github:
+      repo: robertkashyyyk/escape-insights-visuals
+      branch: main
+      deploy_on_push: true
+    build_command: npm run build
+    output_dir: dist
+    # SPA fallback — serve index.html for any unmatched client-side route.
+    catchall_document: index.html
+    routes:
+      - path: /
+    # Public Supabase config, inlined at build time (Vite bakes VITE_* vars in).
+    # The anon/publishable key is public by design — safe to expose.
+    envs:
+      - key: VITE_SUPABASE_URL
+        scope: BUILD_TIME
+        value: https://pftqjrmdksrrpczhomln.supabase.co
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        scope: BUILD_TIME
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmdHFqcm1ka3NycnBjemhvbWxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2OTYyMzAsImV4cCI6MjA5MDI3MjIzMH0.pnIOzWvQOxPLUsf3srx4Qqdc73xUAOa8aenokDABMOA
