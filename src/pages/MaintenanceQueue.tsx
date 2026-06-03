@@ -76,7 +76,7 @@ function useStaffUsers() {
 function IssueCard({ issue }: { issue: MaintenanceIssue }) {
   const { user } = useAuth();
   const { role } = useRole();
-  const m = useMaintenanceQueue();
+  const m = useMaintenanceQueue({ subscribe: false }); // page owns the realtime channel; cards only need mutations
   const staff = useStaffUsers();
   const isPriv = role === "super" || role === "senior";
 

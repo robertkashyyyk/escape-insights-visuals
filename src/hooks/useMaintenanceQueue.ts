@@ -107,11 +107,17 @@ async function fetchAll(): Promise<MaintenanceIssue[]> {
   return issues;
 }
 
-export function useMaintenanceQueue() {
+export function useMaintenanceQueue(options: { subscribe?: boolean } = {}) {
+  const { subscribe = true } = options;
   const qc = useQueryClient();
   const query = useQuery({ queryKey: ["maintenance_queue"], queryFn: fetchAll });
 
   useEffect(() => {
+    // Only one realtime channel should exist for this topic. The page-level
+    // hook subscribes; per-card instances pass { subscribe: false } so they
+    // don't open a duplicate channel (which throws "cannot add postgres_changes
+    // callbacks ... after subscribe()" and crashes the page).
+    if (!subscribe) return;
     const channel = supabase
       .channel("maintenance_queue_changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "clean_issues" }, () => {
@@ -119,7 +125,7 @@ export function useMaintenanceQueue() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [qc]);
+  }, [qc, subscribe]);
 
   const update = async (id: string, patch: Record<string, any>) => {
     const { error } = await (supabase.from("clean_issues") as any).update(patch).eq("id", id);
