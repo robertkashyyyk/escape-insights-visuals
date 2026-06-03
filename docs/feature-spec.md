@@ -104,7 +104,19 @@ Tables `requests` (catalogue: name, icon, active) + `booking_requests`
 - RLS: cleaners can read requests for reservations they're assigned to clean.
 - [DEFERRED] Push notification on add — visibility is icon-driven on the job for v1.
 
-## 3. Laundry — per-region rate + per-turnover charge — ✅ Built
+## 3. Laundry — BY BED TYPE (per turnover) — ✅ Built
+
+**Refined: laundry is priced by bed type, not region.** `bed_types` (name, laundry_cost)
++ `property_beds` (listing, bedroom_label, bed_type, quantity) — migration
+`20260603162954_bed_type_laundry.sql`. A property's laundry per turnover =
+Σ(bed_type.laundry_cost × quantity); the `generate_turnover_charges` trigger computes it
+from the bed inventory (region laundry_rates tables retained but no longer drive
+generation). UI: per-property **Bedrooms & Beds** editor in PropertyForm (edit mode,
+`PropertyBedsEditor.tsx`); **Bed-Type Laundry Costs** config in Expenses → Set Rates.
+Owner-report **Laundry** card now also includes existing `expense_laundry_allocations`
+(actual supplier bills) so historical data shows. (Original region-rate notes below.)
+
+### 3 (original) — per-region rate
 
 Migration `20260603154350_laundry_consumable_rates.sql`. `laundry_rates` (£/turnover) +
 `laundry_rate_regions` (→ region/location_group) + generated `laundry_charges`

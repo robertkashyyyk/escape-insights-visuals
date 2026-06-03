@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Shirt, Package, Plus, Trash2, WashingMachine } from "lucide-react";
+import { Shirt, Package, Plus, Trash2, BedDouble } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -21,110 +21,63 @@ export function TurnoverRatesTab() {
         completed) for covered properties, and rolls onto the owner report. This is separate from the
         actual-cost Consumables / Laundry tabs.
       </p>
-      <LaundryRates />
+      <BedTypeLaundryCosts />
       <ConsumableRates />
       <Accruals />
     </div>
   );
 }
 
-// ---------------- Laundry Rates ----------------
-function LaundryRates() {
+// ---------------- Bed Type Laundry Costs ----------------
+function BedTypeLaundryCosts() {
   const qc = useQueryClient();
-  const [name, setName] = useState("Laundry");
-  const [amount, setAmount] = useState("");
-  const [regions, setRegions] = useState<string[]>([]);
+  const [name, setName] = useState("");
+  const [cost, setCost] = useState("");
 
-  const { data: locationGroups = [] } = useQuery({
-    queryKey: ["lc_location_groups"],
-    queryFn: async () => {
-      const { data } = await supabase.from("location_groups").select("name").eq("archived", false).order("display_order");
-      return (data ?? []).map((g: any) => g.name as string);
-    },
+  const { data: rows = [], refetch } = useQuery({
+    queryKey: ["bed_types_admin"],
+    queryFn: async () => ((await (supabase.from as any)("bed_types")
+      .select("id, name, laundry_cost, active")
+      .order("active", { ascending: false }).order("display_order")).data ?? []) as any[],
   });
 
-  const { data: rates = [], refetch } = useQuery({
-    queryKey: ["laundry_rates_admin"],
-    queryFn: async () => {
-      const { data } = await (supabase.from as any)("laundry_rates")
-        .select("id, name, amount, active, laundry_rate_regions(region)")
-        .order("created_at", { ascending: false });
-      return (data ?? []) as any[];
-    },
-  });
+  const invalidate = () => { refetch(); qc.invalidateQueries({ queryKey: ["bed_types_active"] }); };
 
-  // Regions already covered by an active rate (for overlap prevention).
-  const coveredRegions = useMemo(() => {
-    const s = new Set<string>();
-    for (const r of rates) if (r.active) for (const rr of r.laundry_rate_regions ?? []) s.add(rr.region);
-    return s;
-  }, [rates]);
-
-  const toggleRegion = (region: string) =>
-    setRegions((prev) => (prev.includes(region) ? prev.filter((r) => r !== region) : [...prev, region]));
-
-  const addRate = async () => {
-    const amt = parseFloat(amount);
-    if (!amt || amt <= 0) { toast.error("Enter a valid amount"); return; }
-    if (regions.length === 0) { toast.error("Select at least one region"); return; }
-    const clash = regions.filter((r) => coveredRegions.has(r));
-    if (clash.length) { toast.error(`Already covered by an active rate: ${clash.join(", ")}`); return; }
-    const { data, error } = await (supabase.from as any)("laundry_rates")
-      .insert({ name: name.trim() || "Laundry", amount: amt }).select("id").single();
-    if (error) { toast.error("Could not add rate", { description: error.message }); return; }
-    const rows = regions.map((region) => ({ rate_id: data.id, region }));
-    const { error: e2 } = await (supabase.from as any)("laundry_rate_regions").insert(rows);
-    if (e2) { toast.error("Could not assign regions", { description: e2.message }); return; }
-    setName("Laundry"); setAmount(""); setRegions([]);
-    refetch(); qc.invalidateQueries({ queryKey: ["laundry_rates_admin"] });
+  const add = async () => {
+    if (!name.trim()) { toast.error("Enter a bed type name"); return; }
+    const nextOrder = rows.length ? Math.max(...rows.map((r: any) => r.display_order ?? 0)) + 1 : 0;
+    const { error } = await (supabase.from as any)("bed_types")
+      .insert({ name: name.trim(), laundry_cost: parseFloat(cost) || 0, display_order: nextOrder });
+    if (error) { toast.error("Could not add", { description: error.message }); return; }
+    setName(""); setCost(""); invalidate();
   };
-
-  const toggleActive = async (id: string, active: boolean) => {
-    await (supabase.from as any)("laundry_rates").update({ active: !active }).eq("id", id);
-    refetch();
+  const saveCost = async (id: string, v: string) => {
+    await (supabase.from as any)("bed_types").update({ laundry_cost: parseFloat(v) || 0 }).eq("id", id);
+    invalidate();
   };
-  const remove = async (id: string) => {
-    if (!window.confirm("Delete this laundry rate? Existing accrued charges are kept.")) return;
-    await (supabase.from as any)("laundry_rates").delete().eq("id", id);
-    refetch();
-  };
+  const toggle = async (id: string, active: boolean) => { await (supabase.from as any)("bed_types").update({ active: !active }).eq("id", id); invalidate(); };
+  const remove = async (id: string) => { if (!window.confirm("Delete this bed type?")) return; const { error } = await (supabase.from as any)("bed_types").delete().eq("id", id); if (error) { toast.error("In use — can't delete", { description: error.message }); return; } invalidate(); };
 
   return (
     <Card className="border-border/30">
       <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2"><WashingMachine className="h-4 w-4 text-primary" /> Laundry Rates (per turnover)</CardTitle>
-        <p className="text-xs text-muted-foreground">A flat £/turnover charge for every property in the assigned region(s). One active rate per region.</p>
+        <CardTitle className="text-base flex items-center gap-2"><BedDouble className="h-4 w-4 text-primary" /> Bed-Type Laundry Costs</CardTitle>
+        <p className="text-xs text-muted-foreground">Laundry is priced by bed type. Each property's laundry per turnover = the sum of its beds priced here. Set the bed inventory on each property.</p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-end gap-2">
-          <div className="space-y-1.5"><Label className="text-xs">Name</Label><Input className="w-36" value={name} onChange={(e) => setName(e.target.value)} /></div>
-          <div className="space-y-1.5"><Label className="text-xs">£ / turnover</Label><Input className="w-28" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" /></div>
-          <Button size="sm" onClick={addRate}><Plus className="h-3.5 w-3.5 mr-1" /> Add rate</Button>
+          <div className="space-y-1.5"><Label className="text-xs">Bed type</Label><Input className="w-40" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Emperor" /></div>
+          <div className="space-y-1.5"><Label className="text-xs">£ / turnover</Label><Input className="w-28" type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0.00" /></div>
+          <Button size="sm" onClick={add}><Plus className="h-3.5 w-3.5 mr-1" /> Add</Button>
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Assign regions</Label>
-          <div className="flex flex-wrap gap-1.5">
-            {locationGroups.map((rg) => {
-              const sel = regions.includes(rg);
-              const covered = coveredRegions.has(rg);
-              return (
-                <button key={rg} type="button" onClick={() => toggleRegion(rg)} disabled={covered && !sel}
-                  className={`px-2 py-1 rounded-md text-xs border transition-colors ${sel ? "bg-primary/15 text-primary border-primary/40" : covered ? "opacity-40 cursor-not-allowed border-border/30" : "bg-secondary/40 border-border/40 hover:bg-secondary"}`}
-                  title={covered && !sel ? "Already covered by an active rate" : ""}>
-                  {rg}{covered && !sel ? " ✓" : ""}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        {rates.length > 0 && (
+        {rows.length > 0 && (
           <div className="divide-y divide-border/20 rounded-md border border-border/30 overflow-hidden">
-            {rates.map((r) => (
-              <div key={r.id} className="flex items-center gap-2 px-3 py-2 bg-secondary/20">
-                <span className="text-sm font-medium">{r.name}</span>
-                <span className="text-sm text-muted-foreground">{fmtGbp(Number(r.amount))}/turnover</span>
-                <span className="flex-1 text-xs text-muted-foreground truncate">{(r.laundry_rate_regions ?? []).map((x: any) => x.region).join(", ") || "no regions"}</span>
-                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => toggleActive(r.id, r.active)}>{r.active ? "Active" : "Inactive"}</Button>
+            {rows.map((r: any) => (
+              <div key={r.id} className={`flex items-center gap-2 px-3 py-2 bg-secondary/20 ${r.active ? "" : "opacity-50"}`}>
+                <span className="flex-1 text-sm font-medium">{r.name}</span>
+                <span className="text-xs text-muted-foreground">£</span>
+                <Input type="number" min="0" step="0.01" defaultValue={Number(r.laundry_cost)} onBlur={(e) => saveCost(r.id, e.target.value)} className="h-8 w-24 text-right text-xs" />
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => toggle(r.id, r.active)}>{r.active ? "Active" : "Inactive"}</Button>
                 <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => remove(r.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
               </div>
             ))}
@@ -134,6 +87,7 @@ function LaundryRates() {
     </Card>
   );
 }
+
 
 // ---------------- Consumable Rates ----------------
 function ConsumableRates() {
