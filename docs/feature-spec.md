@@ -38,7 +38,7 @@ top of each section.
 | 3 | Laundry per-region rate | ✅ Built (owner-statement rollup pending statements feature) |
 | 4 | Consumables (+communal type) | ✅ Built (owner-statement rollup pending statements feature) |
 | 10 | Utilities expenses tab | ✅ Built |
-| 8 | Welcome Baskets / Seasons | ⏳ Planned |
+| 8 | Welcome Baskets / Seasons | ✅ Built |
 | 1 | Hostnote/Guestnote/Custom Field (Hostaway) | ⏳ Planned (gated on creds) |
 
 ---
@@ -151,12 +151,17 @@ unless it totals 100%**. [DECISION taken] custom ratios editable; utilities stay
 independent of the Communal Ratio % (even-split default regardless of communal status).
 Feeds the owner-report **Utilities** card (now a real figure, no longer "—").
 
-## 8. Settings → "Welcome Baskets" tab — ⏳ Planned
+## 8. Settings → "Welcome Baskets" tab — ✅ Built
 
-User-defined Seasons stored as month/day ranges that tile the year with no gaps/overlaps
-(validator treats the year as a 365/366 loop). A booking mapped by **check-in date** to a
-season, with revenue over that season's threshold, creates a `welcome_basket` Maintenance
-task.
+Migration `20260603164657_welcome_baskets_seasons.sql`: `seasons` (name, start/end month+day,
+spend_threshold) seeded with a tiling set (Winter/Spring/Easter/Early Summer/Summer/Autumn/
+Christmas). UI: Settings → **Welcome Baskets** (`WelcomeBasketsSettings.tsx`) with a live
+**no-gap/no-overlap validator over a 365-day loop** (mmdd wrap supported) that hard-blocks
+Save. Trigger `tg_create_welcome_basket` fires AFTER INSERT on reservations (new bookings
+only, so historical/re-sync never mass-creates): maps check-in by mmdd to a season; if
+revenue > threshold, creates a `welcome_basket` setup task linked to the reservation
+(idempotent via partial unique index). Exception-wrapped so it can't block sync. Added
+`maintenance_tasks.reservation_id`. Populates the owner-report Welcome Baskets card.
 
 ## 1. Hostnote / Guestnote / Custom Field on a booking — ⏳ Planned (gated)
 

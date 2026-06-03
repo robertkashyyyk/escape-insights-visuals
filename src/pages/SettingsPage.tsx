@@ -4,6 +4,7 @@ import { GeneralSettings } from "@/components/settings/GeneralSettings";
 import { LocationGroupsSettings } from "@/components/settings/LocationGroupsSettings";
 import { CommunalGroupsSettings } from "@/components/settings/CommunalGroupsSettings";
 import { RequestsSettings } from "@/components/settings/RequestsSettings";
+import { WelcomeBasketsSettings } from "@/components/settings/WelcomeBasketsSettings";
 import { IntegrationsSettings } from "@/components/settings/IntegrationsSettings";
 import { CleanersSettings } from "@/components/settings/CleanersSettings";
 import { FinanceSettings } from "@/components/settings/FinanceSettings";
@@ -11,7 +12,7 @@ import { AccountSettings } from "@/components/settings/AccountSettings";
 import { InviteUserForm } from "@/components/settings/InviteUserForm";
 import CleanReset from "@/pages/CleanReset";
 import { useAuth } from "@/contexts/AuthContext";
-import { Settings, Plug, SprayCan, PoundSterling, User, RotateCcw } from "lucide-react";
+import { Settings, Plug, SprayCan, PoundSterling, User, RotateCcw, Gift } from "lucide-react";
 
 export default function SettingsPage() {
   const { role } = useAuth();
@@ -37,6 +38,9 @@ export default function SettingsPage() {
             </TabsTrigger>
             <TabsTrigger value="finance" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               <PoundSterling className="h-3.5 w-3.5" />Finance
+            </TabsTrigger>
+            <TabsTrigger value="welcome-baskets" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
+              <Gift className="h-3.5 w-3.5" />Welcome Baskets
             </TabsTrigger>
             <TabsTrigger value="account" className="gap-1.5 data-[state=active]:bg-primary/10 data-[state=active]:text-primary">
               <User className="h-3.5 w-3.5" />Account
@@ -65,6 +69,7 @@ export default function SettingsPage() {
           <TabsContent value="integrations"><IntegrationsSettings /></TabsContent>
           <TabsContent value="cleaners"><CleanersSettings /></TabsContent>
           <TabsContent value="finance"><FinanceSettings /></TabsContent>
+          <TabsContent value="welcome-baskets"><div className="max-w-3xl"><WelcomeBasketsSettings /></div></TabsContent>
           <TabsContent value="account">
             <div className="space-y-6">
               <AccountSettings />
