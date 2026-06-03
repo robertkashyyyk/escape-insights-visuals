@@ -35,8 +35,8 @@ top of each section.
 | 7 | Maintenance task list (+Setup, +scope) | ✅ Built |
 | 9 | Maintenance manual add | ✅ Built |
 | 2 | Requests + cleaner reminder | ✅ Built |
-| 3 | Laundry per-region rate | ⏳ Planned |
-| 4 | Consumables (+communal type) | ⏳ Planned |
+| 3 | Laundry per-region rate | ✅ Built (owner-statement rollup pending statements feature) |
+| 4 | Consumables (+communal type) | ✅ Built (owner-statement rollup pending statements feature) |
 | 10 | Utilities expenses tab | ⏳ Planned |
 | 8 | Welcome Baskets / Seasons | ⏳ Planned |
 | 1 | Hostnote/Guestnote/Custom Field (Hostaway) | ⏳ Planned (gated on creds) |
@@ -104,15 +104,29 @@ Tables `requests` (catalogue: name, icon, active) + `booking_requests`
 - RLS: cleaners can read requests for reservations they're assigned to clean.
 - [DEFERRED] Push notification on add — visibility is icon-driven on the job for v1.
 
-## 3. Laundry — per-region rate + per-turnover charge — ⏳ Planned
+## 3. Laundry — per-region rate + per-turnover charge — ✅ Built
 
-Flat £-per-turnover rate assigned to region(s); a charge accrues per turnover for each
-property in an assigned region; surfaced per property and on the owner report.
+Migration `20260603154350_laundry_consumable_rates.sql`. `laundry_rates` (£/turnover) +
+`laundry_rate_regions` (→ region/location_group) + generated `laundry_charges`
+(one per turnover, unique on clean_task_id). **Generation:** a SECURITY DEFINER trigger
+`generate_turnover_charges()` on `clean_tasks` AFTER UPDATE OF status fires when a clean
+transitions to `completed`; it's exception-wrapped so a billing-accrual error can never
+block clean completion. One active rate per region (enforced in the config UI).
+UI: Expenses → **Set Rates** tab (`src/components/expenses/TurnoverRatesTab.tsx`):
+Laundry Rates config (amount + region chips, overlap-blocked), and a per-property
+**Accrued charges** table by month. Owners have RLS read on `laundry_charges`.
 
-## 4. Consumables — per turnover/booking, per property + type — ⏳ Planned
+## 4. Consumables — per turnover/booking, per property + type — ✅ Built
 
-Same pattern as laundry. Extend allocation type with `communal` (allocate via Communal
-Ratio % across the group).
+Same migration/engine. `consumable_rates` (type `direct_to_property` / `region` /
+`communal`, with a CHECK that the matching target is set) + generated `consumable_charges`.
+The trigger generates: direct → 1 row (the property); region → 1 row if the property is in
+that region; **communal → one row per group member = amount × Communal Share %**.
+UI: Consumable Rates config in the same Set Rates tab. Owners have RLS read on charges.
+
+> Owner-statement rollup (both items): the accruals are staff-visible now and
+> owner-readable via RLS, but `OwnerStatements.tsx` is currently a stub — line-iteming
+> these onto an owner invoice is deferred to the (separate) owner-statements feature.
 
 ## 10. Expenses → "Utilities" tab — ⏳ Planned
 
