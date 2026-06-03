@@ -495,6 +495,30 @@ export type Database = {
         }
         Relationships: []
       }
+      communal_groups: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       expense_consumables: {
         Row: {
           allocation_type: string
@@ -650,6 +674,41 @@ export type Database = {
         }
         Relationships: []
       }
+      listing_aliases: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          listing_id: string
+          platform: Database["public"]["Enums"]["ota_platform"]
+          raw_name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          listing_id: string
+          platform: Database["public"]["Enums"]["ota_platform"]
+          raw_name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          listing_id?: string
+          platform?: Database["public"]["Enums"]["ota_platform"]
+          raw_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_aliases_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listings: {
         Row: {
           access_details: string | null
@@ -661,8 +720,12 @@ export type Database = {
           bundle_components: Json | null
           city: string | null
           cleaning_duration_minutes: number | null
+          cleaning_fee: number | null
+          communal_group_id: string | null
+          communal_ratio_pct: number | null
           country: string | null
           created_at: string
+          deep_fee: number | null
           default_check_in_time: string | null
           default_check_out_time: string | null
           google_place_id: string | null
@@ -673,6 +736,7 @@ export type Database = {
           image_url: string | null
           is_bundle: boolean
           is_clean: boolean
+          is_communal: boolean
           latitude: number | null
           location_group: string | null
           longitude: number | null
@@ -705,8 +769,12 @@ export type Database = {
           bundle_components?: Json | null
           city?: string | null
           cleaning_duration_minutes?: number | null
+          cleaning_fee?: number | null
+          communal_group_id?: string | null
+          communal_ratio_pct?: number | null
           country?: string | null
           created_at?: string
+          deep_fee?: number | null
           default_check_in_time?: string | null
           default_check_out_time?: string | null
           google_place_id?: string | null
@@ -717,6 +785,7 @@ export type Database = {
           image_url?: string | null
           is_bundle?: boolean
           is_clean?: boolean
+          is_communal?: boolean
           latitude?: number | null
           location_group?: string | null
           longitude?: number | null
@@ -749,8 +818,12 @@ export type Database = {
           bundle_components?: Json | null
           city?: string | null
           cleaning_duration_minutes?: number | null
+          cleaning_fee?: number | null
+          communal_group_id?: string | null
+          communal_ratio_pct?: number | null
           country?: string | null
           created_at?: string
+          deep_fee?: number | null
           default_check_in_time?: string | null
           default_check_out_time?: string | null
           google_place_id?: string | null
@@ -761,6 +834,7 @@ export type Database = {
           image_url?: string | null
           is_bundle?: boolean
           is_clean?: boolean
+          is_communal?: boolean
           latitude?: number | null
           location_group?: string | null
           longitude?: number | null
@@ -784,6 +858,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "listings_communal_group_id_fkey"
+            columns: ["communal_group_id"]
+            isOneToOne: false
+            referencedRelation: "communal_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "listings_owner_id_fkey"
             columns: ["owner_id"]
@@ -819,6 +900,90 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      maintenance_tasks: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          billable: boolean | null
+          communal_group_id: string | null
+          completed_at: string | null
+          completed_by: string | null
+          cost: number | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          listing_id: string | null
+          postpone_reason: string | null
+          postponed_until: string | null
+          scope: string
+          source: string
+          status: string
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          billable?: boolean | null
+          communal_group_id?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          listing_id?: string | null
+          postpone_reason?: string | null
+          postponed_until?: string | null
+          scope?: string
+          source?: string
+          status?: string
+          title: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          billable?: boolean | null
+          communal_group_id?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          cost?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          listing_id?: string | null
+          postpone_reason?: string | null
+          postponed_until?: string | null
+          scope?: string
+          source?: string
+          status?: string
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_tasks_communal_group_id_fkey"
+            columns: ["communal_group_id"]
+            isOneToOne: false
+            referencedRelation: "communal_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_tasks_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       orin_briefs: {
         Row: {
@@ -885,6 +1050,214 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      ota_attribution_decisions: {
+        Row: {
+          allocated_listing_id: string | null
+          decided_at: string
+          decided_by: string | null
+          id: string
+          ota_transaction_id: string
+          outcome: Database["public"]["Enums"]["ota_attribution_outcome"]
+          reason: string | null
+        }
+        Insert: {
+          allocated_listing_id?: string | null
+          decided_at?: string
+          decided_by?: string | null
+          id?: string
+          ota_transaction_id: string
+          outcome: Database["public"]["Enums"]["ota_attribution_outcome"]
+          reason?: string | null
+        }
+        Update: {
+          allocated_listing_id?: string | null
+          decided_at?: string
+          decided_by?: string | null
+          id?: string
+          ota_transaction_id?: string
+          outcome?: Database["public"]["Enums"]["ota_attribution_outcome"]
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ota_attribution_decisions_allocated_listing_id_fkey"
+            columns: ["allocated_listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ota_attribution_decisions_ota_transaction_id_fkey"
+            columns: ["ota_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "ota_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ota_import_batches: {
+        Row: {
+          id: string
+          inferred_period_end: string | null
+          inferred_period_start: string | null
+          platform: Database["public"]["Enums"]["ota_platform"]
+          row_count: number
+          source_filename: string
+          status: Database["public"]["Enums"]["ota_batch_status"]
+          uploaded_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          id?: string
+          inferred_period_end?: string | null
+          inferred_period_start?: string | null
+          platform: Database["public"]["Enums"]["ota_platform"]
+          row_count?: number
+          source_filename: string
+          status?: Database["public"]["Enums"]["ota_batch_status"]
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          id?: string
+          inferred_period_end?: string | null
+          inferred_period_start?: string | null
+          platform?: Database["public"]["Enums"]["ota_platform"]
+          row_count?: number
+          source_filename?: string
+          status?: Database["public"]["Enums"]["ota_batch_status"]
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
+      ota_transactions: {
+        Row: {
+          batch_id: string
+          bookingcom_property_id: string | null
+          check_in: string | null
+          check_out: string | null
+          collection_model:
+            | Database["public"]["Enums"]["ota_collection_model"]
+            | null
+          commission_amount: number | null
+          commission_pct: number | null
+          confirmation_code: string | null
+          created_at: string
+          currency: string
+          gross_amount: number | null
+          guest_name: string | null
+          id: string
+          is_revenue: boolean
+          match_confidence: number | null
+          match_method: Database["public"]["Enums"]["ota_match_method"]
+          matched_reservation_id: string | null
+          net_amount: number | null
+          nights: number | null
+          payment_fee_amount: number | null
+          platform: Database["public"]["Enums"]["ota_platform"]
+          property_name_raw: string | null
+          raw_row: Json | null
+          recon_status: Database["public"]["Enums"]["ota_recon_status"]
+          reference_number: string | null
+          resolved_listing_id: string | null
+          statement_descriptor: string | null
+          tax: number | null
+          txn_type: Database["public"]["Enums"]["ota_txn_type"]
+          vat: number | null
+        }
+        Insert: {
+          batch_id: string
+          bookingcom_property_id?: string | null
+          check_in?: string | null
+          check_out?: string | null
+          collection_model?:
+            | Database["public"]["Enums"]["ota_collection_model"]
+            | null
+          commission_amount?: number | null
+          commission_pct?: number | null
+          confirmation_code?: string | null
+          created_at?: string
+          currency?: string
+          gross_amount?: number | null
+          guest_name?: string | null
+          id?: string
+          is_revenue?: boolean
+          match_confidence?: number | null
+          match_method?: Database["public"]["Enums"]["ota_match_method"]
+          matched_reservation_id?: string | null
+          net_amount?: number | null
+          nights?: number | null
+          payment_fee_amount?: number | null
+          platform: Database["public"]["Enums"]["ota_platform"]
+          property_name_raw?: string | null
+          raw_row?: Json | null
+          recon_status?: Database["public"]["Enums"]["ota_recon_status"]
+          reference_number?: string | null
+          resolved_listing_id?: string | null
+          statement_descriptor?: string | null
+          tax?: number | null
+          txn_type: Database["public"]["Enums"]["ota_txn_type"]
+          vat?: number | null
+        }
+        Update: {
+          batch_id?: string
+          bookingcom_property_id?: string | null
+          check_in?: string | null
+          check_out?: string | null
+          collection_model?:
+            | Database["public"]["Enums"]["ota_collection_model"]
+            | null
+          commission_amount?: number | null
+          commission_pct?: number | null
+          confirmation_code?: string | null
+          created_at?: string
+          currency?: string
+          gross_amount?: number | null
+          guest_name?: string | null
+          id?: string
+          is_revenue?: boolean
+          match_confidence?: number | null
+          match_method?: Database["public"]["Enums"]["ota_match_method"]
+          matched_reservation_id?: string | null
+          net_amount?: number | null
+          nights?: number | null
+          payment_fee_amount?: number | null
+          platform?: Database["public"]["Enums"]["ota_platform"]
+          property_name_raw?: string | null
+          raw_row?: Json | null
+          recon_status?: Database["public"]["Enums"]["ota_recon_status"]
+          reference_number?: string | null
+          resolved_listing_id?: string | null
+          statement_descriptor?: string | null
+          tax?: number | null
+          txn_type?: Database["public"]["Enums"]["ota_txn_type"]
+          vat?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ota_transactions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "ota_import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ota_transactions_matched_reservation_id_fkey"
+            columns: ["matched_reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ota_transactions_resolved_listing_id_fkey"
+            columns: ["resolved_listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -1448,6 +1821,7 @@ export type Database = {
         Row: {
           booking_lead_days: number | null
           channel_commission: number | null
+          channel_reservation_code: string | null
           check_in: string
           check_in_time: string | null
           check_out: string
@@ -1475,6 +1849,7 @@ export type Database = {
         Insert: {
           booking_lead_days?: number | null
           channel_commission?: number | null
+          channel_reservation_code?: string | null
           check_in: string
           check_in_time?: string | null
           check_out: string
@@ -1502,6 +1877,7 @@ export type Database = {
         Update: {
           booking_lead_days?: number | null
           channel_commission?: number | null
+          channel_reservation_code?: string | null
           check_in?: string
           check_in_time?: string | null
           check_out?: string
@@ -1824,6 +2200,10 @@ export type Database = {
         Args: { _listing_id: string; _user_id: string }
         Returns: boolean
       }
+      communal_group_ratio_sum: {
+        Args: { p_group_id: string }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1867,6 +2247,18 @@ export type Database = {
         | "accommodation"
         | "other"
       app_role: "super" | "senior" | "admin" | "client" | "cleaner"
+      ota_attribution_outcome: "management_report" | "company_retention"
+      ota_batch_status: "parsed" | "reconciled" | "partial"
+      ota_collection_model: "channel" | "host"
+      ota_match_method: "code" | "composite" | "manual" | "none"
+      ota_platform: "airbnb" | "bookingcom"
+      ota_recon_status:
+        | "auto_matched"
+        | "needs_recon"
+        | "matched"
+        | "unmatched"
+        | "excluded"
+      ota_txn_type: "reservation" | "payout" | "resolution" | "adjustment"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2017,6 +2409,19 @@ export const Constants = {
         "other",
       ],
       app_role: ["super", "senior", "admin", "client", "cleaner"],
+      ota_attribution_outcome: ["management_report", "company_retention"],
+      ota_batch_status: ["parsed", "reconciled", "partial"],
+      ota_collection_model: ["channel", "host"],
+      ota_match_method: ["code", "composite", "manual", "none"],
+      ota_platform: ["airbnb", "bookingcom"],
+      ota_recon_status: [
+        "auto_matched",
+        "needs_recon",
+        "matched",
+        "unmatched",
+        "excluded",
+      ],
+      ota_txn_type: ["reservation", "payout", "resolution", "adjustment"],
     },
   },
 } as const

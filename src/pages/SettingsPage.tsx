@@ -2,6 +2,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GeneralSettings } from "@/components/settings/GeneralSettings";
 import { LocationGroupsSettings } from "@/components/settings/LocationGroupsSettings";
+import { CommunalGroupsSettings } from "@/components/settings/CommunalGroupsSettings";
 import { IntegrationsSettings } from "@/components/settings/IntegrationsSettings";
 import { CleanersSettings } from "@/components/settings/CleanersSettings";
 import { FinanceSettings } from "@/components/settings/FinanceSettings";
@@ -51,6 +52,9 @@ export default function SettingsPage() {
               <GeneralSettings />
               <div className="max-w-xl">
                 <LocationGroupsSettings />
+              </div>
+              <div className="max-w-xl">
+                <CommunalGroupsSettings />
               </div>
             </div>
           </TabsContent>

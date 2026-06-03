@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Local env — keep out of git. Supabase values are public + also baked into
+# src/integrations/supabase/client.ts; see .env.example for the expected keys.
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

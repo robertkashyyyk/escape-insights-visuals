@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Minus, Plus } from "lucide-react";
 import type { Tables } from "@/integrations/supabase/types";
 import { useLocationGroups } from "@/hooks/useLocationGroups";
+import { useCommunalGroups } from "@/hooks/useCommunalGroups";
 import { AlertTriangle } from "lucide-react";
 
 interface PropertyFormProps {
@@ -44,6 +45,11 @@ const emptyForm = {
   tags: "",
   status: "active",
   is_bundle: false,
+  cleaning_fee: "",
+  deep_fee: "",
+  is_communal: false,
+  communal_group_id: "",
+  communal_ratio_pct: "",
 };
 
 export function PropertyForm({ open, onOpenChange, listing, onSuccess }: PropertyFormProps) {
@@ -98,6 +104,11 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
         tags: listing.tags ?? "",
         status: listing.status,
         is_bundle: (listing as any).is_bundle ?? false,
+        cleaning_fee: (listing as any).cleaning_fee?.toString() ?? "",
+        deep_fee: (listing as any).deep_fee?.toString() ?? "",
+        is_communal: (listing as any).is_communal ?? false,
+        communal_group_id: (listing as any).communal_group_id ?? "",
+        communal_ratio_pct: (listing as any).communal_ratio_pct?.toString() ?? "",
       });
       const comps = (listing as any).bundle_components;
       if (Array.isArray(comps)) {
@@ -162,6 +173,11 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
       status: form.status,
       is_bundle: form.is_bundle,
       bundle_components: form.is_bundle && bundleComponents.length > 0 ? JSON.parse(JSON.stringify(bundleComponents)) : null,
+      cleaning_fee: form.cleaning_fee ? parseFloat(form.cleaning_fee) : null,
+      deep_fee: form.deep_fee ? parseFloat(form.deep_fee) : null,
+      is_communal: form.is_communal,
+      communal_group_id: form.is_communal && form.communal_group_id ? form.communal_group_id : null,
+      communal_ratio_pct: form.is_communal && form.communal_ratio_pct ? parseFloat(form.communal_ratio_pct) : null,
     };
 
     const { error } = isEdit
@@ -237,6 +253,25 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
               </SelectContent>
             </Select>
           </div>
+
+          {/* Cleaning fees */}
+          <div className="grid grid-cols-2 gap-3">
+            {field("Cleaning Fee (£)", "cleaning_fee", "number")}
+            {field("Deep Clean Fee (£)", "deep_fee", "number")}
+          </div>
+
+          {/* Communal */}
+          <CommunalSection
+            isCommunal={form.is_communal}
+            groupId={form.communal_group_id}
+            ratio={form.communal_ratio_pct}
+            onToggle={(v) => {
+              set("is_communal", v);
+              if (!v) { set("communal_group_id", ""); set("communal_ratio_pct", ""); }
+            }}
+            onGroupChange={(v) => set("communal_group_id", v)}
+            onRatioChange={(v) => set("communal_ratio_pct", v)}
+          />
 
           {/* Bundle / Dual Listing */}
           <div className="border border-border/30 rounded-lg p-4 space-y-4">
@@ -319,6 +354,76 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function CommunalSection({
+  isCommunal,
+  groupId,
+  ratio,
+  onToggle,
+  onGroupChange,
+  onRatioChange,
+}: {
+  isCommunal: boolean;
+  groupId: string;
+  ratio: string;
+  onToggle: (v: boolean) => void;
+  onGroupChange: (v: string) => void;
+  onRatioChange: (v: string) => void;
+}) {
+  const { data: groups = [] } = useCommunalGroups();
+  return (
+    <div className="border border-border/30 rounded-lg p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <Label className="text-xs font-semibold">Communal</Label>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            Off = Self-Contained. On = shares communal costs with a group.
+          </p>
+        </div>
+        <Switch checked={isCommunal} onCheckedChange={onToggle} />
+      </div>
+
+      {isCommunal && (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Communal Group</Label>
+            <Select value={groupId || "__none__"} onValueChange={(v) => onGroupChange(v === "__none__" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="Select communal group" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— None —</SelectItem>
+                {groups.map((g) => (
+                  <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {groups.length === 0 && (
+              <p className="text-[10px] text-muted-foreground">
+                No communal groups yet — create one under Settings → General → Communal Groups.
+              </p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Communal Share (%)</Label>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              step="0.001"
+              value={ratio}
+              onChange={(e) => onRatioChange(e.target.value)}
+              placeholder="e.g. 10"
+            />
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              Shares across the group must total exactly 100%. Set and validate them in
+              Settings → Communal Groups.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
