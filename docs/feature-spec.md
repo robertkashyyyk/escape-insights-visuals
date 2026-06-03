@@ -34,7 +34,7 @@ top of each section.
 | 6 | Communal Group | ✅ Built |
 | 7 | Maintenance task list (+Setup, +scope) | ✅ Built |
 | 9 | Maintenance manual add | ✅ Built |
-| 2 | Requests + cleaner reminder | ⏳ Planned |
+| 2 | Requests + cleaner reminder | ✅ Built |
 | 3 | Laundry per-region rate | ⏳ Planned |
 | 4 | Consumables (+communal type) | ⏳ Planned |
 | 10 | Utilities expenses tab | ⏳ Planned |
@@ -89,11 +89,20 @@ only accepted/done/postponed). Manually-added tasks start `pending`.
 "Add task" button in the Tasks board opens a form (title, description, type, scope,
 property/communal group) and inserts with `source = manual`.
 
-## 2. Requests (e.g. High Chair, Cot) + cleaner reminder — ⏳ Planned
+## 2. Requests (e.g. High Chair, Cot) + cleaner reminder — ✅ Built
 
-Catalogue of Requests (name + icon). Add to a booking with quantity → notify assigned
-cleaner. Two-step clean completion: dynamic reminder modal listing the booking's
-requests → then the standard "Are you sure?" confirm.
+Tables `requests` (catalogue: name, icon, active) + `booking_requests`
+(reservation_id, request_id, quantity, unique per pair) — migration
+`20260603151355_requests.sql`. Seeded High Chair / Cot / Travel Cot / Extra Towels.
+- Catalogue admin: `src/components/settings/RequestsSettings.tsx` (Settings → General).
+- Add to a booking: `src/components/requests/BookingRequestsDialog.tsx`, opened from the
+  Requests column in `ReservationsTable` (shows a count badge).
+- Cleaner: request chips on the job card + two-step completion — `handleCompleteClick`
+  shows a reminder modal listing the booking's requests; **"No, not yet" blocks and
+  returns to the job** (chosen default), **"Yes, all sorted"** proceeds to the standard
+  "Yes, confirm". Icon helper: `src/lib/requestIcon.tsx`.
+- RLS: cleaners can read requests for reservations they're assigned to clean.
+- [DEFERRED] Push notification on add — visibility is icon-driven on the job for v1.
 
 ## 3. Laundry — per-region rate + per-turnover charge — ⏳ Planned
 

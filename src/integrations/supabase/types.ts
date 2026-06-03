@@ -134,6 +134,48 @@ export type Database = {
         }
         Relationships: []
       }
+      booking_requests: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          quantity: number
+          request_id: string
+          reservation_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          quantity?: number
+          request_id: string
+          reservation_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          quantity?: number
+          request_id?: string
+          reservation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_requests_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_requests_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clean_issues: {
         Row: {
           acknowledged_at: string | null
@@ -1814,6 +1856,36 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           vat_inclusive?: boolean
+        }
+        Relationships: []
+      }
+      requests: {
+        Row: {
+          active: boolean
+          created_at: string
+          display_order: number
+          icon: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          display_order?: number
+          icon?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          display_order?: number
+          icon?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }

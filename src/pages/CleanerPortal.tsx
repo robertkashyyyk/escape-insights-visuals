@@ -9,6 +9,13 @@ import { format, addDays, startOfWeek, endOfWeek, parseISO } from "date-fns";
 import { Navigate } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
 import { FlagIssueModal } from "@/components/cleaner/FlagIssueModal";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { RequestIcon } from "@/lib/requestIcon";
+
+interface BookingRequest { name: string; icon: string | null; quantity: number; }
 
 interface CleanTask {
   id: string;
@@ -23,6 +30,7 @@ interface CleanTask {
   checkin_time: string | null;
   cleaning_duration_minutes: number;
   listing_id: string;
+  reservation_id: string | null;
   property_name: string;
   location_group: string | null;
   bedrooms: number | null;
@@ -77,6 +85,8 @@ export default function CleanerPortal() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [startingId, setStartingId] = useState<string | null>(null);
   const [flagTask, setFlagTask] = useState<CleanTask | null>(null);
+  const [requestsByReservation, setRequestsByReservation] = useState<Record<string, BookingRequest[]>>({});
+  const [reminderTask, setReminderTask] = useState<CleanTask | null>(null);
   const [activePeriod, setActivePeriod] = useState<PeriodKey>("today");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const pageLoadTime = useRef(new Date().toISOString());
@@ -144,7 +154,7 @@ export default function CleanerPortal() {
         id, status, scheduled_date, route_order, estimated_start_time,
         travel_time_from_previous_minutes, is_same_day_turnaround, priority_level,
         checkout_time, checkin_time, cleaning_duration_minutes,
-        listing_id, started_at,
+        listing_id, reservation_id, started_at,
         listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms, latitude, longitude)
       `)
       .eq("assigned_cleaner_id", cleanerId)
@@ -181,6 +191,7 @@ export default function CleanerPortal() {
       checkin_time: t.checkin_time,
       cleaning_duration_minutes: t.cleaning_duration_minutes,
       listing_id: t.listing_id,
+      reservation_id: t.reservation_id ?? null,
       property_name: t.listings?.name ?? "Unknown",
       location_group: t.listings?.location_group ?? null,
       bedrooms: t.listings?.bedrooms ?? null,
@@ -212,7 +223,7 @@ export default function CleanerPortal() {
         id, status, scheduled_date, route_order, estimated_start_time,
         travel_time_from_previous_minutes, is_same_day_turnaround, priority_level,
         checkout_time, checkin_time, cleaning_duration_minutes,
-        listing_id, started_at, created_at,
+        listing_id, reservation_id, started_at, created_at,
         listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms, latitude, longitude)
       `)
       .eq("assigned_cleaner_id", cleaner.id)
@@ -283,6 +294,46 @@ export default function CleanerPortal() {
       toast.success(`✓ ${task.property_name} marked complete`);
     }
     setCompletingId(null);
+  };
+
+  // Load per-booking requests for the loaded tasks (drives job-card icons + the
+  // clean-completion reminder). Re-runs when the set of reservation ids changes.
+  const reservationKey = useMemo(
+    () => Array.from(new Set(tasks.map((t) => t.reservation_id).filter(Boolean))).sort().join(","),
+    [tasks],
+  );
+  useEffect(() => {
+    const ids = reservationKey ? reservationKey.split(",") : [];
+    if (ids.length === 0) { setRequestsByReservation({}); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("booking_requests")
+        .select("reservation_id, quantity, requests(name, icon)")
+        .in("reservation_id", ids);
+      if (cancelled) return;
+      const map: Record<string, BookingRequest[]> = {};
+      for (const row of (data ?? []) as any[]) {
+        (map[row.reservation_id] ??= []).push({
+          name: row.requests?.name ?? "Request",
+          icon: row.requests?.icon ?? null,
+          quantity: row.quantity,
+        });
+      }
+      setRequestsByReservation(map);
+    })();
+    return () => { cancelled = true; };
+  }, [reservationKey]);
+
+  const requestsForTask = (task: CleanTask): BookingRequest[] =>
+    task.reservation_id ? (requestsByReservation[task.reservation_id] ?? []) : [];
+
+  // Tap "Mark Complete": if the booking has requests, show the reminder first;
+  // otherwise go straight to the standard "Yes, confirm" step.
+  const handleCompleteClick = (task: CleanTask) => {
+    if (isPreviewMode) { toast.info("Preview mode — actions are disabled"); return; }
+    if (requestsForTask(task).length > 0) { setReminderTask(task); return; }
+    requestConfirmComplete(task.id);
   };
 
   const handleStartJob = async (task: CleanTask) => {
@@ -699,6 +750,21 @@ export default function CleanerPortal() {
                               </span>
                             )}
 
+                            {requestsForTask(task).length > 0 && (
+                              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                {requestsForTask(task).map((r, i) => (
+                                  <span
+                                    key={i}
+                                    className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30"
+                                    title={`${r.name} × ${r.quantity}`}
+                                  >
+                                    <RequestIcon icon={r.icon} className="h-3 w-3" />
+                                    {r.name}{r.quantity > 1 ? ` ×${r.quantity}` : ""}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2.5 text-[14px] text-muted-foreground">
                               {proposed && (
                                 <span title="Proposed Clean Time">🕐 Proposed {formatTime(proposed)}</span>
@@ -748,7 +814,7 @@ export default function CleanerPortal() {
                                   <div className={canStart ? "mt-2" : "mt-4"}>
                                     {!isConfirming ? (
                                       <motion.button
-                                        onClick={() => requestConfirmComplete(task.id)}
+                                        onClick={() => handleCompleteClick(task)}
                                         disabled={completingId === task.id || isPreviewMode}
                                         className={`w-full min-h-[48px] rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all duration-300 active:scale-[0.98] disabled:opacity-50 ${
                                           isPreviewMode
@@ -834,6 +900,47 @@ export default function CleanerPortal() {
           cleanerName={cleaner.name}
         />
       )}
+
+      {/* Requests reminder — shown before the standard "Yes, confirm" when the booking has requests */}
+      <AlertDialog open={!!reminderTask} onOpenChange={(o) => !o && setReminderTask(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Before you finish — have you left these out?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {reminderTask?.property_name} has guest requests for this stay:
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <ul className="space-y-2 py-1">
+            {(reminderTask ? requestsForTask(reminderTask) : []).map((r, i) => (
+              <li key={i} className="flex items-center gap-2 text-sm">
+                <RequestIcon icon={r.icon} className="h-4 w-4 text-muted-foreground" />
+                <span className="font-medium text-foreground">{r.name}</span>
+                <span className="text-muted-foreground">× {r.quantity}</span>
+              </li>
+            ))}
+          </ul>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                const t = reminderTask;
+                setReminderTask(null);
+                if (t) toast.info("No problem — sort the requests, then complete the clean.");
+              }}
+            >
+              No, not yet
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const t = reminderTask;
+                setReminderTask(null);
+                if (t) requestConfirmComplete(t.id);
+              }}
+            >
+              Yes, all sorted
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
