@@ -43,8 +43,8 @@ function ConsumablesTab() {
   const [value, setValue] = useState("");
   const [payer, setPayer] = useState<"company" | "cleaner">("company");
   const [allocType, setAllocType] = useState<"property" | "region">("property");
-  const [listingId, setListingId] = useState("");
-  const [region, setRegion] = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [pcts, setPcts] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -84,30 +84,53 @@ function ConsumablesTab() {
     return { total, pending };
   }, [entries]);
 
+  // Multi-select targets (properties or regions) with even-split-default attribution.
+  const targets: { id: string; label: string }[] = allocType === "property"
+    ? (listings as any[]).map((l) => ({ id: l.id, label: l.name }))
+    : (locationGroups as any[]).map((g) => ({ id: g.name, label: g.name }));
+  const round3 = (n: number) => Math.round(n * 1000) / 1000;
+  const evenSplit = (ids: string[]) => {
+    const n = ids.length; if (!n) return {} as Record<string, string>;
+    const share = round3(100 / n); const out: Record<string, string> = {};
+    ids.forEach((id, i) => { out[id] = String(i === n - 1 ? round3(100 - share * (n - 1)) : share); });
+    return out;
+  };
+  const toggleTarget = (id: string) => setSelected((prev) => {
+    const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+    setPcts(evenSplit(next)); return next;
+  });
+  const allocTotal = round3(selected.reduce((s, id) => s + (parseFloat(pcts[id] ?? "") || 0), 0));
+  const allocValid = selected.length > 0 && allocTotal === 100;
+  const setAllocMode = (v: "property" | "region") => { setAllocType(v); setSelected([]); setPcts({}); };
+
   const submit = async () => {
-    if (!supplier || !value || (allocType === "property" && !listingId) || (allocType === "region" && !region)) {
-      toast.error("Please fill all required fields"); return;
-    }
+    if (!supplier || !value) { toast.error("Enter supplier and value"); return; }
+    if (selected.length === 0) { toast.error(`Select at least one ${allocType}`); return; }
+    if (allocTotal !== 100) { toast.error(`Attribution must total 100% (currently ${allocTotal}%)`); return; }
     setSubmitting(true);
     const receipt_path = await uploadReceipt(file, user?.id ?? "");
-    const { error } = await supabase.from("expense_consumables").insert({
+    const totalVal = Number(value);
+    // One expense_consumables row per target, value split by attribution.
+    const rows = selected.map((id) => ({
       purchased_by_user_id: user?.id,
       purchased_by_name: user?.email,
       purchase_date: purchaseDate,
       supplier,
-      receipt_value: Number(value),
+      receipt_value: Math.round(totalVal * (parseFloat(pcts[id]) || 0)) / 100,
       payer,
       allocation_type: allocType,
-      listing_id: allocType === "property" ? listingId : null,
-      region: allocType === "region" ? region : null,
+      listing_id: allocType === "property" ? id : null,
+      region: allocType === "region" ? id : null,
       notes: notes || null,
       receipt_path,
-    });
+    }));
+    const { error } = await supabase.from("expense_consumables").insert(rows);
     setSubmitting(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("Entry added");
-    setSupplier(""); setValue(""); setNotes(""); setFile(null); setListingId(""); setRegion("");
+    toast.success(rows.length > 1 ? `Split across ${rows.length} ${allocType === "property" ? "properties" : "regions"}` : "Entry added");
+    setSupplier(""); setValue(""); setNotes(""); setFile(null); setSelected([]); setPcts({});
     qc.invalidateQueries({ queryKey: ["consumables"] });
+    qc.invalidateQueries({ queryKey: ["owner_cost_categories"] });
   };
 
   const toggleReimbursed = async (id: string, val: boolean) => {
@@ -146,38 +169,58 @@ function ConsumablesTab() {
               </div>
               <div>
                 <Label>Allocation</Label>
-                <Select value={allocType} onValueChange={(v: any) => setAllocType(v)}>
+                <Select value={allocType} onValueChange={(v: any) => setAllocMode(v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="property">Specific Property</SelectItem>
-                    <SelectItem value="region">Region</SelectItem>
+                    <SelectItem value="property">Properties</SelectItem>
+                    <SelectItem value="region">Regions</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              {allocType === "property" ? (
+              <div className="md:col-span-2 grid md:grid-cols-2 gap-3">
                 <div>
-                  <Label>Property</Label>
-                  <Select value={listingId} onValueChange={setListingId}>
-                    <SelectTrigger><SelectValue placeholder="Select property" /></SelectTrigger>
-                    <SelectContent>{listings.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <Label>{allocType === "property" ? "Properties" : "Regions"} (multi-select)</Label>
+                  <div className="max-h-40 overflow-y-auto rounded-md border border-border/30 divide-y divide-border/20 mt-1">
+                    {targets.map((t) => (
+                      <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-muted/30">
+                        <input type="checkbox" checked={selected.includes(t.id)} onChange={() => toggleTarget(t.id)} className="accent-primary" />
+                        <span className="truncate">{t.label}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              ) : (
                 <div>
-                  <Label>Region</Label>
-                  <Select value={region} onValueChange={setRegion}>
-                    <SelectTrigger><SelectValue placeholder="Select region" /></SelectTrigger>
-                    <SelectContent>{locationGroups.map((g: any) => <SelectItem key={g.id} value={g.name}>{g.name}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <div className="flex items-center justify-between">
+                    <Label>Attribution ({selected.length})</Label>
+                    {selected.length > 0 && <button type="button" className="text-[11px] text-primary hover:underline" onClick={() => setPcts(evenSplit(selected))}>Even split</button>}
+                  </div>
+                  {selected.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2">None selected — defaults to an even split.</p>
+                  ) : (
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1 mt-1">
+                      {selected.map((id) => {
+                        const label = targets.find((t) => t.id === id)?.label ?? id;
+                        return (
+                          <div key={id} className="flex items-center gap-2">
+                            <span className="flex-1 text-sm truncate">{label}</span>
+                            <Input type="number" min="0" max="100" step="0.001" value={pcts[id] ?? ""} onChange={(e) => setPcts((p) => ({ ...p, [id]: e.target.value }))} className="h-8 w-20 text-right text-xs" />
+                            <span className="text-xs text-muted-foreground">%</span>
+                            {value && pcts[id] && <span className="text-[10px] text-muted-foreground w-14 text-right">{fmtGbp((Number(value) || 0) * (parseFloat(pcts[id]) || 0) / 100)}</span>}
+                          </div>
+                        );
+                      })}
+                      <div className={`text-xs font-medium text-right pt-1 ${allocValid ? "text-emerald-400" : "text-destructive"}`}>Total: {allocTotal}% {!allocValid && "(must be 100%)"}</div>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
               <div className="md:col-span-2"><Label>Notes</Label><Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} /></div>
               <div className="md:col-span-2">
                 <Label>Receipt Photo</Label>
                 <Input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] ?? null)} />
               </div>
               <div className="md:col-span-2">
-                <Button onClick={submit} disabled={submitting}>
+                <Button onClick={submit} disabled={submitting || !allocValid}>
                   <Upload className="h-4 w-4" /> {submitting ? "Saving…" : "Add Entry"}
                 </Button>
               </div>
