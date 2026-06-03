@@ -3,7 +3,7 @@ import {
   Building2, Users, Briefcase, Settings, LogOut, Telescope,
   Gauge, Target, Sparkles, Home, ChevronRight, Brush, BookOpen,
   FileText, Link, UserSearch, Mail, Send, Megaphone, ClipboardList,
-  Eye, Sun, Moon, MapPin, Wrench, Receipt,
+  Eye, Sun, Moon, MapPin, Wrench, Receipt, UploadCloud,
   LucideIcon,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
@@ -83,6 +83,7 @@ const sections: NavSection[] = [
       { title: "Cleaning Schedule", url: "/operations/schedule", icon: CalendarDays, roles: allRoles },
       { title: "Maintenance", url: "/operations/maintenance", icon: Wrench, roles: allRoles },
       { title: "Cleaning Numbers", url: "/operations/numbers", icon: PoundSterling, roles: managementRoles },
+      { title: "OTA Imports", url: "/operations/imports", icon: UploadCloud, roles: managementRoles },
       { title: "Property Knowledge", url: "/property-knowledge", icon: BookOpen, roles: allRoles },
       { title: "Amenities", url: "/amenities", icon: MapPin, roles: managementRoles },
     ],
