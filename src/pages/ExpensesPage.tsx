@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import { Receipt, ChevronDown, Plus, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { TurnoverRatesTab } from "@/components/expenses/TurnoverRatesTab";
+import { UtilitiesTab } from "@/components/expenses/UtilitiesTab";
 
 const fmtGbp = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(n || 0);
 
@@ -439,10 +440,12 @@ export default function ExpensesPage() {
           <TabsList>
             <TabsTrigger value="consumables">Consumables</TabsTrigger>
             <TabsTrigger value="laundry">Laundry</TabsTrigger>
+            <TabsTrigger value="utilities">Utilities</TabsTrigger>
             <TabsTrigger value="rates">Set Rates</TabsTrigger>
           </TabsList>
           <TabsContent value="consumables" className="mt-4"><ConsumablesTab /></TabsContent>
           <TabsContent value="laundry" className="mt-4"><LaundryTab /></TabsContent>
+          <TabsContent value="utilities" className="mt-4"><UtilitiesTab /></TabsContent>
           <TabsContent value="rates" className="mt-4"><TurnoverRatesTab /></TabsContent>
         </Tabs>
       </div>

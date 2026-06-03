@@ -8,8 +8,8 @@ import { format } from "date-fns";
  * The deliberate £0-vs-null contract: a category returns a NUMBER (possibly 0) when
  * its data source exists — £0 means "genuinely nothing this period". It returns
  * `null` (with `missing: true`) when the underlying source doesn't exist yet — that
- * is a "not built / problem" signal, not a real zero. Today only Utilities is null
- * (its tables land with spec item 10).
+ * is a "not built / problem" signal, not a real zero. All current categories now have
+ * a data source, so none return null today (the contract stays for future categories).
  */
 export interface CostCategory {
   value: number | null;
@@ -48,11 +48,11 @@ export function useOwnerCostCategories(ownerId: string | null, periodStart: Date
       const empty: OwnerCostCategories = {
         cleaning: { value: 0 }, consumables: { value: 0 }, laundry: { value: 0 },
         maintenance: { value: 0 }, setup: { value: 0 }, welcomeBaskets: { value: 0 },
-        utilities: { value: null, missing: true, note: "Utilities not set up yet" },
+        utilities: { value: 0 },
       };
       if (ids.length === 0) return empty;
 
-      const [cleans, laundry, consum, tasks] = await Promise.all([
+      const [cleans, laundry, consum, tasks, utils] = await Promise.all([
         supabase.from("clean_tasks").select("listing_id, status, scheduled_date")
           .in("listing_id", ids).eq("status", "completed")
           .gte("scheduled_date", startDate).lte("scheduled_date", endDate),
@@ -63,6 +63,8 @@ export function useOwnerCostCategories(ownerId: string | null, periodStart: Date
         (supabase.from as any)("maintenance_tasks").select("cost, type, source, billable, completed_at")
           .in("listing_id", ids).eq("billable", true)
           .gte("completed_at", startIso).lte("completed_at", endIso),
+        (supabase.from as any)("utility_expense_allocations").select("amount")
+          .in("listing_id", ids).gte("expense_date", startDate).lte("expense_date", endDate),
       ]);
 
       // Cleaning: completed turnovers x the listing's cleaning fee. Cleans on a
@@ -91,7 +93,7 @@ export function useOwnerCostCategories(ownerId: string | null, periodStart: Date
         maintenance: { value: maintenance },
         setup: { value: setup },
         welcomeBaskets: { value: welcome },
-        utilities: { value: null, missing: true, note: "Utilities not set up yet" },
+        utilities: { value: sum(utils.data) },
       };
     },
   });
