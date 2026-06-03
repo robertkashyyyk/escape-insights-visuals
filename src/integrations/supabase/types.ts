@@ -134,6 +134,36 @@ export type Database = {
         }
         Relationships: []
       }
+      bed_types: {
+        Row: {
+          active: boolean
+          created_at: string
+          display_order: number
+          id: string
+          laundry_cost: number
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          display_order?: number
+          id?: string
+          laundry_cost?: number
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          display_order?: number
+          id?: string
+          laundry_cost?: number
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       booking_requests: {
         Row: {
           created_at: string
@@ -1642,6 +1672,51 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "property_appliances_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_beds: {
+        Row: {
+          bed_type_id: string
+          bedroom_label: string
+          created_at: string
+          id: string
+          listing_id: string
+          quantity: number
+          sort_order: number
+        }
+        Insert: {
+          bed_type_id: string
+          bedroom_label: string
+          created_at?: string
+          id?: string
+          listing_id: string
+          quantity?: number
+          sort_order?: number
+        }
+        Update: {
+          bed_type_id?: string
+          bedroom_label?: string
+          created_at?: string
+          id?: string
+          listing_id?: string
+          quantity?: number
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_beds_bed_type_id_fkey"
+            columns: ["bed_type_id"]
+            isOneToOne: false
+            referencedRelation: "bed_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_beds_listing_id_fkey"
             columns: ["listing_id"]
             isOneToOne: false
             referencedRelation: "listings"

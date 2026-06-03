@@ -13,6 +13,7 @@ import type { Tables } from "@/integrations/supabase/types";
 import { useLocationGroups } from "@/hooks/useLocationGroups";
 import { useCommunalGroups } from "@/hooks/useCommunalGroups";
 import { AlertTriangle } from "lucide-react";
+import { PropertyBedsEditor } from "@/components/properties/PropertyBedsEditor";
 
 interface PropertyFormProps {
   open: boolean;
@@ -272,6 +273,15 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
             onGroupChange={(v) => set("communal_group_id", v)}
             onRatioChange={(v) => set("communal_ratio_pct", v)}
           />
+
+          {/* Bedrooms & Beds (drives laundry cost) — needs a saved listing id */}
+          {isEdit ? (
+            <PropertyBedsEditor listingId={listing!.id} />
+          ) : (
+            <div className="border border-dashed border-border/40 rounded-lg p-4 text-[11px] text-muted-foreground">
+              Save the property first, then reopen it to set up Bedrooms &amp; Beds (laundry).
+            </div>
+          )}
 
           {/* Bundle / Dual Listing */}
           <div className="border border-border/30 rounded-lg p-4 space-y-4">

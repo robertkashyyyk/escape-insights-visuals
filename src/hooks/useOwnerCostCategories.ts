@@ -52,7 +52,7 @@ export function useOwnerCostCategories(ownerId: string | null, periodStart: Date
       };
       if (ids.length === 0) return empty;
 
-      const [cleans, laundry, consum, tasks, utils] = await Promise.all([
+      const [cleans, laundry, consum, tasks, utils, laundryExisting, consumExisting] = await Promise.all([
         supabase.from("clean_tasks").select("listing_id, status, scheduled_date")
           .in("listing_id", ids).eq("status", "completed")
           .gte("scheduled_date", startDate).lte("scheduled_date", endDate),
@@ -65,6 +65,14 @@ export function useOwnerCostCategories(ownerId: string | null, periodStart: Date
           .gte("completed_at", startIso).lte("completed_at", endIso),
         (supabase.from as any)("utility_expense_allocations").select("amount")
           .in("listing_id", ids).gte("expense_date", startDate).lte("expense_date", endDate),
+        // EXISTING actual-cost laundry: supplier-bill allocations (bill period filtered
+        // in JS below for robustness).
+        (supabase.from as any)("expense_laundry_allocations")
+          .select("allocated_amount, expense_laundry_bills(period_start, period_end)")
+          .in("listing_id", ids),
+        // EXISTING actual-cost consumables: property-allocated receipts in the period.
+        (supabase.from as any)("expense_consumables").select("receipt_value")
+          .in("listing_id", ids).gte("purchase_date", startDate).lte("purchase_date", endDate),
       ]);
 
       // Cleaning: completed turnovers x the listing's cleaning fee. Cleans on a
@@ -86,10 +94,20 @@ export function useOwnerCostCategories(ownerId: string | null, periodStart: Date
         else maintenance += cost;
       }
 
+      // Combine new set-rate accruals with the existing actual-cost data so the cards
+      // reflect everything in the system, not just the (currently empty) new tables.
+      // Keep allocations whose bill period overlaps the report period.
+      const laundryExistingTotal = (laundryExisting.data ?? []).reduce((s: number, r: any) => {
+        const b = r.expense_laundry_bills;
+        const overlaps = b && b.period_start <= endDate && b.period_end >= startDate;
+        return overlaps ? s + Number(r.allocated_amount || 0) : s;
+      }, 0);
+      const consumExistingTotal = (consumExisting.data ?? []).reduce((s: number, r: any) => s + Number(r.receipt_value || 0), 0);
+
       return {
         cleaning: { value: cleaning, note: missingFee > 0 ? `${missingFee} clean${missingFee === 1 ? "" : "s"} with no fee set` : undefined },
-        consumables: { value: sum(consum.data) },
-        laundry: { value: sum(laundry.data) },
+        consumables: { value: sum(consum.data) + consumExistingTotal },
+        laundry: { value: sum(laundry.data) + laundryExistingTotal },
         maintenance: { value: maintenance },
         setup: { value: setup },
         welcomeBaskets: { value: welcome },
