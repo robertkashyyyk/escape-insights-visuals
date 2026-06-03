@@ -20,6 +20,14 @@ static_sites:
     output_dir: dist
     # SPA fallback — serve index.html for any unmatched client-side route.
     catchall_document: index.html
-    # Long-cache hashed assets; index.html stays fresh.
     routes:
       - path: /
+    # Public Supabase config, inlined at build time (Vite bakes VITE_* vars in).
+    # The anon/publishable key is public by design — safe to expose.
+    envs:
+      - key: VITE_SUPABASE_URL
+        scope: BUILD_TIME
+        value: https://pftqjrmdksrrpczhomln.supabase.co
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        scope: BUILD_TIME
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmdHFqcm1ka3NycnBjemhvbWxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2OTYyMzAsImV4cCI6MjA5MDI3MjIzMH0.pnIOzWvQOxPLUsf3srx4Qqdc73xUAOa8aenokDABMOA
