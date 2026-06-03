@@ -561,6 +561,115 @@ export type Database = {
         }
         Relationships: []
       }
+      consumable_charges: {
+        Row: {
+          amount: number
+          charge_date: string
+          clean_task_id: string
+          created_at: string
+          id: string
+          listing_id: string
+          rate_id: string | null
+          type: string | null
+        }
+        Insert: {
+          amount: number
+          charge_date: string
+          clean_task_id: string
+          created_at?: string
+          id?: string
+          listing_id: string
+          rate_id?: string | null
+          type?: string | null
+        }
+        Update: {
+          amount?: number
+          charge_date?: string
+          clean_task_id?: string
+          created_at?: string
+          id?: string
+          listing_id?: string
+          rate_id?: string | null
+          type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consumable_charges_clean_task_id_fkey"
+            columns: ["clean_task_id"]
+            isOneToOne: false
+            referencedRelation: "clean_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consumable_charges_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consumable_charges_rate_id_fkey"
+            columns: ["rate_id"]
+            isOneToOne: false
+            referencedRelation: "consumable_rates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      consumable_rates: {
+        Row: {
+          active: boolean
+          amount: number
+          communal_group_id: string | null
+          created_at: string
+          id: string
+          listing_id: string | null
+          name: string
+          region: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          amount: number
+          communal_group_id?: string | null
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          name: string
+          region?: string | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          amount?: number
+          communal_group_id?: string | null
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          name?: string
+          region?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consumable_rates_communal_group_id_fkey"
+            columns: ["communal_group_id"]
+            isOneToOne: false
+            referencedRelation: "communal_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consumable_rates_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expense_consumables: {
         Row: {
           allocation_type: string
@@ -713,6 +822,114 @@ export type Database = {
           receipt_path?: string | null
           supplier?: string
           total_amount?: number
+        }
+        Relationships: []
+      }
+      laundry_charges: {
+        Row: {
+          amount: number
+          charge_date: string
+          clean_task_id: string
+          created_at: string
+          id: string
+          listing_id: string
+          rate_id: string | null
+          region: string | null
+        }
+        Insert: {
+          amount: number
+          charge_date: string
+          clean_task_id: string
+          created_at?: string
+          id?: string
+          listing_id: string
+          rate_id?: string | null
+          region?: string | null
+        }
+        Update: {
+          amount?: number
+          charge_date?: string
+          clean_task_id?: string
+          created_at?: string
+          id?: string
+          listing_id?: string
+          rate_id?: string | null
+          region?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "laundry_charges_clean_task_id_fkey"
+            columns: ["clean_task_id"]
+            isOneToOne: true
+            referencedRelation: "clean_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "laundry_charges_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "laundry_charges_rate_id_fkey"
+            columns: ["rate_id"]
+            isOneToOne: false
+            referencedRelation: "laundry_rates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      laundry_rate_regions: {
+        Row: {
+          id: string
+          rate_id: string
+          region: string
+        }
+        Insert: {
+          id?: string
+          rate_id: string
+          region: string
+        }
+        Update: {
+          id?: string
+          rate_id?: string
+          region?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "laundry_rate_regions_rate_id_fkey"
+            columns: ["rate_id"]
+            isOneToOne: false
+            referencedRelation: "laundry_rates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      laundry_rates: {
+        Row: {
+          active: boolean
+          amount: number
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          amount: number
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          amount?: number
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }
