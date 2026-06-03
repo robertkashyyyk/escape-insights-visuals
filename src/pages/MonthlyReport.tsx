@@ -16,9 +16,11 @@ import { cn } from "@/lib/utils";
 import {
   PoundSterling, Moon, PercentCircle, Briefcase, Building2,
   TrendingUp, TrendingDown, Minus, FileDown, Gauge, CalendarIcon, Telescope,
-  Sparkles, Package, WashingMachine, Wrench, Hammer, Gift, Plug, AlertTriangle,
+  Sparkles, Package, WashingMachine, Wrench, Hammer, Gift, Plug, AlertTriangle, CreditCard,
 } from "lucide-react";
 import { useOwnerCostCategories, type CostCategory } from "@/hooks/useOwnerCostCategories";
+import { useOwnerSettlement } from "@/hooks/useOwnerSettlement";
+import { ReconBanner, SettlementSection } from "@/components/owner-reports/SettlementBlocks";
 
 const fmt = (n: number) => `£${n.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 const fmtMoney = (n: number) => `£${n.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -170,6 +172,7 @@ export default function MonthlyReport() {
 
   const { data: report, isLoading } = useMonthlyReport(ownerId, periodStart, periodEnd);
   const { data: costs } = useOwnerCostCategories(ownerId, periodStart, periodEnd);
+  const { data: settlement } = useOwnerSettlement(ownerId, periodStart, periodEnd);
 
   const monthOptions = useMemo(() => {
     const opts: { value: string; label: string }[] = [];
@@ -312,9 +315,12 @@ export default function MonthlyReport() {
               </div>
             </div>
 
+            {/* OTA reconciliation banner */}
+            {settlement && <ReconBanner recon={settlement.recon} />}
+
             {/* Section 2 — KPI cards */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              <KpiCard icon={PoundSterling} label="Rental Revenue" value={fmt(report.totalRevenue)} accentClass="bg-primary/10" />
+              <KpiCard icon={PoundSterling} label="Revenue (gross)" value={fmt(report.totalRevenue)} accentClass="bg-primary/10" />
               <KpiCard icon={Briefcase} label="Management Fees" value={fmt(report.managementFee)} accentClass="bg-accent/10" />
               <KpiCard icon={Moon} label="Nights Occupied" value={String(report.totalNights)} accentClass="bg-chart-3/10" />
               <KpiCard icon={PercentCircle} label="Avg Occupancy" value={`${report.avgOccupancy.toFixed(1)}%`} accentClass="bg-chart-4/10" />
@@ -332,12 +338,27 @@ export default function MonthlyReport() {
                 <CostCard icon={Package} label="Consumables" cat={costs?.consumables} />
                 <CostCard icon={WashingMachine} label="Laundry" cat={costs?.laundry} />
                 <CostCard icon={Briefcase} label="Management" cat={{ value: report.managementFee }} />
+                <CostCard icon={CreditCard} label="Booking Fees" cat={{ value: settlement?.bookingFees ?? null }} />
+                <CostCard icon={CreditCard} label="Card Processing" cat={{ value: settlement?.cardProcessing ?? null }} />
                 <CostCard icon={Wrench} label="Maintenance" cat={costs?.maintenance} />
                 <CostCard icon={Hammer} label="Setup" cat={costs?.setup} />
                 <CostCard icon={Gift} label="Welcome Baskets" cat={costs?.welcomeBaskets} />
                 <CostCard icon={Plug} label="Utilities" cat={costs?.utilities} />
               </div>
             </div>
+
+            {/* Section 2c — Settlement waterfall (gross model) */}
+            {settlement && ownerId && (
+              <SettlementSection
+                ownerId={ownerId}
+                periodStart={format(periodStart, "yyyy-MM-dd")}
+                periodEnd={format(periodEnd, "yyyy-MM-dd")}
+                grossRevenue={report.totalRevenue}
+                managementFee={report.managementFee}
+                costs={costs}
+                settlement={settlement}
+              />
+            )}
 
             {/* Section 3 — YoY Comparison (Fix 1: show prior year values) */}
             <div className="glass-card p-6">

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { differenceInDays, parseISO, format, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
-import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
+import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
 export interface ReportPropertyRow {
   listingId: string;
@@ -168,7 +168,7 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
       const byListing: Record<string, { revenue: number; nights: number }> = {};
       for (const r of currentRows) {
         const nights = nightsInRange(r.check_in, r.check_out, periodStart, periodEnd);
-        const rev = getNetRevenue(r);
+        const rev = getGrossRevenue(r);
         if (!byListing[r.listing_id]) byListing[r.listing_id] = { revenue: 0, nights: 0 };
         byListing[r.listing_id].revenue += rev;
         byListing[r.listing_id].nights += nights;
@@ -190,7 +190,7 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
       const prevByListing: Record<string, { revenue: number }> = {};
       for (const r of prevRows) {
         const nights = nightsInRange(r.check_in, r.check_out, prevStart, prevEnd);
-        const rev = getNetRevenue(r);
+        const rev = getGrossRevenue(r);
         prevTotalRevenue += rev;
         prevTotalNights += nights;
         if (!prevByListing[r.listing_id]) prevByListing[r.listing_id] = { revenue: 0 };
@@ -222,7 +222,7 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
         for (const r of trendRows) {
           const ci = parseISO(r.check_in);
           if (ci >= m.start && ci <= m.end) {
-            rev += getNetRevenue(r);
+            rev += getGrossRevenue(r);
           }
         }
         return { label: m.label, revenue: rev };
@@ -236,7 +236,7 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
 
       if (showForward) {
         for (const r of forwardRows) {
-          forwardRevenue += getNetRevenue(r);
+          forwardRevenue += getGrossRevenue(r);
           forwardNights += differenceInDays(parseISO(r.check_out), parseISO(r.check_in));
           if (!nextCheckinDate || r.check_in < nextCheckinDate) nextCheckinDate = r.check_in;
         }
@@ -247,7 +247,7 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
           let rev = 0;
           for (const r of forwardRows) {
             const ci = parseISO(r.check_in);
-            if (ci >= ms && ci <= me) rev += getNetRevenue(r);
+            if (ci >= ms && ci <= me) rev += getGrossRevenue(r);
           }
           forwardMonthBuckets.push({ label: format(ms, "MMM yyyy"), revenue: rev });
         }

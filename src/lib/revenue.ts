@@ -42,6 +42,28 @@ export function getNetRevenue(r: RevenueRow | null | undefined): number {
   return total;
 }
 
-/** Standard select() field list for any query that needs net revenue. */
+/**
+ * GROSS revenue — the Management Report basis (decided 2026-06-03).
+ *
+ * Revenue = gross booking value BEFORE the channel's commission/service fee:
+ *   Booking.com = "Gross amount"; Airbnb = "Amount + Service fee".
+ * Hostaway's total_amount is the gross price the guest paid, so it is the
+ * gross figure here. (channel_commission is then a REAL settlement cost line,
+ * not netted out of revenue — see the engine R1/R4.)
+ *
+ * Resolution: total_amount, else host_payout + channel_commission (reconstruct
+ * gross from a net payout), else host_payout.
+ */
+export function getGrossRevenue(r: RevenueRow | null | undefined): number {
+  if (!r) return 0;
+  const total = Number(r.total_amount ?? 0);
+  if (total > 0) return total;
+  const payout = Number(r.host_payout ?? 0);
+  const commission = Number(r.channel_commission ?? 0);
+  if (payout > 0) return payout + commission;
+  return 0;
+}
+
+/** Standard select() field list for any query that needs revenue figures. */
 export const REVENUE_FIELDS =
   "total_amount, host_payout, cleaning_fee, channel_commission, tax_amount";
