@@ -39,7 +39,7 @@ top of each section.
 | 4 | Consumables (+communal type) | ✅ Built (owner-statement rollup pending statements feature) |
 | 10 | Utilities expenses tab | ✅ Built |
 | 8 | Welcome Baskets / Seasons | ✅ Built |
-| 1 | Hostnote/Guestnote/Custom Field (Hostaway) | ⏳ Planned (gated on creds) |
+| 1 | Hostnote/Guestnote/Custom Field (Hostaway) | ✅ Built |
 
 ---
 
@@ -163,11 +163,16 @@ revenue > threshold, creates a `welcome_basket` setup task linked to the reserva
 (idempotent via partial unique index). Exception-wrapped so it can't block sync. Added
 `maintenance_tasks.reservation_id`. Populates the owner-report Welcome Baskets card.
 
-## 1. Hostnote / Guestnote / Custom Field on a booking — ⏳ Planned (gated)
+## 1. Hostnote / Guestnote / Custom Field on a booking — ✅ Built
 
-Pull `hostNote` / `guestNote` / `customFieldValues` from the Hostaway reservation onto our
-booking record. Requires `includeResources=1`, OAuth client-credentials, `afterId`
-pagination. Map `customFieldId → name` via the custom-field definitions. Read-only first.
+Migration `20260603165238_reservation_notes.sql` adds `reservations.host_note`,
+`guest_note`, `custom_fields` (jsonb). The `hostaway-sync` edge function (deployed v57)
+now fetches with `includeResources=1`, fetches the custom-field definitions once for
+human names, and maps each reservation's `hostNote`/`guestNote`/`customFieldValues` onto
+the row. UI: clicking a guest name in the reservations table opens `BookingDetailDialog`
+(host note, guest note incl. Booking.com special requests, and custom fields as
+label/value rows). Read-only. **Populates on the next sync** (incremental cron or a manual
+full sync). NOTE: pagination still uses `offset` (afterId migration is a later hardening).
 
 ---
 

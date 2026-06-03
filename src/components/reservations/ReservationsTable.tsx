@@ -12,6 +12,7 @@ import { Search, ArrowUpDown, ChevronLeft, ChevronRight, Package } from "lucide-
 import { differenceInDays, format, parseISO } from "date-fns";
 import { useLocationGroups } from "@/hooks/useLocationGroups";
 import { BookingRequestsDialog } from "@/components/requests/BookingRequestsDialog";
+import { BookingDetailDialog } from "@/components/reservations/BookingDetailDialog";
 
 type SortKey = "guest_name" | "property" | "check_in" | "check_out" | "nights" | "lead_time" | "amount" | "platform" | "status";
 type SortDir = "asc" | "desc";
@@ -44,6 +45,7 @@ export function ReservationsTable() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
   const [reqDialog, setReqDialog] = useState<{ id: string; guest: string } | null>(null);
+  const [detailRes, setDetailRes] = useState<{ id: string; guest: string } | null>(null);
 
   const todayStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
 
@@ -315,7 +317,11 @@ export function ReservationsTable() {
               )}
               {pagedRows.map((r) => (
                 <TableRow key={r.id}>
-                  <TableCell className="font-medium">{r.guest_name}</TableCell>
+                  <TableCell className="font-medium">
+                    <button onClick={() => setDetailRes({ id: r.id, guest: r.guest_name })} className="text-left hover:text-primary hover:underline underline-offset-2 transition-colors">
+                      {r.guest_name}
+                    </button>
+                  </TableCell>
                   <TableCell>
                     {r.propertyId ? (
                       <Link to={`/properties/${r.propertyId}`} className="text-primary hover:underline underline-offset-2 transition-colors">
@@ -428,6 +434,12 @@ export function ReservationsTable() {
         guestName={reqDialog?.guest}
         open={!!reqDialog}
         onOpenChange={(o) => !o && setReqDialog(null)}
+      />
+      <BookingDetailDialog
+        reservationId={detailRes?.id ?? null}
+        guestName={detailRes?.guest}
+        open={!!detailRes}
+        onOpenChange={(o) => !o && setDetailRes(null)}
       />
     </div>
   );
