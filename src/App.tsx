@@ -44,6 +44,7 @@ import GuestPortal from "./pages/GuestPortal";
 import CleanReset from "./pages/CleanReset";
 import MaintenanceQueue from "./pages/MaintenanceQueue";
 import OtaImports from "./pages/OtaImports";
+import OwnerReports from "./pages/OwnerReports";
 import ExpensesPage from "./pages/ExpensesPage";
 
 const queryClient = new QueryClient({
@@ -102,7 +103,8 @@ const App = () => (
             <Route path="/property-knowledge" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PropertyKnowledge /></ProtectedRoute>} />
             <Route path="/property-knowledge/:listingId" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PropertyKnowledgeDetail /></ProtectedRoute>} />
             <Route path="/amenities" element={<ProtectedRoute requiredRoles={["super", "senior", "admin"]}><Amenities /></ProtectedRoute>} />
-            <Route path="/owner-reports" element={<ProtectedRoute requiredRoles={["super", "senior"]}><MonthlyReport /></ProtectedRoute>} />
+            <Route path="/owner-reports" element={<ProtectedRoute requiredRoles={["super", "senior"]}><OwnerReports /></ProtectedRoute>} />
+            <Route path="/owner-reports/monthly" element={<ProtectedRoute requiredRoles={["super", "senior"]}><MonthlyReport /></ProtectedRoute>} />
             <Route path="/owner-reports/invoice" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ComingSoon title="Owner Reports — Invoice Generator" /></ProtectedRoute>} />
             <Route path="/xero-sync" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ComingSoon title="Xero Sync" /></ProtectedRoute>} />
             <Route path="/guests" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Guest Database" /></ProtectedRoute>} />
