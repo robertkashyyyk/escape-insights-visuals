@@ -21,6 +21,7 @@ import {
 import { useOwnerCostCategories, type CostCategory } from "@/hooks/useOwnerCostCategories";
 import { useOwnerSettlement } from "@/hooks/useOwnerSettlement";
 import { ReconBanner, SettlementSection } from "@/components/owner-reports/SettlementBlocks";
+import { CostGroups } from "@/components/owner-reports/CostGroups";
 
 const fmt = (n: number) => `£${n.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 const fmtMoney = (n: number) => `£${n.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -327,25 +328,14 @@ export default function MonthlyReport() {
               <KpiCard icon={Gauge} label="Avg Nightly Rate" value={fmt(report.avgNightlyRate)} accentClass="bg-chart-5/10" />
             </div>
 
-            {/* Section 2b — Cost categories ("what's in the system") */}
-            <div className="glass-card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-display font-semibold text-foreground">Cost Categories</h3>
-                <p className="text-[10px] text-muted-foreground">£0 = nothing this period · <span className="text-amber-400">—</span> = not set up yet</p>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <CostCard icon={Sparkles} label="Cleaning" cat={costs?.cleaning} />
-                <CostCard icon={Package} label="Consumables" cat={costs?.consumables} />
-                <CostCard icon={WashingMachine} label="Laundry" cat={costs?.laundry} />
-                <CostCard icon={Briefcase} label="Management" cat={{ value: report.managementFee }} />
-                <CostCard icon={CreditCard} label="Booking Fees" cat={{ value: settlement?.bookingFees ?? null }} />
-                <CostCard icon={CreditCard} label="Card Processing" cat={{ value: settlement?.cardProcessing ?? null }} />
-                <CostCard icon={Wrench} label="Maintenance" cat={costs?.maintenance} />
-                <CostCard icon={Hammer} label="Setup" cat={costs?.setup} />
-                <CostCard icon={Gift} label="Welcome Baskets" cat={costs?.welcomeBaskets} />
-                <CostCard icon={Plug} label="Utilities" cat={costs?.utilities} />
-              </div>
-            </div>
+            {/* Section 2b — Grouped, foldable statement breakdown (5 cards) */}
+            <CostGroups
+              grossRevenue={report.totalRevenue}
+              managementFee={report.managementFee}
+              bookingFees={settlement?.bookingFees ?? 0}
+              cardProcessing={settlement?.cardProcessing ?? 0}
+              costs={costs}
+            />
 
             {/* Section 2c — Settlement waterfall (gross model) */}
             {settlement && ownerId && (
