@@ -32,8 +32,8 @@ top of each section.
 |---|------|--------|
 | 5 | Per-property records (fees, communal flag, share) | ✅ Built |
 | 6 | Communal Group | ✅ Built |
-| 7 | Maintenance task list (+Setup, +scope) | ⏳ Planned |
-| 9 | Maintenance manual add | ⏳ Planned |
+| 7 | Maintenance task list (+Setup, +scope) | ✅ Built |
+| 9 | Maintenance manual add | ✅ Built |
 | 2 | Requests + cleaner reminder | ⏳ Planned |
 | 3 | Laundry per-region rate | ⏳ Planned |
 | 4 | Consumables (+communal type) | ⏳ Planned |
@@ -67,15 +67,27 @@ groups, membership, per-member share editing, even-split helper, and **hard-bloc
 saving shares unless the group totals exactly 100%**. Helper: SQL function
 `communal_group_ratio_sum(uuid)`.
 
-## 7. Maintenance task list (+ Setup type, + communal/by-property) — ⏳ Planned
+## 7. Maintenance task list (+ Setup type, + communal/by-property) — ✅ Built
 
-Tasks with accept/done/postpone lifecycle, billable/non-billable on completion,
-"Are you sure?" confirm, a `setup` type, and `property` vs `communal` scope.
-Billable tasks feed the owner report; communal billable tasks allocate by Communal Ratio %.
+New table `maintenance_tasks` (migration `20260603134502_maintenance_tasks.sql`):
+`type` (maintenance|setup), `scope` (property|communal, with a CHECK enforcing the
+matching FK), `status` (pending→accepted→done | postponed), `billable` + `cost` set on
+completion, `source` (manual|welcome_basket). Lifecycle actions Accept / Done / Postpone.
+Done → choose Billable/Non-billable → "Are you sure?" confirm (AlertDialog). Setup uses the
+same flow (type flag only). Billable tasks feed the owner report; communal billable tasks
+allocate cost across the group by Communal Ratio % (allocation applied at report time).
 
-## 9. Maintenance → manual task add — ⏳ Planned
+UI: `src/pages/MaintenanceQueue.tsx` now has an outer **Issues | Tasks** split; the Tasks
+board is `src/components/maintenance/MaintenanceTasksPanel.tsx` (hook
+`src/hooks/useMaintenanceTasks.ts`).
 
-"Add task" entry point creating a task with `source = manual`.
+[ASSUMPTION] Added a `pending` status so the **Accept** action is meaningful (spec listed
+only accepted/done/postponed). Manually-added tasks start `pending`.
+
+## 9. Maintenance → manual task add — ✅ Built
+
+"Add task" button in the Tasks board opens a form (title, description, type, scope,
+property/communal group) and inserts with `source = manual`.
 
 ## 2. Requests (e.g. High Chair, Cot) + cleaner reminder — ⏳ Planned
 
