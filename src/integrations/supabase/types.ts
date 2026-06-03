@@ -2202,9 +2202,12 @@ export type Database = {
           check_out_time: string | null
           cleaning_fee: number | null
           created_at: string
+          custom_fields: Json
           day_of_week: number | null
           guest_fees: number | null
           guest_name: string
+          guest_note: string | null
+          host_note: string | null
           host_payout: number | null
           hostaway_reservation_id: number | null
           id: string
@@ -2230,9 +2233,12 @@ export type Database = {
           check_out_time?: string | null
           cleaning_fee?: number | null
           created_at?: string
+          custom_fields?: Json
           day_of_week?: number | null
           guest_fees?: number | null
           guest_name: string
+          guest_note?: string | null
+          host_note?: string | null
           host_payout?: number | null
           hostaway_reservation_id?: number | null
           id?: string
@@ -2258,9 +2264,12 @@ export type Database = {
           check_out_time?: string | null
           cleaning_fee?: number | null
           created_at?: string
+          custom_fields?: Json
           day_of_week?: number | null
           guest_fees?: number | null
           guest_name?: string
+          guest_note?: string | null
+          host_note?: string | null
           host_payout?: number | null
           hostaway_reservation_id?: number | null
           id?: string

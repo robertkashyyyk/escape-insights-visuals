@@ -172,7 +172,9 @@ Deno.serve(async (req) => {
 
     // 5. Sync reservations
     // For incremental: only fetch reservations modified in the last N days
-    let reservationUrlBase = `${HOSTAWAY_API}/reservations?limit=${LIMIT}&sortOrder=arrivalDate&includeResources=0`;
+    // includeResources=1 is REQUIRED for customFieldValues / hostNote / guestNote to be
+    // returned (they come back empty otherwise — Hostaway's #1 silent gotcha).
+    let reservationUrlBase = `${HOSTAWAY_API}/reservations?limit=${LIMIT}&sortOrder=arrivalDate&includeResources=1`;
     if (syncMode === "incremental" && lookbackDays > 0) {
       const sinceDate = new Date();
       sinceDate.setDate(sinceDate.getDate() - lookbackDays);
@@ -181,6 +183,20 @@ Deno.serve(async (req) => {
       console.log(`Incremental sync: fetching reservations modified since ${sinceStr}`);
     } else {
       console.log("Full sync: fetching all reservations");
+    }
+
+    // Fetch custom-field definitions once so customFieldValues can be shown with names.
+    const customFieldNames = new Map<number, string>();
+    try {
+      const cfRes = await fetch(`${HOSTAWAY_API}/customFields`, { headers: authHeaders });
+      if (cfRes.ok) {
+        const cfBody = await cfRes.json();
+        for (const cf of (cfBody.result || [])) {
+          if (cf?.id != null) customFieldNames.set(cf.id, cf.name || cf.label || `Field ${cf.id}`);
+        }
+      }
+    } catch (e) {
+      console.warn(`Custom field definitions fetch failed (continuing): ${e}`);
     }
 
     let resOffset = 0;
@@ -271,6 +287,18 @@ Deno.serve(async (req) => {
         const taxAmount = Number(r.totalTax ?? r.taxAmount ?? r.cityTax ?? 0);
         const guestFees = Number(r.guestFeeAmount ?? 0);
 
+        // Notes + custom fields (require includeResources=1). guestNote also captures
+        // Booking.com special requests, which don't arrive through the channel otherwise.
+        const hostNote = r.hostNote ?? null;
+        const guestNote = r.guestNote ?? null;
+        const customFields = Array.isArray(r.customFieldValues)
+          ? r.customFieldValues.map((cf: any) => ({
+              field_id: cf.customFieldId ?? cf.customField?.id ?? null,
+              name: cf.customField?.name ?? customFieldNames.get(cf.customFieldId) ?? `Field ${cf.customFieldId ?? "?"}`,
+              value: cf.value ?? null,
+            })).filter((cf: any) => cf.value != null && cf.value !== "")
+          : [];
+
         rows.push({
           hostaway_reservation_id: r.id,
           listing_id: listingUuid,
@@ -289,6 +317,9 @@ Deno.serve(async (req) => {
           tax_amount: taxAmount,
           guest_fees: guestFees,
           reservation_date: reservationDate,
+          host_note: hostNote,
+          guest_note: guestNote,
+          custom_fields: customFields,
           booking_lead_days: bookingLeadDays,
           day_of_week: dayOfWeek,
           week_number: weekNumber,
