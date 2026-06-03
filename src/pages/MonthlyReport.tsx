@@ -16,9 +16,12 @@ import { cn } from "@/lib/utils";
 import {
   PoundSterling, Moon, PercentCircle, Briefcase, Building2,
   TrendingUp, TrendingDown, Minus, FileDown, Gauge, CalendarIcon, Telescope,
+  Sparkles, Package, WashingMachine, Wrench, Hammer, Gift, Plug, AlertTriangle,
 } from "lucide-react";
+import { useOwnerCostCategories, type CostCategory } from "@/hooks/useOwnerCostCategories";
 
 const fmt = (n: number) => `£${n.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+const fmtMoney = (n: number) => `£${n.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 
 type PeriodMode = "month" | "quarter" | "custom";
 
@@ -82,6 +85,36 @@ function KpiCard({ icon: Icon, label, value, accentClass }: {
   );
 }
 
+// One cost-category card. Distinguishes a real £0 (source exists, nothing this period)
+// from a null "—" (source not built yet — a flag, not a zero).
+function CostCard({ icon: Icon, label, cat }: { icon: React.ElementType; label: string; cat?: CostCategory }) {
+  const loading = cat === undefined;
+  const missing = !loading && (cat!.missing || cat!.value === null);
+  return (
+    <div className="glass-card p-5">
+      <div className="h-10 w-10 rounded-xl bg-secondary/40 flex items-center justify-center mb-3">
+        <Icon className="h-5 w-5 text-primary" />
+      </div>
+      <p className="text-muted-foreground text-xs font-medium uppercase tracking-wider mb-1">{label}</p>
+      {loading ? (
+        <p className="text-2xl font-display font-bold text-muted-foreground tracking-tight">…</p>
+      ) : missing ? (
+        <div className="flex items-center gap-2">
+          <p className="text-2xl font-display font-bold text-muted-foreground tracking-tight">—</p>
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500/30 text-amber-400 bg-amber-500/10 gap-1">
+            <AlertTriangle className="h-3 w-3" /> Not set up
+          </Badge>
+        </div>
+      ) : (
+        <p className="text-2xl font-display font-bold text-foreground tracking-tight">{fmtMoney(cat!.value!)}</p>
+      )}
+      {!loading && cat!.note && (
+        <p className="text-[10px] text-amber-400/80 mt-1">{cat!.note}</p>
+      )}
+    </div>
+  );
+}
+
 function DatePicker({ date, onSelect, label }: { date: Date | undefined; onSelect: (d: Date | undefined) => void; label: string }) {
   return (
     <div className="space-y-1">
@@ -136,6 +169,7 @@ export default function MonthlyReport() {
   }, [periodMode, selectedMonth, selectedQuarter, customStartDate, customEndDate]);
 
   const { data: report, isLoading } = useMonthlyReport(ownerId, periodStart, periodEnd);
+  const { data: costs } = useOwnerCostCategories(ownerId, periodStart, periodEnd);
 
   const monthOptions = useMemo(() => {
     const opts: { value: string; label: string }[] = [];
@@ -285,6 +319,24 @@ export default function MonthlyReport() {
               <KpiCard icon={Moon} label="Nights Occupied" value={String(report.totalNights)} accentClass="bg-chart-3/10" />
               <KpiCard icon={PercentCircle} label="Avg Occupancy" value={`${report.avgOccupancy.toFixed(1)}%`} accentClass="bg-chart-4/10" />
               <KpiCard icon={Gauge} label="Avg Nightly Rate" value={fmt(report.avgNightlyRate)} accentClass="bg-chart-5/10" />
+            </div>
+
+            {/* Section 2b — Cost categories ("what's in the system") */}
+            <div className="glass-card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-display font-semibold text-foreground">Cost Categories</h3>
+                <p className="text-[10px] text-muted-foreground">£0 = nothing this period · <span className="text-amber-400">—</span> = not set up yet</p>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <CostCard icon={Sparkles} label="Cleaning" cat={costs?.cleaning} />
+                <CostCard icon={Package} label="Consumables" cat={costs?.consumables} />
+                <CostCard icon={WashingMachine} label="Laundry" cat={costs?.laundry} />
+                <CostCard icon={Briefcase} label="Management" cat={{ value: report.managementFee }} />
+                <CostCard icon={Wrench} label="Maintenance" cat={costs?.maintenance} />
+                <CostCard icon={Hammer} label="Setup" cat={costs?.setup} />
+                <CostCard icon={Gift} label="Welcome Baskets" cat={costs?.welcomeBaskets} />
+                <CostCard icon={Plug} label="Utilities" cat={costs?.utilities} />
+              </div>
             </div>
 
             {/* Section 3 — YoY Comparison (Fix 1: show prior year values) */}
