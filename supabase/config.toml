@@ -9,5 +9,10 @@ verify_jwt = false
 [functions.notify-urgent-issue]
 verify_jwt = true
 
+# Internal sync triggered by the hostaway-auto-sync cron (which passes the
+# publishable key, not a JWT). Gate off so the cron isn't rejected with 401.
+[functions.hostaway-sync]
+verify_jwt = false
+
 [functions.ota-ingest]
 verify_jwt = true
