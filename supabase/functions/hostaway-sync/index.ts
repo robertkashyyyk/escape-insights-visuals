@@ -287,6 +287,12 @@ Deno.serve(async (req) => {
         const taxAmount = Number(r.totalTax ?? r.taxAmount ?? r.cityTax ?? 0);
         const guestFees = Number(r.guestFeeAmount ?? 0);
 
+        // Channel reservation code = the OTA's own confirmation/reference (Airbnb
+        // confirmation code, Booking.com reference number). Enables the strong
+        // code-based match in OTA ingestion. NOT Hostaway's internal id (r.id).
+        const channelReservationCode =
+          r.channelReservationId ?? r.channelReservationID ?? r.externalReservationId ?? r.channelReservation ?? null;
+
         // Notes + custom fields (require includeResources=1). guestNote also captures
         // Booking.com special requests, which don't arrive through the channel otherwise.
         const hostNote = r.hostNote ?? null;
@@ -309,6 +315,7 @@ Deno.serve(async (req) => {
           check_out_time: checkOutTime,
           status,
           platform: platform.toLowerCase(),
+          channel_reservation_code: channelReservationCode ? String(channelReservationCode) : null,
           total_amount: totalPrice,
           host_payout: hostPayout,
           owner_payout: hostPayout ?? totalPrice,
