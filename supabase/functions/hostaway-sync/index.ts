@@ -290,8 +290,17 @@ Deno.serve(async (req) => {
         // Channel reservation code = the OTA's own confirmation/reference (Airbnb
         // confirmation code, Booking.com reference number). Enables the strong
         // code-based match in OTA ingestion. NOT Hostaway's internal id (r.id).
-        const channelReservationCode =
+        // Airbnb's channelReservationId is a composite like
+        //   "316896-guest-657747496-confirmation-HMF98PR3E3"
+        // whose actual confirmation code (HMF98PR3E3) is what appears on the OTA
+        // report — so extract that suffix. Booking.com is already the plain ref.
+        let channelReservationCode: string | null =
           r.channelReservationId ?? r.channelReservationID ?? r.externalReservationId ?? r.channelReservation ?? null;
+        if (channelReservationCode != null) {
+          const raw = String(channelReservationCode).trim();
+          const m = raw.match(/confirmation-([A-Za-z0-9]+)/i);
+          channelReservationCode = m ? m[1] : (raw || null);
+        }
 
         // Notes + custom fields (require includeResources=1). guestNote also captures
         // Booking.com special requests, which don't arrive through the channel otherwise.
