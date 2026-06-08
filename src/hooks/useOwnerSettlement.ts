@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { differenceInDays, format } from "date-fns";
+import { differenceInDays, format, parseISO } from "date-fns";
 
 // Layers the gross-model settlement onto the owner report:
 //  - Booking Fees + Card Processing as REAL cost lines (OTA settlement truth,
@@ -32,9 +32,10 @@ export function useOwnerSettlement(ownerId: string | null, periodStart: Date, pe
     enabled: !!ownerId,
     queryFn: async (): Promise<OwnerSettlement | null> => {
       const { data: owner } = await db.from("property_owners")
-        .select("opening_balance, weekly_rr_amount, settlement_method, management_fee_method, flat_portfolio_fee")
+        .select("opening_balance, weekly_rr_amount, settlement_method, management_fee_method, flat_portfolio_fee, revenue_recognition")
         .eq("id", ownerId).single();
       if (!owner) return null;
+      const prorate = (owner.revenue_recognition ?? "prorate_by_nights") !== "whole_in_attributed_month";
 
       const { data: listings } = await db.from("listings").select("id").eq("owner_id", ownerId);
       const listingIds = (listings ?? []).map((l: any) => l.id);
@@ -48,7 +49,7 @@ export function useOwnerSettlement(ownerId: string | null, periodStart: Date, pe
       if (listingIds.length) {
         // reservations overlapping the period (match useMonthlyReport's window)
         const { data: resv } = await db.from("reservations")
-          .select("id, channel_commission")
+          .select("id, channel_commission, check_in, check_out")
           .in("listing_id", listingIds)
           .lte("check_in", endStr).gte("check_out", startStr).eq("status", "confirmed");
         const reservations = (resv ?? []) as any[];
@@ -62,10 +63,20 @@ export function useOwnerSettlement(ownerId: string | null, periodStart: Date, pe
             .in("matched_reservation_id", resvIds).in("recon_status", ["auto_matched", "matched"]);
           (ota ?? []).forEach((o: any) => { if (o.matched_reservation_id) otaByResv.set(o.matched_reservation_id, o); });
         }
+        // Pro-rate fees by the same in-period night ratio as revenue (R1).
+        const ratioFor = (r: any) => {
+          if (!prorate) return 1;
+          const bn = Math.max(1, differenceInDays(parseISO(r.check_out), parseISO(r.check_in)));
+          const ci = parseISO(r.check_in), co = parseISO(r.check_out);
+          const s = ci < periodStart ? periodStart : ci;
+          const e = co > periodEnd ? periodEnd : co;
+          return Math.max(0, differenceInDays(e, s)) / bn;
+        };
         for (const r of reservations) {
           const o = otaByResv.get(r.id);
-          bookingFees += Number(o?.commission_amount ?? r.channel_commission ?? 0);
-          cardProcessing += Number(o?.payment_fee_amount ?? 0);
+          const ratio = ratioFor(r);
+          bookingFees += Number(o?.commission_amount ?? r.channel_commission ?? 0) * ratio;
+          cardProcessing += Number(o?.payment_fee_amount ?? 0) * ratio;
         }
 
         // reconciliation summary across the owner's revenue OTA rows

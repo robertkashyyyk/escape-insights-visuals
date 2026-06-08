@@ -61,6 +61,18 @@ function nightsInRange(checkIn: string, checkOut: string, rangeStart: Date, rang
   return Math.max(0, diff);
 }
 
+// Engine R1: recognise only the in-period portion of a booking's gross.
+// prorate_by_nights (default) apportions month-boundary stays by nights — this is
+// how the manual report splits e.g. a 30 Apr–2 May booking across the two months.
+// whole_in_attributed_month counts the full gross in the overlapping month.
+function recognisedRevenue(r: any, rangeStart: Date, rangeEnd: Date, prorate: boolean): number {
+  const gross = getGrossRevenue(r);
+  if (!prorate) return gross;
+  const bookingNights = Math.max(1, differenceInDays(parseISO(r.check_out), parseISO(r.check_in)));
+  const nip = nightsInRange(r.check_in, r.check_out, rangeStart, rangeEnd);
+  return gross * (nip / bookingNights);
+}
+
 export function useMonthlyReport(ownerId: string | null, periodStart: Date, periodEnd: Date) {
   return useQuery({
     queryKey: ["monthly_report", ownerId, periodStart.toISOString(), periodEnd.toISOString()],
@@ -164,11 +176,14 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
       const trendRows = filter(trendRes.data);
       const forwardRows = filter(forwardRes.data);
 
+      // Revenue recognition (default prorate_by_nights) — apportion boundary stays.
+      const prorate = ((owner as any).revenue_recognition ?? "prorate_by_nights") !== "whole_in_attributed_month";
+
       // Current period aggregation per property
       const byListing: Record<string, { revenue: number; nights: number }> = {};
       for (const r of currentRows) {
         const nights = nightsInRange(r.check_in, r.check_out, periodStart, periodEnd);
-        const rev = getGrossRevenue(r);
+        const rev = recognisedRevenue(r, periodStart, periodEnd, prorate);
         if (!byListing[r.listing_id]) byListing[r.listing_id] = { revenue: 0, nights: 0 };
         byListing[r.listing_id].revenue += rev;
         byListing[r.listing_id].nights += nights;
@@ -190,7 +205,7 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
       const prevByListing: Record<string, { revenue: number }> = {};
       for (const r of prevRows) {
         const nights = nightsInRange(r.check_in, r.check_out, prevStart, prevEnd);
-        const rev = getGrossRevenue(r);
+        const rev = recognisedRevenue(r, prevStart, prevEnd, prorate);
         prevTotalRevenue += rev;
         prevTotalNights += nights;
         if (!prevByListing[r.listing_id]) prevByListing[r.listing_id] = { revenue: 0 };
