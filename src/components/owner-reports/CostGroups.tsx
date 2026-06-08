@@ -15,51 +15,63 @@ const cat = (c: CostCategory | undefined): Line["value"] => (c?.value ?? null);
 const sum = (lines: Line[]) => lines.reduce((s, l) => s + Number(l.value ?? 0), 0);
 
 export function CostGroups({
-  grossRevenue, managementFee, bookingFees, cardProcessing, costs,
+  grossRevenue, managementFee, bookingFees, cardProcessing, costs, manualByCode = {},
 }: {
   grossRevenue: number; managementFee: number; bookingFees: number; cardProcessing: number;
-  costs: OwnerCostCategories | undefined;
+  costs: OwnerCostCategories | undefined; manualByCode?: Record<string, number>;
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const toggle = (k: string) => setOpen((p) => ({ ...p, [k]: !p[k] }));
   const pctOf = (v: number) => (grossRevenue > 0 ? `${((v / grossRevenue) * 100).toFixed(1)}%` : "—");
 
+  const man = (code: string) => manualByCode[code] ?? 0;
+  // engine value + any manual entry/adjustment for that line; missing only if neither exists
+  const merge = (c: CostCategory | undefined, code: string): Line => {
+    const ev = c?.value ?? null;
+    const m = man(code);
+    if (ev == null && m === 0) return { label: "", value: null, missing: true };
+    return { label: "", value: (ev ?? 0) + m };
+  };
+  const withLabel = (label: string, l: Line): Line => ({ ...l, label });
+  const derived = (label: string, base: number, code: string): Line => ({ label, value: base + man(code) });
+  const refunds = man("refunds");
+
   const groups: Group[] = [
     {
       key: "revenue", title: "Revenue", icon: PoundSterling, tone: "revenue", color: "primary",
       lines: [
-        { label: "Revenue (gross)", value: grossRevenue },
-        { label: "Refunds", value: null, missing: true },
+        { label: "Revenue (gross)", value: grossRevenue + (manualByCode["revenue"] ?? 0) },
+        { label: "Refunds", value: refunds > 0 ? -refunds : null, missing: refunds === 0 },
       ],
     },
     {
       key: "distribution", title: "Distribution Fees", icon: CreditCard, tone: "cost", color: "chart-3",
       lines: [
-        { label: "Booking Fees", value: bookingFees },
-        { label: "Card Processing Fees", value: cardProcessing },
+        derived("Booking Fees", bookingFees, "booking_fees"),
+        derived("Card Processing Fees", cardProcessing, "card_processing"),
       ],
     },
     {
       key: "servicing", title: "Servicing", icon: Sparkles, tone: "cost", color: "chart-2",
       lines: [
-        { label: "Cleaning", value: cat(costs?.cleaning), missing: costs?.cleaning?.missing },
-        { label: "Laundry", value: cat(costs?.laundry), missing: costs?.laundry?.missing },
-        { label: "Consumables", value: cat(costs?.consumables), missing: costs?.consumables?.missing },
-        { label: "Welcome Baskets", value: cat(costs?.welcomeBaskets), missing: costs?.welcomeBaskets?.missing },
+        withLabel("Cleaning", merge(costs?.cleaning, "cleaning")),
+        withLabel("Laundry", merge(costs?.laundry, "laundry")),
+        withLabel("Consumables", merge(costs?.consumables, "consumables")),
+        withLabel("Welcome Baskets", merge(costs?.welcomeBaskets, "welcome_baskets")),
       ],
     },
     {
       key: "operations", title: "Operations", icon: Wrench, tone: "cost", color: "chart-4",
       lines: [
-        { label: "Utilities", value: cat(costs?.utilities), missing: costs?.utilities?.missing },
-        { label: "Maintenance", value: cat(costs?.maintenance), missing: costs?.maintenance?.missing },
+        withLabel("Utilities", merge(costs?.utilities, "utilities")),
+        withLabel("Maintenance", merge(costs?.maintenance, "maintenance")),
       ],
     },
     {
       key: "management", title: "Management", icon: Briefcase, tone: "cost", color: "chart-5",
       lines: [
-        { label: "Management Fees", value: managementFee },
-        { label: "Setup Fees", value: cat(costs?.setup), missing: costs?.setup?.missing },
+        derived("Management Fees", managementFee, "management"),
+        withLabel("Setup Fees", merge(costs?.setup, "setup")),
       ],
     },
   ];

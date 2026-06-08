@@ -33,19 +33,26 @@ export function SettlementSection({
   const platformCosts =
     v(costs?.cleaning) + v(costs?.consumables) + v(costs?.laundry) + v(costs?.maintenance) +
     v(costs?.setup) + v(costs?.welcomeBaskets) + v(costs?.utilities);
+  // manual cost lines / cost-line adjustments (refunds handled on the revenue side)
+  const manual = settlement.manualByCode ?? {};
+  const refunds = Number(manual["refunds"] ?? 0);
+  const manualCosts = Object.entries(manual).filter(([k]) => k !== "refunds").reduce((s, [, val]) => s + Number(val), 0);
   const portfolioFee = settlement.managementFeeMethod === "flat_per_portfolio" ? settlement.flatPortfolioFee : 0;
-  const costTotal = round2(managementFee + settlement.bookingFees + settlement.cardProcessing + platformCosts + portfolioFee);
-  const netTotal = round2(grossRevenue - costTotal);
-  const settlementDue = round2(netTotal + settlement.openingBalance);
+
+  const revenueTotal = round2(grossRevenue - refunds + (settlement.revenueAdj ?? 0));
+  const costTotal = round2(managementFee + settlement.bookingFees + settlement.cardProcessing + platformCosts + manualCosts + portfolioFee);
+  const netTotal = round2(revenueTotal - costTotal);
+  const settlementDue = round2(netTotal + settlement.openingBalance + (settlement.settlementAdj ?? 0));
   const netSettlementBalance = round2(settlementDue - settlement.weeklyRrTotal);
 
   const rows: [string, number][] = [
-    ["Revenue (gross)", grossRevenue],
+    ["Revenue (net of refunds)", revenueTotal],
     ["− Costs (incl. management, booking fees)", -costTotal],
     ["= Net", netTotal],
     ["+ Opening balance", settlement.openingBalance],
-    ["= Settlement due", settlementDue],
   ];
+  if (settlement.settlementAdj) rows.push(["+ Settlement adjustment", settlement.settlementAdj]);
+  rows.push(["= Settlement due", settlementDue]);
   if (settlement.settlementMethod === "weekly_draw")
     rows.push([`− Weekly RR draw (×${settlement.weeksDrawn})`, -settlement.weeklyRrTotal]);
   rows.push(["= Net settlement balance", netSettlementBalance]);
@@ -57,7 +64,7 @@ export function SettlementSection({
           <div className="font-semibold">Settlement</div>
           <Button size="sm" onClick={() => finalize.mutate(
             { ownerId, periodStart, periodEnd, openingBalance: settlement.openingBalance, weeklyRrTotal: settlement.weeklyRrTotal,
-              revenueTotal: grossRevenue, costTotal, netTotal, settlementDue, netSettlementBalance },
+              revenueTotal, costTotal, netTotal, settlementDue, netSettlementBalance },
             { onSuccess: () => toast.success("Period finalised — balance carried forward"),
               onError: (e: any) => toast.error(e.message ?? "Finalise failed") })}
             disabled={finalize.isPending}>

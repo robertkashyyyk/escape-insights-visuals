@@ -24,6 +24,10 @@ export interface OwnerSettlement {
     total: number; matched: number; inQueue: number;
     matchedAmount: number; totalAmount: number; fullyReconciled: boolean;
   };
+  manualByCode: Record<string, number>;   // manual cost / cost-line adjustments per code
+  revenueAdj: number;
+  settlementAdj: number;
+  reportPeriodId: string | null;
 }
 
 export function useOwnerSettlement(ownerId: string | null, periodStart: Date, periodEnd: Date) {
@@ -94,6 +98,30 @@ export function useOwnerSettlement(ownerId: string | null, periodStart: Date, pe
         };
       }
 
+      // Manual cost lines (property_costs) + logged adjustments (line_adjustments).
+      // Both hang off a report_period; null if none exists yet for this owner/month.
+      const manualByCode: Record<string, number> = {};
+      let revenueAdj = 0, settlementAdj = 0, reportPeriodId: string | null = null;
+      const { data: period } = await db.from("report_periods").select("id")
+        .eq("owner_id", ownerId).eq("period_start", startStr).maybeSingle();
+      reportPeriodId = period?.id ?? null;
+      if (reportPeriodId) {
+        const { data: pcs } = await db.from("property_costs")
+          .select("actual_amount, cost_line_types(code)").eq("report_period_id", reportPeriodId);
+        (pcs ?? []).forEach((c: any) => {
+          const code = c.cost_line_types?.code;
+          if (code) manualByCode[code] = (manualByCode[code] ?? 0) + Number(c.actual_amount ?? 0);
+        });
+        const { data: adj } = await db.from("line_adjustments")
+          .select("target, amount, cost_line_types(code)").eq("report_period_id", reportPeriodId);
+        (adj ?? []).forEach((a: any) => {
+          if (a.target === "revenue") revenueAdj += Number(a.amount);
+          else if (a.target === "settlement") settlementAdj += Number(a.amount);
+          else if (a.target === "cost_line" && a.cost_line_types?.code)
+            manualByCode[a.cost_line_types.code] = (manualByCode[a.cost_line_types.code] ?? 0) + Number(a.amount);
+        });
+      }
+
       const weeksDrawn = Math.round(daysInPeriod / 7);
       const weeklyRrAmount = Number(owner.weekly_rr_amount ?? 0);
       const weeklyRrTotal = owner.settlement_method === "weekly_draw" ? weeklyRrAmount * weeksDrawn : 0;
@@ -104,6 +132,7 @@ export function useOwnerSettlement(ownerId: string | null, periodStart: Date, pe
         weeklyRrAmount, weeklyRrTotal: round2(weeklyRrTotal),
         settlementMethod: owner.settlement_method, managementFeeMethod: owner.management_fee_method,
         flatPortfolioFee: Number(owner.flat_portfolio_fee ?? 0), weeksDrawn, recon,
+        manualByCode, revenueAdj: round2(revenueAdj), settlementAdj: round2(settlementAdj), reportPeriodId,
       };
     },
   });
@@ -135,3 +164,93 @@ export function useFinalizePeriod() {
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+
+// ── Manual cost lines + logged adjustments ──────────────────────────────────
+export interface ManualCostRow { id: string; cost_code: string; display_name: string; listing_id: string | null; listing_name: string | null; amount: number }
+export interface AdjustmentRow { id: string; target: string; cost_code: string | null; amount: number; reason: string }
+
+async function ensureDraftPeriod(ownerId: string, periodStart: string, periodEnd: string): Promise<string> {
+  const { data: existing } = await db.from("report_periods").select("id")
+    .eq("owner_id", ownerId).eq("period_start", periodStart).maybeSingle();
+  if (existing?.id) return existing.id;
+  const { data: created, error } = await db.from("report_periods")
+    .insert({ owner_id: ownerId, period_start: periodStart, period_end: periodEnd, status: "draft" })
+    .select("id").single();
+  if (error) throw error;
+  return created.id;
+}
+
+export function useManualEntries(ownerId: string | null, periodStart: string, periodEnd: string) {
+  const qc = useQueryClient();
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["owner_settlement"] });
+    qc.invalidateQueries({ queryKey: ["manual_entries"] });
+  };
+
+  const entries = useQuery({
+    queryKey: ["manual_entries", ownerId, periodStart],
+    enabled: !!ownerId,
+    queryFn: async (): Promise<{ costs: ManualCostRow[]; adjustments: AdjustmentRow[] }> => {
+      const { data: period } = await db.from("report_periods").select("id")
+        .eq("owner_id", ownerId).eq("period_start", periodStart).maybeSingle();
+      if (!period?.id) return { costs: [], adjustments: [] };
+      const { data: pcs } = await db.from("property_costs")
+        .select("id, actual_amount, listing_id, cost_line_types(code, display_name), listings(name)")
+        .eq("report_period_id", period.id);
+      const { data: adj } = await db.from("line_adjustments")
+        .select("id, target, amount, reason, cost_line_types(code)").eq("report_period_id", period.id);
+      return {
+        costs: (pcs ?? []).map((c: any) => ({
+          id: c.id, cost_code: c.cost_line_types?.code, display_name: c.cost_line_types?.display_name,
+          listing_id: c.listing_id, listing_name: c.listings?.name ?? null, amount: Number(c.actual_amount),
+        })),
+        adjustments: (adj ?? []).map((a: any) => ({
+          id: a.id, target: a.target, cost_code: a.cost_line_types?.code ?? null,
+          amount: Number(a.amount), reason: a.reason,
+        })),
+      };
+    },
+  });
+
+  const addCost = useMutation({
+    mutationFn: async (v: { listingId: string; costCode: string; amount: number }) => {
+      if (!ownerId) return;
+      const periodId = await ensureDraftPeriod(ownerId, periodStart, periodEnd);
+      const { data: clt } = await db.from("cost_line_types").select("id").eq("code", v.costCode).single();
+      await db.from("property_costs").upsert({
+        report_period_id: periodId, listing_id: v.listingId, cost_line_type_id: clt.id,
+        actual_amount: v.amount, source: "manual",
+      }, { onConflict: "report_period_id,listing_id,cost_line_type_id" });
+    },
+    onSuccess: invalidate,
+  });
+
+  const addAdjustment = useMutation({
+    mutationFn: async (v: { target: "revenue" | "cost_line" | "settlement"; costCode?: string; amount: number; reason: string }) => {
+      if (!ownerId) return;
+      const periodId = await ensureDraftPeriod(ownerId, periodStart, periodEnd);
+      let costLineTypeId: string | null = null;
+      if (v.target === "cost_line" && v.costCode) {
+        const { data: clt } = await db.from("cost_line_types").select("id").eq("code", v.costCode).single();
+        costLineTypeId = clt?.id ?? null;
+      }
+      const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
+      await db.from("line_adjustments").insert({
+        report_period_id: periodId, target: v.target, cost_line_type_id: costLineTypeId,
+        amount: v.amount, reason: v.reason, adjusted_by: uid,
+      });
+    },
+    onSuccess: invalidate,
+  });
+
+  const removeCost = useMutation({
+    mutationFn: async (id: string) => { await db.from("property_costs").delete().eq("id", id); },
+    onSuccess: invalidate,
+  });
+  const removeAdjustment = useMutation({
+    mutationFn: async (id: string) => { await db.from("line_adjustments").delete().eq("id", id); },
+    onSuccess: invalidate,
+  });
+
+  return { entries, addCost, addAdjustment, removeCost, removeAdjustment };
+}

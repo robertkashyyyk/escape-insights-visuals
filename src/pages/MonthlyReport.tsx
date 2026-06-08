@@ -22,6 +22,7 @@ import { useOwnerCostCategories, type CostCategory } from "@/hooks/useOwnerCostC
 import { useOwnerSettlement } from "@/hooks/useOwnerSettlement";
 import { ReconBanner, SettlementSection } from "@/components/owner-reports/SettlementBlocks";
 import { CostGroups } from "@/components/owner-reports/CostGroups";
+import { ManualEntries } from "@/components/owner-reports/ManualEntries";
 
 const fmt = (n: number) => `£${n.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 const fmtMoney = (n: number) => `£${n.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
@@ -335,6 +336,7 @@ export default function MonthlyReport() {
               bookingFees={settlement?.bookingFees ?? 0}
               cardProcessing={settlement?.cardProcessing ?? 0}
               costs={costs}
+              manualByCode={settlement?.manualByCode}
             />
 
             {/* Section 2c — Settlement waterfall (gross model) */}
@@ -347,6 +349,15 @@ export default function MonthlyReport() {
                 managementFee={report.managementFee}
                 costs={costs}
                 settlement={settlement}
+              />
+            )}
+
+            {/* Section 2d — Manual cost lines + adjustments */}
+            {ownerId && (
+              <ManualEntries
+                ownerId={ownerId}
+                periodStart={format(periodStart, "yyyy-MM-dd")}
+                periodEnd={format(periodEnd, "yyyy-MM-dd")}
               />
             )}
 
