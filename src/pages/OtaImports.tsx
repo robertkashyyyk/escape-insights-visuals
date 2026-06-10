@@ -288,7 +288,12 @@ function AttributionRow({ txn, listings, m }: {
           <span className="font-medium">{fmtGBP(txn.net_amount ?? txn.gross_amount)}</span>
           <span className="text-xs text-muted-foreground">{txn.statement_descriptor ?? txn.property_name_raw ?? "—"}</span>
         </div>
-        <div className="text-xs text-muted-foreground">{txn.guest_name ?? ""} {txn.check_in ? `· ${d(txn.check_in)}` : ""}</div>
+        <div className="text-xs text-muted-foreground">
+          {txn.guest_name ?? ""} {txn.check_in ? `· ${d(txn.check_in)}` : ""}
+          {(txn.reference_number || txn.confirmation_code) && (
+            <> · <span className="font-mono">{txn.reference_number ?? txn.confirmation_code}</span></>
+          )}
+        </div>
         <Textarea rows={2} placeholder="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} />
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
           <Select value={listingId} onValueChange={setListingId}>
@@ -407,7 +412,6 @@ function MatchedTab() {
 function SecurityTab() {
   const { data, isLoading } = useSecurityDeposits();
   const [month, setMonth] = useState<string>("all");
-  const [showLedger, setShowLedger] = useState(false);
   const monthLabel = (m: string) => format(new Date(`${m}-01T00:00:00`), "MMM yyyy");
   const chip = (active: boolean) =>
     `px-2.5 py-1 rounded-full text-xs border transition-colors ${active ? "bg-primary/15 text-primary border-primary/40" : "border-border/60 text-muted-foreground hover:border-border"}`;
@@ -415,16 +419,11 @@ function SecurityTab() {
   const inM = <T extends { month: string | null }>(arr: T[]) => (month === "all" ? arr : arr.filter((x) => x.month === month));
   const held = inM(data?.held ?? []);
   const refundOnly = inM(data?.refundOnly ?? []);
-  const txns = inM(data?.txns ?? []);
+  const pairs = inM(data?.pairs ?? []);
   const totalHeld = Math.round(held.reduce((s, g) => s + g.net, 0) * 100) / 100;
-  const returnedCount = new Set(txns.filter((t) => t.status === "returned").map((t) => t.ref)).size;
-  const feeTotal = Math.round(txns.reduce((s, t) => s + t.fee, 0) * 100) / 100;
+  const returnedCount = pairs.length;
+  const feeTotal = Math.round(([...held, ...refundOnly].reduce((s, g) => s + g.fee, 0) + pairs.reduce((s, p) => s + p.fee, 0)) * 100) / 100;
   const months = data?.months ?? [];
-
-  const statusBadge = (s: string) =>
-    s === "returned" ? <Badge variant="outline" className="bg-green-500/15 text-green-400 border-green-500/30">returned</Badge>
-    : s === "held" ? <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/30">held</Badge>
-    : <Badge variant="outline" className="bg-red-500/15 text-red-400 border-red-500/30">awaiting charge</Badge>;
 
   return (
     <div className="space-y-4">
@@ -503,28 +502,55 @@ function SecurityTab() {
         </CardContent></Card>
       )}
 
-      {/* Full in/out ledger (audit log) */}
+    </div>
+  );
+}
+
+// Reconciled-deposit ledger: only deposits with BOTH an in and an out, one line
+// each (Source id + both payment references + the two amounts), split by month.
+function LedgerTab() {
+  const { data } = useSecurityDeposits();
+  const [month, setMonth] = useState<string>("all");
+  const monthLabel = (m: string) => format(new Date(`${m}-01T00:00:00`), "MMM yyyy");
+  const chip = (active: boolean) =>
+    `px-2.5 py-1 rounded-full text-xs border transition-colors ${active ? "bg-primary/15 text-primary border-primary/40" : "border-border/60 text-muted-foreground hover:border-border"}`;
+  const months = data?.months ?? [];
+  const pairs = (data?.pairs ?? []).filter((p) => month === "all" || p.month === month);
+
+  return (
+    <div className="space-y-4">
+      {months.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground">Month:</span>
+          <button onClick={() => setMonth("all")} className={chip(month === "all")}>All</button>
+          {months.map((m) => <button key={m} onClick={() => setMonth(m)} className={chip(month === m)}>{monthLabel(m)}</button>)}
+        </div>
+      )}
       <Card><CardContent className="p-0">
-        <button onClick={() => setShowLedger((v) => !v)} className="w-full p-3 text-sm font-semibold border-b border-border flex items-center justify-between">
-          <span>In / out ledger ({txns.length})</span>
-          <span className="text-xs text-muted-foreground">{showLedger ? "hide" : "show"}</span>
-        </button>
-        {showLedger && (
+        <div className="p-3 text-sm font-semibold border-b border-border">Reconciled deposits — in & out paired ({pairs.length})</div>
+        {pairs.length === 0 ? (
+          <div className="p-6 text-center text-muted-foreground text-sm">No fully-paired deposits{month === "all" ? "" : " this month"}.</div>
+        ) : (
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground border-b border-border">
-              <tr><th className="text-left p-3">Date</th><th className="text-left p-3">Stripe charge (Source)</th>
-              <th className="text-right p-3">In</th><th className="text-right p-3">Out</th>
-              <th className="text-right p-3">Fee</th><th className="text-left p-3 pl-4">Status</th></tr>
+              <tr>
+                <th className="text-left p-3">Date</th>
+                <th className="text-left p-3">Source ID</th>
+                <th className="text-left p-3">Payment ref (in)</th>
+                <th className="text-left p-3">Payment ref (out)</th>
+                <th className="text-right p-3">In</th>
+                <th className="text-right p-3">Out</th>
+              </tr>
             </thead>
             <tbody>
-              {txns.map((t) => (
-                <tr key={t.id} className="border-b border-border/40">
-                  <td className="p-3">{t.date ? format(new Date(t.date), "dd MMM") : "—"}</td>
-                  <td className="p-3 font-mono text-xs text-muted-foreground">{t.ref}</td>
-                  <td className="p-3 text-right text-green-400">{t.direction === "in" ? fmtGBP(t.amount) : ""}</td>
-                  <td className="p-3 text-right text-red-400">{t.direction === "out" ? fmtGBP(t.amount) : ""}</td>
-                  <td className="p-3 text-right text-muted-foreground">{t.fee ? fmtGBP(t.fee) : ""}</td>
-                  <td className="p-3 pl-4">{statusBadge(t.status)}</td>
+              {pairs.map((p) => (
+                <tr key={p.ref} className="border-b border-border/40">
+                  <td className="p-3 whitespace-nowrap">{p.date ? format(new Date(p.date), "dd MMM yyyy") : "—"}</td>
+                  <td className="p-3 font-mono text-xs text-muted-foreground">{p.ref}</td>
+                  <td className="p-3 font-mono text-xs text-muted-foreground">{p.inRefs.join(", ") || "—"}</td>
+                  <td className="p-3 font-mono text-xs text-muted-foreground">{p.outRefs.join(", ") || "—"}</td>
+                  <td className="p-3 text-right text-green-400">{fmtGBP(p.inTotal)}</td>
+                  <td className="p-3 text-right text-red-400">{fmtGBP(-p.outTotal)}</td>
                 </tr>
               ))}
             </tbody>
@@ -558,12 +584,14 @@ export default function OtaImports() {
             <TabsTrigger value="recon">Recon Queue ({recon.length})</TabsTrigger>
             <TabsTrigger value="attribution">Attribution ({attrib.length})</TabsTrigger>
             <TabsTrigger value="security">Security ({sec?.held.length ?? 0})</TabsTrigger>
+            <TabsTrigger value="ledger">Ledger ({sec?.pairs.length ?? 0})</TabsTrigger>
           </TabsList>
           <TabsContent value="batches" className="mt-4"><BatchesTab /></TabsContent>
           <TabsContent value="matched" className="mt-4"><MatchedTab /></TabsContent>
           <TabsContent value="recon" className="mt-4"><ReconTab /></TabsContent>
           <TabsContent value="attribution" className="mt-4"><AttributionTab /></TabsContent>
           <TabsContent value="security" className="mt-4"><SecurityTab /></TabsContent>
+          <TabsContent value="ledger" className="mt-4"><LedgerTab /></TabsContent>
         </Tabs>
       </div>
     </AppLayout>
