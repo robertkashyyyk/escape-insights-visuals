@@ -1,7 +1,7 @@
 // Shared OTA-ingestion types + client-side helpers (candidate ranking for the
 // Recon Queue mirrors the authoritative server scorer in supabase/functions/ota-ingest).
 
-export type OtaPlatform = "airbnb" | "bookingcom";
+export type OtaPlatform = "airbnb" | "bookingcom" | "stripe";
 export type OtaTxnType = "reservation" | "payout" | "resolution" | "adjustment";
 export type OtaCollectionModel = "channel" | "host" | null;
 export type OtaMatchMethod = "code" | "composite" | "manual" | "none";

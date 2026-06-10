@@ -51,6 +51,7 @@ function UploadCard() {
               <SelectContent>
                 <SelectItem value="airbnb">Airbnb</SelectItem>
                 <SelectItem value="bookingcom">Booking.com</SelectItem>
+                <SelectItem value="stripe">Stripe (Direct)</SelectItem>
               </SelectContent>
             </Select>
           </div>

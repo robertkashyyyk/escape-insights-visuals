@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
       return json({ error: "Staff only" }, 403);
 
     const { platform, filename, csv } = await req.json();
-    if (!["airbnb", "bookingcom"].includes(platform)) return json({ error: "Unknown platform" }, 400);
+    if (!["airbnb", "bookingcom", "stripe"].includes(platform)) return json({ error: "Unknown platform" }, 400);
     if (!csv || typeof csv !== "string") return json({ error: "Missing csv" }, 400);
 
     const grid = parseCsv(csv);
@@ -194,7 +194,7 @@ Deno.serve(async (req) => {
         } else {
           staged.push({ ...base, txn_type: "adjustment", is_revenue: false, net_amount: amount, recon_status: "needs_recon" });
         }
-      } else {
+      } else if (platform === "bookingcom") {
         // booking.com
         const type = (cell(r, "Type") ?? cell(r, "Transaction type") ?? "").trim();
         const status = (cell(r, "Reservation status") ?? "").trim();
@@ -246,6 +246,45 @@ Deno.serve(async (req) => {
             net_amount: gross });
         }
         trackPeriod(ci);
+      } else {
+        // stripe (balance history)
+        const type = (cell(r, "Type") ?? "").trim().toLowerCase();
+        const amount = num(cell(r, "Amount"));
+        const fee = num(cell(r, "Fee"));
+        const netAmt = num(cell(r, "Net"));
+        const created = toDate((cell(r, "Created (UTC)") ?? "").slice(0, 10));
+        const desc = cell(r, "Description") ?? "";
+        const chargeRef = (cell(r, "Source") ?? cell(r, "id") ?? "").trim() || null;
+        // Hostaway reservation id linked in the description / metadata
+        const ridMatch = desc.match(/Reservation Id:\s*(\d+)/i);
+        const stripeResvId = ridMatch ? ridMatch[1] : null;
+        const base: Stg = {
+          platform, raw_row: rawObj, currency: (cell(r, "Currency") ?? "GBP").trim() || "GBP",
+          reference_number: chargeRef, statement_descriptor: desc || null,
+          check_in: created, stripe_resv_id: stripeResvId,
+        };
+        if (type === "charge" || type === "payment") {
+          if (stripeResvId) {
+            // direct/website/google booking paid via Stripe -> match by Hostaway id
+            staged.push({ ...base, txn_type: "reservation", is_revenue: true, collection_model: "channel",
+              gross_amount: amount, commission_amount: 0, payment_fee_amount: fee, net_amount: netAmt ?? amount });
+            trackPeriod(created);
+          } else {
+            // no reservation link -> security deposit / hold: excluded from revenue,
+            // but its card fee is still a real cost (captured on the row).
+            staged.push({ ...base, txn_type: "adjustment", is_revenue: false,
+              statement_descriptor: "Security deposit / hold", payment_fee_amount: fee,
+              net_amount: amount, recon_status: "excluded" });
+          }
+        } else if (type === "refund" || type === "payment_refund") {
+          // deposit returns / booking refunds -> non-revenue; netting is the Phase-2 audit
+          staged.push({ ...base, txn_type: "adjustment", is_revenue: false,
+            statement_descriptor: stripeResvId ? "Refund" : "Deposit refund",
+            payment_fee_amount: fee, net_amount: amount, recon_status: "excluded" });
+        } else {
+          // payout / refund_failure / other -> informational
+          staged.push({ ...base, txn_type: "payout", is_revenue: false, net_amount: amount, recon_status: "excluded" });
+        }
       }
     }
 
@@ -276,6 +315,18 @@ Deno.serve(async (req) => {
         .select("id, listing_id, guest_name, check_in, check_out, total_amount, host_payout, channel_reservation_code, status")
         .in("channel_reservation_code", allCodes.slice(i, i + 300));
       (data ?? []).forEach((r: any) => { if (r.channel_reservation_code) codeToResv.set(r.channel_reservation_code, r); });
+    }
+
+    // Stripe direct bookings link by Hostaway reservation id (not a channel code).
+    const hostawayIds = Array.from(new Set(
+      staged.filter((s) => s.txn_type === "reservation" && s.stripe_resv_id).map((s) => Number(s.stripe_resv_id)),
+    )).filter((n) => Number.isFinite(n)) as number[];
+    const hostawayIdToResv = new Map<string, any>();
+    for (let i = 0; i < hostawayIds.length; i += 300) {
+      const { data } = await admin.from("reservations")
+        .select("id, listing_id, hostaway_reservation_id, status")
+        .in("hostaway_reservation_id", hostawayIds.slice(i, i + 300));
+      (data ?? []).forEach((r: any) => { if (r.hostaway_reservation_id != null) hostawayIdToResv.set(String(r.hostaway_reservation_id), r); });
     }
     const learnedAliases: { platform: string; raw_name: string; listing_id: string }[] = [];
     const learnAlias = (t: Stg, listingId: string) => {
@@ -374,6 +425,22 @@ Deno.serve(async (req) => {
       const rowCode = t.confirmation_code || t.reference_number;
       if (rowCode && cancelledCodes.has(rowCode)) {
         out.is_revenue = false; out.recon_status = "excluded";
+        rowsToInsert.push(out);
+        continue;
+      }
+
+      if (t.txn_type === "reservation" && t.stripe_resv_id) {
+        // Stripe direct booking — match by Hostaway reservation id.
+        const hit = hostawayIdToResv.get(String(t.stripe_resv_id));
+        if (hit) {
+          out.matched_reservation_id = hit.id;
+          out.resolved_listing_id = hit.listing_id;
+          out.match_method = "code"; out.match_confidence = 1.0;
+          if (hit.status === "confirmed") out.recon_status = "auto_matched";
+          else { out.is_revenue = false; out.recon_status = "excluded"; } // cancelled
+        } else {
+          out.recon_status = "needs_recon";
+        }
         rowsToInsert.push(out);
         continue;
       }
