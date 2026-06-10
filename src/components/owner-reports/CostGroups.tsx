@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { ChevronDown, PoundSterling, CreditCard, Sparkles, Wrench, Briefcase, type LucideIcon } from "lucide-react";
 import type { OwnerCostCategories, CostCategory } from "@/hooks/useOwnerCostCategories";
 
@@ -122,26 +122,23 @@ export function CostGroups({
 
               <div className={`grid transition-all duration-200 ${isOpen ? "grid-rows-[1fr] opacity-100 mt-3" : "grid-rows-[0fr] opacity-0"}`}>
                 <div className="overflow-hidden">
-                  <div className="space-y-1.5 border-t border-border/50 pt-2">
+                  {/* shared 3-col grid so % and £ line up vertically across every row */}
+                  <div className="grid grid-cols-[1fr_auto_auto] gap-x-2 gap-y-1.5 items-baseline border-t border-border/50 pt-2 text-xs">
                     {g.lines.map((l) => {
                       const v = Number(l.value ?? 0);
-                      // Revenue card: show this channel's share of revenue beside the label.
-                      const showRevPct = g.pctMode === "revenue" && l.value != null && v > 0 && grossRevenue > 0;
-                      // Cost cards (except Distribution): show this line as % of revenue by the value.
-                      const showCostPct = g.pctMode === "cost" && !l.missing && l.value != null && grossRevenue > 0;
+                      // Revenue card → this channel's share of revenue; cost cards (not
+                      // Distribution) → this line as % of revenue. Same column either way.
+                      const showPct =
+                        (g.pctMode === "revenue" && l.value != null && v > 0 && grossRevenue > 0) ||
+                        (g.pctMode === "cost" && !l.missing && l.value != null && grossRevenue > 0);
                       return (
-                        <div key={l.label} className="flex items-baseline justify-between gap-2 text-xs min-w-0">
-                          <span className="flex items-baseline gap-1.5 min-w-0">
-                            <span className="text-muted-foreground truncate min-w-0" title={l.label}>{l.label}</span>
-                            {showRevPct && <span className="text-[10px] text-muted-foreground/60 shrink-0">{pctOf(v)}</span>}
+                        <Fragment key={l.label}>
+                          <span className="text-muted-foreground truncate min-w-0" title={l.label}>{l.label}</span>
+                          <span className="text-[10px] text-muted-foreground/60 tabular-nums text-right">{showPct ? pctOf(v) : ""}</span>
+                          <span className={`tabular-nums text-right whitespace-nowrap ${l.missing ? "text-amber-400" : "text-foreground"}`}>
+                            {l.missing || l.value == null ? "—" : gbp(v)}
                           </span>
-                          <span className="flex items-baseline gap-1.5 shrink-0 tabular-nums">
-                            {showCostPct && <span className="text-[10px] text-muted-foreground/70">{pctOf(v)}</span>}
-                            <span className={`whitespace-nowrap ${l.missing ? "text-amber-400" : "text-foreground"}`}>
-                              {l.missing || l.value == null ? "—" : gbp(v)}
-                            </span>
-                          </span>
-                        </div>
+                        </Fragment>
                       );
                     })}
                   </div>
