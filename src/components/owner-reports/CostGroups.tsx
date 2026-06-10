@@ -116,9 +116,10 @@ export function CostGroups({
                 </div>
                 <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
               </div>
-              <div className="mt-3 text-xs uppercase tracking-wide text-muted-foreground truncate">{g.title}</div>
-              <div className="text-xl font-bold tabular-nums truncate">{gbp(total)}</div>
-              {g.tone === "cost" && <div className="text-[11px] text-muted-foreground">{pctOf(total)} of revenue</div>}
+              <div className="mt-3 h-4 text-xs uppercase tracking-wide text-muted-foreground truncate leading-4">{g.title}</div>
+              <div className="h-7 text-xl font-bold tabular-nums truncate leading-7">{gbp(total)}</div>
+              {/* always reserve the subline so the divider + lines start at the same y on every card (Revenue has no %) */}
+              <div className="h-4 text-[11px] text-muted-foreground leading-4">{g.tone === "cost" ? `${pctOf(total)} of revenue` : ""}</div>
 
               <div className={`grid transition-all duration-200 ${isOpen ? "grid-rows-[1fr] opacity-100 mt-3" : "grid-rows-[0fr] opacity-0"}`}>
                 <div className="overflow-hidden">
