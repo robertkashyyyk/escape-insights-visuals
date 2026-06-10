@@ -132,22 +132,29 @@ export function useOwnerSettlement(ownerId: string | null, periodStart: Date, pe
           distributionByChannel["deposit_fees"] = (distributionByChannel["deposit_fees"] ?? 0) + depositCardFees;
         }
 
-        // reconciliation summary across the owner's revenue OTA rows — scoped to
-        // the selected period (overlap), so it reflects this month's reconciliation
-        // rather than all-time. (This is a coverage metric — settlement-match value,
-        // not gross revenue — so it intentionally won't equal the Revenue card.)
-        const { data: rec } = await db.from("ota_transactions")
-          .select("recon_status, gross_amount, net_amount")
-          .in("resolved_listing_id", listingIds).eq("is_revenue", true)
-          .lte("check_in", endStr).gte("check_out", startStr);
-        const rows = (rec ?? []) as any[];
-        const matched = rows.filter((r) => ["auto_matched", "matched"].includes(r.recon_status));
-        const queue = rows.filter((r) => ["needs_recon", "unmatched"].includes(r.recon_status));
+        // Reservation-level reconciliation COVERAGE for the period (not a £ figure).
+        // For each of the period's confirmed reservations: is it matched to a
+        // settlement row (Airbnb/Booking.com payout, or a Stripe charge for direct),
+        // or does it have one awaiting manual recon? Period-correct and works for
+        // Stripe rows, which carry no check_out. We deliberately don't show a £
+        // here — it's coverage, not revenue, so comparing it to the Revenue card
+        // was misleading.
+        const matchedResv = new Set<string>(otaByResv.keys());
+        const queueResv = new Set<string>();
+        if (resvIds.length) {
+          const { data: rec } = await db.from("ota_transactions")
+            .select("matched_reservation_id")
+            .in("matched_reservation_id", resvIds).eq("is_revenue", true)
+            .in("recon_status", ["needs_recon", "unmatched"]);
+          (rec ?? []).forEach((o: any) => {
+            if (o.matched_reservation_id && !matchedResv.has(o.matched_reservation_id)) queueResv.add(o.matched_reservation_id);
+          });
+        }
+        const awaiting = Math.max(0, reservations.length - matchedResv.size - queueResv.size);
         recon = {
-          total: rows.length, matched: matched.length, inQueue: queue.length,
-          matchedAmount: matched.reduce((s, r) => s + Number(r.gross_amount ?? r.net_amount ?? 0), 0),
-          totalAmount: rows.reduce((s, r) => s + Number(r.gross_amount ?? r.net_amount ?? 0), 0),
-          fullyReconciled: queue.length === 0,
+          total: reservations.length, matched: matchedResv.size, inQueue: queueResv.size,
+          matchedAmount: 0, totalAmount: awaiting, // totalAmount repurposed: # awaiting a settlement
+          fullyReconciled: queueResv.size === 0,
         };
       }
 

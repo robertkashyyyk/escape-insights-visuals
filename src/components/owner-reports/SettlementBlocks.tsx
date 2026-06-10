@@ -14,7 +14,9 @@ export function ReconBanner({ recon }: { recon: OwnerSettlement["recon"] }) {
     <div className={`flex items-center gap-2 rounded-lg border p-3 text-sm ${ok ? "border-green-500/30 bg-green-500/10 text-green-400" : "border-amber-500/30 bg-amber-500/10 text-amber-400"}`}>
       {ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
       <span>
-        {recon.matched} of {recon.total} reservations reconciled to OTA settlements · {gbp(recon.matchedAmount)} of {gbp(recon.totalAmount)} matched · {recon.inQueue} in queue
+        {recon.matched} of {recon.total} reservations matched to a settlement
+        {recon.inQueue > 0 ? ` · ${recon.inQueue} in recon queue` : ""}
+        {recon.totalAmount > 0 ? ` · ${recon.totalAmount} awaiting a settlement` : ""}
       </span>
     </div>
   );
