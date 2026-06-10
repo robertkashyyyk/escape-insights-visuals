@@ -97,6 +97,23 @@ export function useOwnerSettlement(ownerId: string | null, periodStart: Date, pe
           distributionByChannel[ch] = (distributionByChannel[ch] ?? 0) + comm + card;
         }
 
+        // Security-deposit card fees (non-revenue): the card processing fee is
+        // charged when the deposit is taken and is NOT refunded with the deposit,
+        // so it's a real cost. Attribute it to the property the deposit resolved
+        // to, recognising it in the month of the stay (check_in within period).
+        const { data: depRows } = await db.from("ota_transactions")
+          .select("payment_fee_amount")
+          .eq("platform", "stripe").eq("txn_type", "adjustment")
+          .ilike("statement_descriptor", "%security deposit%")
+          .gt("payment_fee_amount", 0)
+          .in("resolved_listing_id", listingIds)
+          .gte("check_in", startStr).lte("check_in", endStr);
+        const depositCardFees = (depRows ?? []).reduce((s: number, d: any) => s + Number(d.payment_fee_amount ?? 0), 0);
+        if (depositCardFees > 0) {
+          cardProcessing += depositCardFees;
+          distributionByChannel["deposit_fees"] = (distributionByChannel["deposit_fees"] ?? 0) + depositCardFees;
+        }
+
         // reconciliation summary across the owner's revenue OTA rows
         const { data: rec } = await db.from("ota_transactions")
           .select("recon_status, gross_amount, net_amount")

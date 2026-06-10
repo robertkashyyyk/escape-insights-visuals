@@ -26,7 +26,7 @@ export function CostGroups({
   const toggle = (k: string) => setOpen((p) => ({ ...p, [k]: !p[k] }));
   const pctOf = (v: number) => (grossRevenue > 0 ? `${((v / grossRevenue) * 100).toFixed(1)}%` : "—");
 
-  const CH_LABEL: Record<string, string> = { bookingcom: "Booking.com", airbnb: "Airbnb", direct: "Direct", vrbo: "Vrbo" };
+  const CH_LABEL: Record<string, string> = { bookingcom: "Booking.com", airbnb: "Airbnb", direct: "Direct", vrbo: "Vrbo", deposit_fees: "Security deposit fees" };
   const channelLines = (obj: Record<string, number>): Line[] =>
     Object.entries(obj).filter(([, v]) => Math.abs(v) >= 0.005).sort((a, b) => b[1] - a[1])
       .map(([k, v]) => ({ label: CH_LABEL[k] ?? k, value: v }));
