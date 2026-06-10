@@ -386,7 +386,7 @@ function LaundryTab() {
       .select("listing_id, listings:listing_id (name, bedrooms)")
       .lt("check_in", periodEnd)
       .gt("check_out", periodStart)
-      .not("status", "in", "(cancelled,canceled,declined,expired)");
+      .not("status", "in", "(cancelled,canceled,declined,expired,inquiry)");
 
     const byListing = new Map<string, { name: string; bedrooms: number; bookings: number }>();
     (resv ?? []).forEach((r: any) => {
