@@ -97,7 +97,7 @@ export function CostGroups({
         <h3 className="text-sm font-display font-semibold text-foreground">Statement Breakdown</h3>
         <p className="text-[10px] text-muted-foreground">tap a card to expand · £0 = nothing this period · <span className="text-amber-400">—</span> = not set up yet</p>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 items-stretch">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-stretch">
         {groups.map((g) => {
           const Icon = g.icon;
           const total = sum(g.lines);
