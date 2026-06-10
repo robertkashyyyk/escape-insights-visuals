@@ -261,7 +261,7 @@ Deno.serve(async (req) => {
         const base: Stg = {
           platform, raw_row: rawObj, currency: (cell(r, "Currency") ?? "GBP").trim() || "GBP",
           reference_number: chargeRef, statement_descriptor: desc || null,
-          check_in: created, stripe_resv_id: stripeResvId,
+          check_in: created, stripe_resv_id: stripeResvId, external_txn_id: rawObj["id"] || null,
         };
         // A security deposit is a round £ hold, up to £400 (100/200/300/400).
         // Anything else without a reservation link goes to the queues for review.
@@ -430,7 +430,7 @@ Deno.serve(async (req) => {
         commission_amount: t.commission_amount ?? null, commission_pct: t.commission_pct ?? null,
         payment_fee_amount: t.payment_fee_amount ?? null, vat: t.vat ?? null, tax: t.tax ?? null,
         net_amount: t.net_amount ?? null, collection_model: t.collection_model ?? null,
-        is_revenue: !!t.is_revenue, raw_row: t.raw_row,
+        is_revenue: !!t.is_revenue, raw_row: t.raw_row, external_txn_id: t.external_txn_id ?? null,
         match_method: "none", recon_status: t.recon_status ?? "needs_recon",
         match_confidence: null, resolved_listing_id: null, matched_reservation_id: null,
       };
@@ -513,9 +513,13 @@ Deno.serve(async (req) => {
       rowsToInsert.push(out);
     }
 
-    // chunked insert
+    // chunked insert (Stripe upserts on the txn id so re-uploads / API syncs dedup)
     for (let i = 0; i < rowsToInsert.length; i += 500) {
-      const { error } = await admin.from("ota_transactions").insert(rowsToInsert.slice(i, i + 500));
+      const chunk = rowsToInsert.slice(i, i + 500);
+      const op = platform === "stripe"
+        ? admin.from("ota_transactions").upsert(chunk, { onConflict: "external_txn_id", ignoreDuplicates: false })
+        : admin.from("ota_transactions").insert(chunk);
+      const { error } = await op;
       if (error) throw error;
     }
 
