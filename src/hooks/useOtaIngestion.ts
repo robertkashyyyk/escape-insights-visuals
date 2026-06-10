@@ -63,11 +63,39 @@ export async function fetchReservationCandidates(listingId: string): Promise<Res
   return data ?? [];
 }
 
+export interface AttributionDecisionRow {
+  id: string;
+  ota_transaction_id: string;
+  outcome: "management_report" | "company_retention";
+  allocated_listing_id: string | null;
+  allocated_listing_name: string | null;
+  reason: string | null;
+  txn: any;
+}
+
+/** Already-decided attribution items (so they can be reviewed / re-opened). */
+export function useAttributionDecisions() {
+  return useQuery({
+    queryKey: ["attribution_decisions"],
+    queryFn: async (): Promise<AttributionDecisionRow[]> => {
+      const { data } = await db.from("ota_attribution_decisions")
+        .select("id, ota_transaction_id, outcome, allocated_listing_id, reason, listings(name), ota_transactions(platform, txn_type, statement_descriptor, property_name_raw, guest_name, check_in, net_amount, gross_amount)")
+        .order("decided_at", { ascending: false });
+      return (data ?? []).map((d: any) => ({
+        id: d.id, ota_transaction_id: d.ota_transaction_id, outcome: d.outcome,
+        allocated_listing_id: d.allocated_listing_id, allocated_listing_name: d.listings?.name ?? null,
+        reason: d.reason, txn: d.ota_transactions ?? {},
+      }));
+    },
+  });
+}
+
 export function useOtaMutations() {
   const qc = useQueryClient();
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["ota_transactions"] });
     qc.invalidateQueries({ queryKey: ["ota_batches"] });
+    qc.invalidateQueries({ queryKey: ["attribution_decisions"] });
   };
 
   const uploadCsv = useMutation({
@@ -137,6 +165,8 @@ export function useOtaMutations() {
   const attributionDecision = useMutation({
     mutationFn: async (vars: { txnId: string; outcome: "management_report" | "company_retention"; allocatedListingId?: string | null; reason?: string }) => {
       const uid = await getUid();
+      // replace any prior decision so re-deciding an item just works
+      await db.from("ota_attribution_decisions").delete().eq("ota_transaction_id", vars.txnId);
       await db.from("ota_attribution_decisions").insert({
         ota_transaction_id: vars.txnId,
         outcome: vars.outcome,
@@ -152,6 +182,15 @@ export function useOtaMutations() {
     onSuccess: invalidate,
   });
 
+  // Re-open a decided attribution item -> back to the pending queue to re-decide.
+  const reopenAttribution = useMutation({
+    mutationFn: async (txnId: string) => {
+      await db.from("ota_attribution_decisions").delete().eq("ota_transaction_id", txnId);
+      await db.from("ota_transactions").update({ recon_status: "needs_recon", resolved_listing_id: null }).eq("id", txnId);
+    },
+    onSuccess: invalidate,
+  });
+
   // Delete a batch and (via FK cascade) its staged transactions + attribution
   // decisions. Learned listing aliases persist.
   const deleteBatch = useMutation({
@@ -162,5 +201,5 @@ export function useOtaMutations() {
     onSuccess: invalidate,
   });
 
-  return { uploadCsv, confirmListing, confirmMatch, markNoReservation, attributionDecision, deleteBatch, invalidate };
+  return { uploadCsv, confirmListing, confirmMatch, markNoReservation, attributionDecision, reopenAttribution, deleteBatch, invalidate };
 }

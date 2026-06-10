@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UploadCloud, FileSpreadsheet, CheckCircle2, AlertTriangle, Link2, Ban, Trash2 } from "lucide-react";
+import { UploadCloud, FileSpreadsheet, CheckCircle2, AlertTriangle, Link2, Ban, Trash2, RotateCcw } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import {
   useOtaBatches, useOtaTransactions, useOtaMutations, useListings, fetchReservationCandidates, ListingLite,
+  useAttributionDecisions,
 } from "@/hooks/useOtaIngestion";
 import {
   OtaTransaction, OtaPlatform, ResvCandidate, scoreCandidate, fuzzyListingScore, fmtGBP, reconBadgeClass,
@@ -311,17 +312,46 @@ function AttributionRow({ txn, listings, m }: {
 
 function AttributionTab() {
   const { data: rows = [], isLoading } = useOtaTransactions({ statuses: ["needs_recon"], nonRevenueOnly: true });
+  const { data: decided = [] } = useAttributionDecisions();
   const { data: listings = [] } = useListings();
   const m = useOtaMutations();
   return (
-    <div className="space-y-3">
-      {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
-      {!isLoading && rows.length === 0 && (
-        <Card><CardContent className="p-8 text-center text-muted-foreground">
-          <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-green-500" /> No items awaiting attribution.
-        </CardContent></Card>
+    <div className="space-y-5">
+      <div className="space-y-3">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">Awaiting decision ({rows.length})</div>
+        {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
+        {!isLoading && rows.length === 0 && (
+          <Card><CardContent className="p-6 text-center text-muted-foreground text-sm">
+            <CheckCircle2 className="h-6 w-6 mx-auto mb-2 text-green-500" /> Nothing awaiting attribution.
+          </CardContent></Card>
+        )}
+        {rows.map((t) => <AttributionRow key={t.id} txn={t} listings={listings} m={m} />)}
+      </div>
+
+      {decided.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-xs uppercase tracking-wide text-muted-foreground">Decided ({decided.length}) — re-open to change</div>
+          {decided.map((dd) => (
+            <Card key={dd.id} className="border-border/60"><CardContent className="p-3 flex items-center justify-between gap-2 text-sm">
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="secondary">{dd.txn.platform}</Badge>
+                  <span className="font-medium">{fmtGBP(dd.txn.net_amount ?? dd.txn.gross_amount)}</span>
+                  {dd.outcome === "management_report"
+                    ? <Badge variant="outline" className="bg-green-500/15 text-green-400 border-green-500/30">→ {dd.allocated_listing_name ?? "property"}</Badge>
+                    : <Badge variant="outline">Company retention</Badge>}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {dd.txn.statement_descriptor ?? dd.txn.property_name_raw ?? dd.txn.guest_name ?? "—"}{dd.reason ? ` · ${dd.reason}` : ""}
+                </div>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => m.reopenAttribution.mutate(dd.ota_transaction_id, {
+                onSuccess: () => toast.success("Re-opened — re-decide above"),
+              })}><RotateCcw className="h-3.5 w-3.5" /> Re-open</Button>
+            </CardContent></Card>
+          ))}
+        </div>
       )}
-      {rows.map((t) => <AttributionRow key={t.id} txn={t} listings={listings} m={m} />)}
     </div>
   );
 }
