@@ -263,24 +263,38 @@ Deno.serve(async (req) => {
           reference_number: chargeRef, statement_descriptor: desc || null,
           check_in: created, stripe_resv_id: stripeResvId,
         };
+        // A security deposit is a round £ hold, up to £400 (100/200/300/400).
+        // Anything else without a reservation link goes to the queues for review.
+        const isDeposit = (a: number | null) => a != null && a > 0 && a <= 400 && a % 100 === 0;
         if (type === "charge" || type === "payment") {
           if (stripeResvId) {
             // direct/website/google booking paid via Stripe -> match by Hostaway id
             staged.push({ ...base, txn_type: "reservation", is_revenue: true, collection_model: "channel",
               gross_amount: amount, commission_amount: 0, payment_fee_amount: fee, net_amount: netAmt ?? amount });
             trackPeriod(created);
-          } else {
-            // no reservation link -> security deposit / hold: excluded from revenue,
-            // but its card fee is still a real cost (captured on the row).
+          } else if (isDeposit(amount)) {
+            // security deposit / hold: excluded from revenue; card fee still captured.
             staged.push({ ...base, txn_type: "adjustment", is_revenue: false,
               statement_descriptor: "Security deposit / hold", payment_fee_amount: fee,
               net_amount: amount, recon_status: "excluded" });
+          } else {
+            // unlinked, non-deposit charge -> human review (attribution).
+            staged.push({ ...base, txn_type: "adjustment", is_revenue: false,
+              statement_descriptor: "Stripe charge — review", payment_fee_amount: fee,
+              net_amount: amount, recon_status: "needs_recon" });
           }
         } else if (type === "refund" || type === "payment_refund") {
-          // deposit returns / booking refunds -> non-revenue; netting is the Phase-2 audit
-          staged.push({ ...base, txn_type: "adjustment", is_revenue: false,
-            statement_descriptor: stripeResvId ? "Refund" : "Deposit refund",
-            payment_fee_amount: fee, net_amount: amount, recon_status: "excluded" });
+          if (isDeposit(amount != null ? Math.abs(amount) : null)) {
+            // deposit return -> Security audit (paired by Source)
+            staged.push({ ...base, txn_type: "adjustment", is_revenue: false,
+              statement_descriptor: "Deposit refund", payment_fee_amount: fee,
+              net_amount: amount, recon_status: "excluded" });
+          } else {
+            // non-deposit refund (e.g. a booking refund) -> human review
+            staged.push({ ...base, txn_type: "adjustment", is_revenue: false,
+              statement_descriptor: "Stripe refund — review", payment_fee_amount: fee,
+              net_amount: amount, recon_status: "needs_recon" });
+          }
         } else {
           // payout / refund_failure / other -> informational
           staged.push({ ...base, txn_type: "payout", is_revenue: false, net_amount: amount, recon_status: "excluded" });
