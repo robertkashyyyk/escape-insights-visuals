@@ -327,9 +327,56 @@ function AttributionTab() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+function MatchedTab() {
+  const { data: rows = [], isLoading } = useOtaTransactions({ statuses: ["auto_matched", "matched"], revenueOnly: true });
+  const { data: listings = [] } = useListings();
+  const nameById = new Map(listings.map((l) => [l.id, l.name]));
+  return (
+    <div className="space-y-3">
+      {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
+      {!isLoading && rows.length === 0 && (
+        <Card><CardContent className="p-8 text-center text-muted-foreground">No matched reservations yet.</CardContent></Card>
+      )}
+      {rows.length > 0 && (
+        <Card><CardContent className="p-0">
+          <div className="p-3 text-xs text-muted-foreground border-b border-border">{rows.length} reservations reconciled to Hostaway</div>
+          <table className="w-full text-sm">
+            <thead className="text-xs text-muted-foreground border-b border-border">
+              <tr>
+                <th className="text-left p-3">Property</th><th className="text-left p-3">Guest</th>
+                <th className="text-left p-3">Dates</th><th className="text-right p-3">Gross</th>
+                <th className="text-right p-3">Booking fee</th><th className="text-left p-3">Match</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((t) => (
+                <tr key={t.id} className="border-b border-border/40">
+                  <td className="p-3">{(t.resolved_listing_id && nameById.get(t.resolved_listing_id)) || t.property_name_raw || "—"}</td>
+                  <td className="p-3">{t.guest_name ?? "—"}</td>
+                  <td className="p-3">{d(t.check_in)}–{d(t.check_out)}</td>
+                  <td className="p-3 text-right">{fmtGBP(t.gross_amount ?? t.net_amount)}</td>
+                  <td className="p-3 text-right text-muted-foreground">{fmtGBP(t.commission_amount)}</td>
+                  <td className="p-3">
+                    <Badge variant="outline" className={t.match_method === "code"
+                      ? "bg-green-500/15 text-green-400 border-green-500/30"
+                      : "bg-blue-500/15 text-blue-400 border-blue-500/30"}>
+                      {t.match_method}{t.match_confidence != null ? ` · ${t.match_confidence.toFixed(2)}` : ""}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent></Card>
+      )}
+    </div>
+  );
+}
+
 export default function OtaImports() {
   const { data: recon = [] } = useOtaTransactions({ statuses: ["needs_recon", "unmatched"], revenueOnly: true });
   const { data: attrib = [] } = useOtaTransactions({ statuses: ["needs_recon"], nonRevenueOnly: true });
+  const { data: matched = [] } = useOtaTransactions({ statuses: ["auto_matched", "matched"], revenueOnly: true });
   return (
     <AppLayout>
       <div className="p-6 space-y-6 max-w-6xl mx-auto">
@@ -344,10 +391,12 @@ export default function OtaImports() {
         <Tabs defaultValue="batches">
           <TabsList>
             <TabsTrigger value="batches">Imports</TabsTrigger>
+            <TabsTrigger value="matched">Matched ({matched.length})</TabsTrigger>
             <TabsTrigger value="recon">Recon Queue ({recon.length})</TabsTrigger>
             <TabsTrigger value="attribution">Attribution ({attrib.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="batches" className="mt-4"><BatchesTab /></TabsContent>
+          <TabsContent value="matched" className="mt-4"><MatchedTab /></TabsContent>
           <TabsContent value="recon" className="mt-4"><ReconTab /></TabsContent>
           <TabsContent value="attribution" className="mt-4"><AttributionTab /></TabsContent>
         </Tabs>
