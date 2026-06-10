@@ -16,14 +16,20 @@ const sum = (lines: Line[]) => lines.reduce((s, l) => s + Number(l.value ?? 0), 
 
 export function CostGroups({
   grossRevenue, managementFee, bookingFees, cardProcessing, costs, manualByCode = {},
+  revenueByChannel = {}, distributionByChannel = {},
 }: {
   grossRevenue: number; managementFee: number; bookingFees: number; cardProcessing: number;
   costs: OwnerCostCategories | undefined; manualByCode?: Record<string, number>;
+  revenueByChannel?: Record<string, number>; distributionByChannel?: Record<string, number>;
 }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const toggle = (k: string) => setOpen((p) => ({ ...p, [k]: !p[k] }));
   const pctOf = (v: number) => (grossRevenue > 0 ? `${((v / grossRevenue) * 100).toFixed(1)}%` : "—");
 
+  const CH_LABEL: Record<string, string> = { bookingcom: "Booking.com", airbnb: "Airbnb", direct: "Direct", vrbo: "Vrbo" };
+  const channelLines = (obj: Record<string, number>): Line[] =>
+    Object.entries(obj).filter(([, v]) => Math.abs(v) >= 0.005).sort((a, b) => b[1] - a[1])
+      .map(([k, v]) => ({ label: CH_LABEL[k] ?? k, value: v }));
   const man = (code: string) => manualByCode[code] ?? 0;
   // engine value + any manual entry/adjustment for that line; missing only if neither exists
   const merge = (c: CostCategory | undefined, code: string): Line => {
@@ -40,16 +46,22 @@ export function CostGroups({
     {
       key: "revenue", title: "Revenue", icon: PoundSterling, tone: "revenue", color: "primary",
       lines: [
-        { label: "Revenue (gross)", value: grossRevenue + (manualByCode["revenue"] ?? 0) },
+        ...(Object.keys(revenueByChannel).length
+          ? channelLines(revenueByChannel)
+          : [{ label: "Revenue (gross)", value: grossRevenue + (manualByCode["revenue"] ?? 0) }]),
         { label: "Refunds", value: refunds > 0 ? -refunds : null, missing: refunds === 0 },
       ],
     },
     {
       key: "distribution", title: "Distribution Fees", icon: CreditCard, tone: "cost", color: "chart-3",
-      lines: [
-        derived("Booking Fees", bookingFees, "booking_fees"),
-        derived("Card Processing Fees", cardProcessing, "card_processing"),
-      ],
+      lines: Object.keys(distributionByChannel).length
+        ? [
+            ...channelLines(distributionByChannel),
+            ...(man("booking_fees") + man("card_processing") !== 0
+              ? [{ label: "Manual adjustment", value: man("booking_fees") + man("card_processing") }]
+              : []),
+          ]
+        : [derived("Booking Fees", bookingFees, "booking_fees"), derived("Card Processing Fees", cardProcessing, "card_processing")],
     },
     {
       key: "servicing", title: "Servicing", icon: Sparkles, tone: "cost", color: "chart-2",

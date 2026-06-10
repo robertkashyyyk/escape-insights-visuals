@@ -25,6 +25,7 @@ export interface OwnerSettlement {
     matchedAmount: number; totalAmount: number; fullyReconciled: boolean;
   };
   manualByCode: Record<string, number>;   // manual cost / cost-line adjustments per code
+  distributionByChannel: Record<string, number>;  // booking fee + card per channel
   revenueAdj: number;
   settlementAdj: number;
   reportPeriodId: string | null;
@@ -48,12 +49,21 @@ export function useOwnerSettlement(ownerId: string | null, periodStart: Date, pe
       const daysInPeriod = Math.max(1, differenceInDays(periodEnd, periodStart) + 1);
 
       let bookingFees = 0, cardProcessing = 0;
+      const distributionByChannel: Record<string, number> = {};
+      const mapChannel = (p: string | null): string => {
+        const s = (p ?? "").toLowerCase();
+        if (s.includes("book") && s.includes("engine")) return "direct";
+        if (s.includes("book")) return "bookingcom";
+        if (s.includes("air")) return "airbnb";
+        if (s.includes("homeaway") || s.includes("vrbo")) return "vrbo";
+        return "direct";
+      };
       let recon = { total: 0, matched: 0, inQueue: 0, matchedAmount: 0, totalAmount: 0, fullyReconciled: true };
 
       if (listingIds.length) {
         // reservations overlapping the period (match useMonthlyReport's window)
         const { data: resv } = await db.from("reservations")
-          .select("id, channel_commission, check_in, check_out")
+          .select("id, channel_commission, check_in, check_out, platform")
           .in("listing_id", listingIds)
           .lte("check_in", endStr).gte("check_out", startStr).eq("status", "confirmed");
         const reservations = (resv ?? []) as any[];
@@ -79,8 +89,12 @@ export function useOwnerSettlement(ownerId: string | null, periodStart: Date, pe
         for (const r of reservations) {
           const o = otaByResv.get(r.id);
           const ratio = ratioFor(r);
-          bookingFees += Number(o?.commission_amount ?? r.channel_commission ?? 0) * ratio;
-          cardProcessing += Number(o?.payment_fee_amount ?? 0) * ratio;
+          const comm = Number(o?.commission_amount ?? r.channel_commission ?? 0) * ratio;
+          const card = Number(o?.payment_fee_amount ?? 0) * ratio;
+          bookingFees += comm;
+          cardProcessing += card;
+          const ch = mapChannel(r.platform);
+          distributionByChannel[ch] = (distributionByChannel[ch] ?? 0) + comm + card;
         }
 
         // reconciliation summary across the owner's revenue OTA rows
@@ -133,6 +147,7 @@ export function useOwnerSettlement(ownerId: string | null, periodStart: Date, pe
         settlementMethod: owner.settlement_method, managementFeeMethod: owner.management_fee_method,
         flatPortfolioFee: Number(owner.flat_portfolio_fee ?? 0), weeksDrawn, recon,
         manualByCode, revenueAdj: round2(revenueAdj), settlementAdj: round2(settlementAdj), reportPeriodId,
+        distributionByChannel: Object.fromEntries(Object.entries(distributionByChannel).map(([k, v]) => [k, round2(v)])),
       };
     },
   });

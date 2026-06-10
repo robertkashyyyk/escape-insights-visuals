@@ -337,6 +337,8 @@ export default function MonthlyReport() {
               cardProcessing={settlement?.cardProcessing ?? 0}
               costs={costs}
               manualByCode={settlement?.manualByCode}
+              revenueByChannel={report.revenueByChannel}
+              distributionByChannel={settlement?.distributionByChannel}
             />
 
             {/* Section 2c — Settlement waterfall (gross model) */}

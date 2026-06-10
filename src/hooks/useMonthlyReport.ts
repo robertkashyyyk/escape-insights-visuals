@@ -50,6 +50,7 @@ export interface MonthlyReportData {
   nextCheckinDate: string | null;
   forwardMonths: ForwardBooking[];
   showForward: boolean;
+  revenueByChannel: Record<string, number>;
 }
 
 function nightsInRange(checkIn: string, checkOut: string, rangeStart: Date, rangeEnd: Date): number {
@@ -135,7 +136,7 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
       const monthsAgo = differenceInDays(today, periodEnd);
       const showForward = monthsAgo <= 31;
 
-      const resCols = `listing_id, check_in, check_out, status, ${REVENUE_FIELDS}`;
+      const resCols = `listing_id, check_in, check_out, status, platform, ${REVENUE_FIELDS}`;
       const [currentRes, prevRes, trendRes, forwardRes] = await Promise.all([
         supabase
           .from("reservations")
@@ -179,14 +180,25 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
       // Revenue recognition (default prorate_by_nights) — apportion boundary stays.
       const prorate = ((owner as any).revenue_recognition ?? "prorate_by_nights") !== "whole_in_attributed_month";
 
-      // Current period aggregation per property
+      // Current period aggregation per property + per channel
+      const mapChannel = (p: string | null): string => {
+        const s = (p ?? "").toLowerCase();
+        if (s.includes("book") && s.includes("engine")) return "direct";
+        if (s.includes("book")) return "bookingcom";
+        if (s.includes("air")) return "airbnb";
+        if (s.includes("homeaway") || s.includes("vrbo")) return "vrbo";
+        return "direct";
+      };
       const byListing: Record<string, { revenue: number; nights: number }> = {};
+      const revenueByChannel: Record<string, number> = {};
       for (const r of currentRows) {
         const nights = nightsInRange(r.check_in, r.check_out, periodStart, periodEnd);
         const rev = recognisedRevenue(r, periodStart, periodEnd, prorate);
         if (!byListing[r.listing_id]) byListing[r.listing_id] = { revenue: 0, nights: 0 };
         byListing[r.listing_id].revenue += rev;
         byListing[r.listing_id].nights += nights;
+        const ch = mapChannel(r.platform);
+        revenueByChannel[ch] = (revenueByChannel[ch] ?? 0) + rev;
       }
 
       const totalRevenue = Object.values(byListing).reduce((s, v) => s + v.revenue, 0);
@@ -296,6 +308,7 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
         nextCheckinDate,
         forwardMonths: forwardMonthBuckets,
         showForward,
+        revenueByChannel,
       };
     },
   });
