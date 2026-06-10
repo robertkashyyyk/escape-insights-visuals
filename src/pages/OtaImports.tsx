@@ -6,7 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { UploadCloud, FileSpreadsheet, CheckCircle2, AlertTriangle, Link2, Ban } from "lucide-react";
+import { UploadCloud, FileSpreadsheet, CheckCircle2, AlertTriangle, Link2, Ban, Trash2 } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import {
@@ -78,6 +82,35 @@ function UploadCard() {
 // ─────────────────────────────────────────────────────────────────────────────
 // Batches
 // ─────────────────────────────────────────────────────────────────────────────
+function DeleteBatchButton({ batchId, filename }: { batchId: string; filename: string }) {
+  const { deleteBatch } = useOtaMutations();
+  return (
+    <AlertDialog>
+      <AlertDialogTrigger asChild>
+        <button className="text-muted-foreground hover:text-destructive" title="Delete import">
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete this import?</AlertDialogTitle>
+          <AlertDialogDescription>
+            “{filename}” and all of its parsed rows (matches + attribution decisions) will be removed.
+            Learned property aliases are kept. This can't be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={() => deleteBatch.mutate(batchId, {
+            onSuccess: () => toast.success("Import deleted"),
+            onError: (e: any) => toast.error(e.message ?? "Delete failed"),
+          })}>Delete</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 function BatchesTab() {
   const { data: batches = [], isLoading } = useOtaBatches();
   return (
@@ -95,6 +128,7 @@ function BatchesTab() {
                 <th className="text-left p-3">File</th><th className="text-left p-3">Platform</th>
                 <th className="text-left p-3">Period</th><th className="text-right p-3">Rows</th>
                 <th className="text-left p-3">Status</th><th className="text-left p-3">Uploaded</th>
+                <th className="p-3"></th>
               </tr>
             </thead>
             <tbody>
@@ -106,6 +140,7 @@ function BatchesTab() {
                   <td className="p-3 text-right">{b.row_count}</td>
                   <td className="p-3">{b.status}</td>
                   <td className="p-3 text-muted-foreground">{format(new Date(b.uploaded_at), "dd MMM HH:mm")}</td>
+                  <td className="p-3 text-right"><DeleteBatchButton batchId={b.id} filename={b.source_filename} /></td>
                 </tr>
               ))}
             </tbody>

@@ -152,5 +152,15 @@ export function useOtaMutations() {
     onSuccess: invalidate,
   });
 
-  return { uploadCsv, confirmListing, confirmMatch, markNoReservation, attributionDecision, invalidate };
+  // Delete a batch and (via FK cascade) its staged transactions + attribution
+  // decisions. Learned listing aliases persist.
+  const deleteBatch = useMutation({
+    mutationFn: async (batchId: string) => {
+      const { error } = await db.from("ota_import_batches").delete().eq("id", batchId);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
+  return { uploadCsv, confirmListing, confirmMatch, markNoReservation, attributionDecision, deleteBatch, invalidate };
 }
