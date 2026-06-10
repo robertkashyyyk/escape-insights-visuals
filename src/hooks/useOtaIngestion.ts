@@ -91,42 +91,63 @@ export function useAttributionDecisions() {
 }
 
 // ── Security deposits (Stripe) — one-in/one-out audit, paired by charge id ──
+export type DepositStatus = "held" | "returned" | "refund_only";
 export interface SecurityDeposit {
   ref: string; charge: number; refund: number; net: number; fee: number;
-  date: string | null; status: "held" | "returned" | "refund_only";
+  date: string | null; month: string | null; status: DepositStatus;
+}
+export interface DepositTxn {
+  id: string; ref: string; date: string | null; month: string | null;
+  amount: number; fee: number; direction: "in" | "out"; descriptor: string | null; status: DepositStatus;
+}
+export interface SecurityData {
+  txns: DepositTxn[]; held: SecurityDeposit[]; refundOnly: SecurityDeposit[];
+  returnedCount: number; totalHeld: number; totalFees: number; months: string[];
 }
 export function useSecurityDeposits() {
   return useQuery({
     queryKey: ["security_deposits"],
-    queryFn: async (): Promise<{ held: SecurityDeposit[]; returned: SecurityDeposit[]; refundOnly: SecurityDeposit[]; totalHeld: number; totalFees: number }> => {
-      // All Stripe deposit charges + deposit refunds, across every batch (so a
-      // May charge pairs with a June refund). Grouped by Stripe charge id.
+    queryFn: async (): Promise<SecurityData> => {
+      // Every Stripe deposit charge + refund, across all batches; paired by the
+      // Stripe `Source` charge id (so a May charge marries a June refund).
       const { data } = await db.from("ota_transactions")
-        .select("reference_number, net_amount, payment_fee_amount, check_in, statement_descriptor")
+        .select("id, reference_number, net_amount, payment_fee_amount, check_in, statement_descriptor")
         .eq("platform", "stripe").eq("txn_type", "adjustment").eq("is_revenue", false)
         .in("statement_descriptor", ["Security deposit / hold", "Deposit refund"]);
+      const rows = (data ?? []) as any[];
+      const monthOf = (d: string | null) => (d ? d.slice(0, 7) : null);
       const groups = new Map<string, SecurityDeposit>();
-      (data ?? []).forEach((r: any) => {
+      for (const r of rows) {
         const ref = r.reference_number ?? "(none)";
-        const g = groups.get(ref) ?? { ref, charge: 0, refund: 0, net: 0, fee: 0, date: null, status: "held" };
+        const g = groups.get(ref) ?? { ref, charge: 0, refund: 0, net: 0, fee: 0, date: null, month: null, status: "held" as DepositStatus };
         const amt = Number(r.net_amount ?? 0);
         if (amt >= 0) g.charge += amt; else g.refund += -amt;
         g.fee += Number(r.payment_fee_amount ?? 0);
-        if (r.check_in && (!g.date || r.check_in < g.date)) g.date = r.check_in;
+        if (r.check_in && (!g.date || r.check_in < g.date)) { g.date = r.check_in; g.month = monthOf(r.check_in); }
         groups.set(ref, g);
-      });
-      const held: SecurityDeposit[] = [], returned: SecurityDeposit[] = [], refundOnly: SecurityDeposit[] = [];
+      }
+      const held: SecurityDeposit[] = [], refundOnly: SecurityDeposit[] = [];
+      let returnedCount = 0;
       for (const g of groups.values()) {
         g.net = Math.round((g.charge - g.refund) * 100) / 100;
-        if (Math.abs(g.net) < 1) { g.status = "returned"; returned.push(g); }
+        if (Math.abs(g.net) < 1) { g.status = "returned"; returnedCount++; }
         else if (g.charge > 0) { g.status = "held"; held.push(g); }
         else { g.status = "refund_only"; refundOnly.push(g); }
       }
-      held.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
+      const statusByRef = new Map([...groups.values()].map((g) => [g.ref, g.status]));
+      const txns: DepositTxn[] = rows.map((r) => {
+        const ref = r.reference_number ?? "(none)";
+        const amt = Number(r.net_amount ?? 0);
+        return { id: r.id, ref, date: r.check_in ?? null, month: monthOf(r.check_in ?? null),
+          amount: amt, fee: Number(r.payment_fee_amount ?? 0), direction: (amt >= 0 ? "in" : "out") as "in" | "out",
+          descriptor: r.statement_descriptor, status: (statusByRef.get(ref) ?? "held") as DepositStatus };
+      }).sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+      [held, refundOnly].forEach((arr) => arr.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? "")));
+      const months = Array.from(new Set(txns.map((t) => t.month).filter(Boolean))).sort().reverse() as string[];
       return {
-        held, returned, refundOnly,
+        txns, held, refundOnly, returnedCount, months,
         totalHeld: Math.round(held.reduce((s, g) => s + g.net, 0) * 100) / 100,
-        totalFees: Math.round([...held, ...returned].reduce((s, g) => s + g.fee, 0) * 100) / 100,
+        totalFees: Math.round([...held, ...refundOnly, ...[...groups.values()].filter((g) => g.status === "returned")].reduce((s, g) => s + g.fee, 0) * 100) / 100,
       };
     },
   });

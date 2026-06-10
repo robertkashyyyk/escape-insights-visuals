@@ -406,33 +406,61 @@ function MatchedTab() {
 
 function SecurityTab() {
   const { data, isLoading } = useSecurityDeposits();
-  const held = data?.held ?? [], returned = data?.returned ?? [], refundOnly = data?.refundOnly ?? [];
+  const [month, setMonth] = useState<string>("all");
+  const [showLedger, setShowLedger] = useState(false);
+  const monthLabel = (m: string) => format(new Date(`${m}-01T00:00:00`), "MMM yyyy");
+  const chip = (active: boolean) =>
+    `px-2.5 py-1 rounded-full text-xs border transition-colors ${active ? "bg-primary/15 text-primary border-primary/40" : "border-border/60 text-muted-foreground hover:border-border"}`;
+
+  const inM = <T extends { month: string | null }>(arr: T[]) => (month === "all" ? arr : arr.filter((x) => x.month === month));
+  const held = inM(data?.held ?? []);
+  const refundOnly = inM(data?.refundOnly ?? []);
+  const txns = inM(data?.txns ?? []);
+  const totalHeld = Math.round(held.reduce((s, g) => s + g.net, 0) * 100) / 100;
+  const returnedCount = new Set(txns.filter((t) => t.status === "returned").map((t) => t.ref)).size;
+  const feeTotal = Math.round(txns.reduce((s, t) => s + t.fee, 0) * 100) / 100;
+  const months = data?.months ?? [];
+
+  const statusBadge = (s: string) =>
+    s === "returned" ? <Badge variant="outline" className="bg-green-500/15 text-green-400 border-green-500/30">returned</Badge>
+    : s === "held" ? <Badge variant="outline" className="bg-amber-500/15 text-amber-400 border-amber-500/30">held</Badge>
+    : <Badge variant="outline" className="bg-red-500/15 text-red-400 border-red-500/30">awaiting charge</Badge>;
+
   return (
     <div className="space-y-4">
+      {months.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground">Month:</span>
+          <button onClick={() => setMonth("all")} className={chip(month === "all")}>All</button>
+          {months.map((m) => <button key={m} onClick={() => setMonth(m)} className={chip(month === m)}>{monthLabel(m)}</button>)}
+        </div>
+      )}
+
       <div className="grid grid-cols-3 gap-3">
         <Card><CardContent className="p-4">
           <div className="text-xs text-muted-foreground">Held (awaiting return)</div>
-          <div className="text-lg font-bold">{fmtGBP(data?.totalHeld ?? 0)}</div>
+          <div className="text-lg font-bold">{fmtGBP(totalHeld)}</div>
           <div className="text-xs text-muted-foreground">{held.length} deposit{held.length === 1 ? "" : "s"}</div>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <div className="text-xs text-muted-foreground">Returned (paired in/out)</div>
-          <div className="text-lg font-bold">{returned.length}</div>
+          <div className="text-lg font-bold">{returnedCount}</div>
           <div className="text-xs text-muted-foreground">net £0</div>
         </CardContent></Card>
         <Card><CardContent className="p-4">
           <div className="text-xs text-muted-foreground">Deposit card fees</div>
-          <div className="text-lg font-bold">{fmtGBP(data?.totalFees ?? 0)}</div>
+          <div className="text-lg font-bold">{fmtGBP(feeTotal)}</div>
           <div className="text-xs text-muted-foreground">always charged</div>
         </CardContent></Card>
       </div>
 
       {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
 
+      {/* Held */}
       <Card><CardContent className="p-0">
-        <div className="p-3 text-sm font-semibold border-b border-border">Held deposits — carry to next month until refunded</div>
+        <div className="p-3 text-sm font-semibold border-b border-border">Held deposits — carry to next month until refunded ({held.length})</div>
         {held.length === 0 ? (
-          <div className="p-6 text-center text-muted-foreground text-sm">No deposits currently held.</div>
+          <div className="p-6 text-center text-muted-foreground text-sm">No deposits held{month === "all" ? "" : " this month"}.</div>
         ) : (
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground border-b border-border">
@@ -452,12 +480,57 @@ function SecurityTab() {
         )}
       </CardContent></Card>
 
+      {/* Refunds awaiting their charge (prior-month deposits) */}
       {refundOnly.length > 0 && (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-400">
-          <AlertTriangle className="h-4 w-4" />
-          <span>{refundOnly.length} refund{refundOnly.length === 1 ? "" : "s"} with no matching charge in the data — the deposit was likely taken in a prior period (cross-month).</span>
-        </div>
+        <Card><CardContent className="p-0">
+          <div className="p-3 text-sm font-semibold border-b border-border flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-400" /> Refunds awaiting their charge ({refundOnly.length}) — upload the earlier month's Stripe to reconcile
+          </div>
+          <table className="w-full text-sm">
+            <thead className="text-xs text-muted-foreground border-b border-border">
+              <tr><th className="text-left p-3">Refunded</th><th className="text-left p-3">Stripe charge</th><th className="text-right p-3">Amount</th></tr>
+            </thead>
+            <tbody>
+              {refundOnly.map((g) => (
+                <tr key={g.ref} className="border-b border-border/40">
+                  <td className="p-3">{g.date ? format(new Date(g.date), "dd MMM yyyy") : "—"}</td>
+                  <td className="p-3 font-mono text-xs text-muted-foreground">{g.ref}</td>
+                  <td className="p-3 text-right">{fmtGBP(-g.refund)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent></Card>
       )}
+
+      {/* Full in/out ledger (audit log) */}
+      <Card><CardContent className="p-0">
+        <button onClick={() => setShowLedger((v) => !v)} className="w-full p-3 text-sm font-semibold border-b border-border flex items-center justify-between">
+          <span>In / out ledger ({txns.length})</span>
+          <span className="text-xs text-muted-foreground">{showLedger ? "hide" : "show"}</span>
+        </button>
+        {showLedger && (
+          <table className="w-full text-sm">
+            <thead className="text-xs text-muted-foreground border-b border-border">
+              <tr><th className="text-left p-3">Date</th><th className="text-left p-3">Stripe charge (Source)</th>
+              <th className="text-right p-3">In</th><th className="text-right p-3">Out</th>
+              <th className="text-right p-3">Fee</th><th className="text-left p-3 pl-4">Status</th></tr>
+            </thead>
+            <tbody>
+              {txns.map((t) => (
+                <tr key={t.id} className="border-b border-border/40">
+                  <td className="p-3">{t.date ? format(new Date(t.date), "dd MMM") : "—"}</td>
+                  <td className="p-3 font-mono text-xs text-muted-foreground">{t.ref}</td>
+                  <td className="p-3 text-right text-green-400">{t.direction === "in" ? fmtGBP(t.amount) : ""}</td>
+                  <td className="p-3 text-right text-red-400">{t.direction === "out" ? fmtGBP(t.amount) : ""}</td>
+                  <td className="p-3 text-right text-muted-foreground">{t.fee ? fmtGBP(t.fee) : ""}</td>
+                  <td className="p-3 pl-4">{statusBadge(t.status)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </CardContent></Card>
     </div>
   );
 }
