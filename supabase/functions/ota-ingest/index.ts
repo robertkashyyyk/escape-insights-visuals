@@ -338,6 +338,21 @@ Deno.serve(async (req) => {
       return s;
     };
 
+    // Cancelled & refunded bookings: a confirmation code whose rows (reservation
+    // + adjustments) net to ~£0 was booked then fully refunded -> exclude all its
+    // rows (no net revenue, no fee). A non-zero residual (e.g. a kept cancellation
+    // fee, or a resolution deduction on a real stay) is NOT excluded.
+    const codeNet = new Map<string, { sum: number; n: number }>();
+    for (const s of staged) {
+      const c = s.confirmation_code || s.reference_number;
+      if (!c) continue;
+      const e = codeNet.get(c) ?? { sum: 0, n: 0 };
+      e.sum += Number(s.net_amount ?? s.gross_amount ?? 0); e.n += 1;
+      codeNet.set(c, e);
+    }
+    const cancelledCodes = new Set<string>();
+    for (const [c, e] of codeNet) if (e.n >= 2 && Math.abs(e.sum) < 1) cancelledCodes.add(c);
+
     const rowsToInsert: Stg[] = [];
     for (const t of staged) {
       const out: Stg = {
@@ -354,6 +369,14 @@ Deno.serve(async (req) => {
         match_method: "none", recon_status: t.recon_status ?? "needs_recon",
         match_confidence: null, resolved_listing_id: null, matched_reservation_id: null,
       };
+
+      // Cancelled & refunded (net ~£0 across the code's rows) -> exclude, no revenue.
+      const rowCode = t.confirmation_code || t.reference_number;
+      if (rowCode && cancelledCodes.has(rowCode)) {
+        out.is_revenue = false; out.recon_status = "excluded";
+        rowsToInsert.push(out);
+        continue;
+      }
 
       if (t.txn_type === "reservation") {
         // 1) PRIMARY — global code match (listing comes from the reservation)
