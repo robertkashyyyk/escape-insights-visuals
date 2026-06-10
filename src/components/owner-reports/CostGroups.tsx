@@ -9,7 +9,10 @@ const gbp = (n: number) =>
   new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 2 }).format(n);
 
 interface Line { label: string; value: number | null; missing?: boolean }
-interface Group { key: string; title: string; icon: LucideIcon; tone: "revenue" | "cost"; color: string; lines: Line[] }
+// pctMode controls the small per-line %: "cost" = this line as % of revenue
+// (right of the value, for cost groups), "revenue" = this channel's share of
+// revenue (right of the label, the revenue mix), "none" = no per-line %.
+interface Group { key: string; title: string; icon: LucideIcon; tone: "revenue" | "cost"; color: string; pctMode: "cost" | "revenue" | "none"; lines: Line[] }
 
 const cat = (c: CostCategory | undefined): Line["value"] => (c?.value ?? null);
 const sum = (lines: Line[]) => lines.reduce((s, l) => s + Number(l.value ?? 0), 0);
@@ -44,7 +47,7 @@ export function CostGroups({
 
   const groups: Group[] = [
     {
-      key: "revenue", title: "Revenue", icon: PoundSterling, tone: "revenue", color: "primary",
+      key: "revenue", title: "Revenue", icon: PoundSterling, tone: "revenue", color: "primary", pctMode: "revenue",
       lines: [
         ...(Object.keys(revenueByChannel).length
           ? channelLines(revenueByChannel)
@@ -53,7 +56,7 @@ export function CostGroups({
       ],
     },
     {
-      key: "distribution", title: "Distribution Fees", icon: CreditCard, tone: "cost", color: "chart-3",
+      key: "distribution", title: "Distribution Fees", icon: CreditCard, tone: "cost", color: "chart-3", pctMode: "none",
       lines: Object.keys(distributionByChannel).length
         ? [
             ...channelLines(distributionByChannel),
@@ -64,7 +67,7 @@ export function CostGroups({
         : [derived("Booking Fees", bookingFees, "booking_fees"), derived("Card Processing Fees", cardProcessing, "card_processing")],
     },
     {
-      key: "servicing", title: "Servicing", icon: Sparkles, tone: "cost", color: "chart-2",
+      key: "servicing", title: "Servicing", icon: Sparkles, tone: "cost", color: "chart-2", pctMode: "cost",
       lines: [
         withLabel("Cleaning", merge(costs?.cleaning, "cleaning")),
         withLabel("Laundry", merge(costs?.laundry, "laundry")),
@@ -73,17 +76,17 @@ export function CostGroups({
       ],
     },
     {
-      key: "operations", title: "Operations", icon: Wrench, tone: "cost", color: "chart-4",
+      key: "operations", title: "Operations", icon: Wrench, tone: "cost", color: "chart-4", pctMode: "cost",
       lines: [
         withLabel("Utilities", merge(costs?.utilities, "utilities")),
         withLabel("Maintenance", merge(costs?.maintenance, "maintenance")),
+        withLabel("Setup Fees", merge(costs?.setup, "setup")),
       ],
     },
     {
-      key: "management", title: "Management", icon: Briefcase, tone: "cost", color: "chart-5",
+      key: "management", title: "Management", icon: Briefcase, tone: "cost", color: "chart-5", pctMode: "cost",
       lines: [
         derived("Management Fees", managementFee, "management"),
-        withLabel("Setup Fees", merge(costs?.setup, "setup")),
       ],
     },
   ];
@@ -94,7 +97,7 @@ export function CostGroups({
         <h3 className="text-sm font-display font-semibold text-foreground">Statement Breakdown</h3>
         <p className="text-[10px] text-muted-foreground">tap a card to expand · £0 = nothing this period · <span className="text-amber-400">—</span> = not set up yet</p>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-start">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3 items-stretch">
         {groups.map((g) => {
           const Icon = g.icon;
           const total = sum(g.lines);
@@ -120,19 +123,27 @@ export function CostGroups({
               <div className={`grid transition-all duration-200 ${isOpen ? "grid-rows-[1fr] opacity-100 mt-3" : "grid-rows-[0fr] opacity-0"}`}>
                 <div className="overflow-hidden">
                   <div className="space-y-1.5 border-t border-border/50 pt-2">
-                    {g.lines.map((l) => (
-                      <div key={l.label} className="flex items-baseline justify-between gap-2 text-xs min-w-0">
-                        <span className="text-muted-foreground truncate min-w-0" title={l.label}>{l.label}</span>
-                        <span className="flex items-baseline gap-1.5 shrink-0 tabular-nums">
-                          {g.tone === "cost" && !l.missing && l.value != null && grossRevenue > 0 && (
-                            <span className="text-[10px] text-muted-foreground/70">{pctOf(Number(l.value))}</span>
-                          )}
-                          <span className={`whitespace-nowrap ${l.missing ? "text-amber-400" : "text-foreground"}`}>
-                            {l.missing || l.value == null ? "—" : gbp(Number(l.value))}
+                    {g.lines.map((l) => {
+                      const v = Number(l.value ?? 0);
+                      // Revenue card: show this channel's share of revenue beside the label.
+                      const showRevPct = g.pctMode === "revenue" && l.value != null && v > 0 && grossRevenue > 0;
+                      // Cost cards (except Distribution): show this line as % of revenue by the value.
+                      const showCostPct = g.pctMode === "cost" && !l.missing && l.value != null && grossRevenue > 0;
+                      return (
+                        <div key={l.label} className="flex items-baseline justify-between gap-2 text-xs min-w-0">
+                          <span className="flex items-baseline gap-1.5 min-w-0">
+                            <span className="text-muted-foreground truncate min-w-0" title={l.label}>{l.label}</span>
+                            {showRevPct && <span className="text-[10px] text-muted-foreground/60 shrink-0">{pctOf(v)}</span>}
                           </span>
-                        </span>
-                      </div>
-                    ))}
+                          <span className="flex items-baseline gap-1.5 shrink-0 tabular-nums">
+                            {showCostPct && <span className="text-[10px] text-muted-foreground/70">{pctOf(v)}</span>}
+                            <span className={`whitespace-nowrap ${l.missing ? "text-amber-400" : "text-foreground"}`}>
+                              {l.missing || l.value == null ? "—" : gbp(v)}
+                            </span>
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

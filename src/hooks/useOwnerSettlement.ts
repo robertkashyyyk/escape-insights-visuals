@@ -132,10 +132,14 @@ export function useOwnerSettlement(ownerId: string | null, periodStart: Date, pe
           distributionByChannel["deposit_fees"] = (distributionByChannel["deposit_fees"] ?? 0) + depositCardFees;
         }
 
-        // reconciliation summary across the owner's revenue OTA rows
+        // reconciliation summary across the owner's revenue OTA rows — scoped to
+        // the selected period (overlap), so it reflects this month's reconciliation
+        // rather than all-time. (This is a coverage metric — settlement-match value,
+        // not gross revenue — so it intentionally won't equal the Revenue card.)
         const { data: rec } = await db.from("ota_transactions")
           .select("recon_status, gross_amount, net_amount")
-          .in("resolved_listing_id", listingIds).eq("is_revenue", true);
+          .in("resolved_listing_id", listingIds).eq("is_revenue", true)
+          .lte("check_in", endStr).gte("check_out", startStr);
         const rows = (rec ?? []) as any[];
         const matched = rows.filter((r) => ["auto_matched", "matched"].includes(r.recon_status));
         const queue = rows.filter((r) => ["needs_recon", "unmatched"].includes(r.recon_status));
