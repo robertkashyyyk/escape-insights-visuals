@@ -85,7 +85,7 @@ export default function CleanerPortal() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [startingId, setStartingId] = useState<string | null>(null);
   const [flagTask, setFlagTask] = useState<CleanTask | null>(null);
-  const [requestsByReservation, setRequestsByReservation] = useState<Record<string, BookingRequest[]>>({});
+  const [requestsByTask, setRequestsByTask] = useState<Record<string, BookingRequest[]>>({});
   const [reminderTask, setReminderTask] = useState<CleanTask | null>(null);
   const [activePeriod, setActivePeriod] = useState<PeriodKey>("today");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -296,37 +296,63 @@ export default function CleanerPortal() {
     setCompletingId(null);
   };
 
-  // Load per-booking requests for the loaded tasks (drives job-card icons + the
-  // clean-completion reminder). Re-runs when the set of reservation ids changes.
-  const reservationKey = useMemo(
-    () => Array.from(new Set(tasks.map((t) => t.reservation_id).filter(Boolean))).sort().join(","),
+  // Surface a booking's requests on the clean that PREPARES for that guest's arrival.
+  // Cleans are dated on the departing reservation's checkout, so for each clean we find
+  // the next reservation arriving at that property (check-in >= the clean date) and show
+  // its requests — that's the guest the cleaner is setting the property up for.
+  const taskKey = useMemo(
+    () => tasks.map((t) => `${t.id}:${t.listing_id}:${t.scheduled_date}:${t.reservation_id ?? ""}`).sort().join("|"),
     [tasks],
   );
   useEffect(() => {
-    const ids = reservationKey ? reservationKey.split(",") : [];
-    if (ids.length === 0) { setRequestsByReservation({}); return; }
+    if (tasks.length === 0) { setRequestsByTask({}); return; }
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
+      const listingIds = Array.from(new Set(tasks.map((t) => t.listing_id)));
+      const minDate = tasks.reduce((m, t) => (t.scheduled_date < m ? t.scheduled_date : m), tasks[0].scheduled_date);
+      const { data: resv } = await supabase
+        .from("reservations")
+        .select("id, listing_id, check_in")
+        .in("listing_id", listingIds)
+        .eq("status", "confirmed")
+        .gte("check_in", minDate)
+        .order("check_in", { ascending: true });
+      if (cancelled) return;
+
+      const byListing: Record<string, { id: string; check_in: string }[]> = {};
+      for (const r of (resv ?? []) as any[]) (byListing[r.listing_id] ??= []).push(r);
+
+      // task -> the next arriving reservation it prepares for
+      const arrivalForTask: Record<string, string> = {};
+      const arrivalIds = new Set<string>();
+      for (const t of tasks) {
+        const next = (byListing[t.listing_id] ?? []).find((r) => r.check_in >= t.scheduled_date && r.id !== t.reservation_id);
+        if (next) { arrivalForTask[t.id] = next.id; arrivalIds.add(next.id); }
+      }
+      if (arrivalIds.size === 0) { setRequestsByTask({}); return; }
+
+      const { data: reqs } = await supabase
         .from("booking_requests")
         .select("reservation_id, quantity, requests(name, icon)")
-        .in("reservation_id", ids);
+        .in("reservation_id", Array.from(arrivalIds));
       if (cancelled) return;
-      const map: Record<string, BookingRequest[]> = {};
-      for (const row of (data ?? []) as any[]) {
-        (map[row.reservation_id] ??= []).push({
+
+      const byRes: Record<string, BookingRequest[]> = {};
+      for (const row of (reqs ?? []) as any[]) {
+        (byRes[row.reservation_id] ??= []).push({
           name: row.requests?.name ?? "Request",
           icon: row.requests?.icon ?? null,
           quantity: row.quantity,
         });
       }
-      setRequestsByReservation(map);
+      const byTask: Record<string, BookingRequest[]> = {};
+      for (const t of tasks) { const rid = arrivalForTask[t.id]; if (rid && byRes[rid]) byTask[t.id] = byRes[rid]; }
+      setRequestsByTask(byTask);
     })();
     return () => { cancelled = true; };
-  }, [reservationKey]);
+  }, [taskKey]);
 
-  const requestsForTask = (task: CleanTask): BookingRequest[] =>
-    task.reservation_id ? (requestsByReservation[task.reservation_id] ?? []) : [];
+  const requestsForTask = (task: CleanTask): BookingRequest[] => requestsByTask[task.id] ?? [];
 
   // Tap "Mark Complete": if the booking has requests, show the reminder first;
   // otherwise go straight to the standard "Yes, confirm" step.
