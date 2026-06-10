@@ -59,13 +59,26 @@ const num = (v: string | undefined): number | null => {
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
 };
-const toDate = (v: string | undefined): string | null => {
+// order = the expected slash-date order for AMBIGUOUS values (both parts <= 12).
+// Airbnb exports US "mdy" (05/29/2026); most others "dmy". Unambiguous values
+// (a part > 12) are auto-detected regardless of `order`.
+const toDate = (v: string | undefined, order: "mdy" | "dmy" = "dmy"): string | null => {
   if (!v) return null;
   const t = v.trim();
-  let m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);          // 2026-04-02
+  if (t === "" || t === "-") return null;
+  let m = t.match(/^(\d{4})-(\d{2})-(\d{2})/);          // 2026-04-02 (ISO)
   if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-  m = t.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);    // 02/04/2026 (d/m/Y)
-  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  m = t.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/);    // slash date
+  if (m) {
+    const a = parseInt(m[1], 10), b = parseInt(m[2], 10);
+    let mm: number, dd: number;
+    if (a > 12) { dd = a; mm = b; }                      // unambiguous day-first
+    else if (b > 12) { mm = a; dd = b; }                 // unambiguous month-first
+    else if (order === "mdy") { mm = a; dd = b; }
+    else { dd = a; mm = b; }
+    if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+    return `${m[3]}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+  }
   const d = new Date(t);
   return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
 };
@@ -150,7 +163,7 @@ Deno.serve(async (req) => {
 
       if (platform === "airbnb") {
         const type = (cell(r, "Type") ?? "").trim();
-        const ci = toDate(cell(r, "Start date"));
+        const ci = toDate(cell(r, "Start date"), "mdy");
         const co = (() => {
           const nights = num(cell(r, "Nights"));
           if (ci && nights) { const d = new Date(ci); d.setDate(d.getDate() + nights); return d.toISOString().slice(0, 10); }
@@ -208,12 +221,22 @@ Deno.serve(async (req) => {
           staged.push({ ...base, txn_type: "payout", is_revenue: false, net_amount: num(cell(r, "Payout amount")), recon_status: "excluded" });
           continue;
         }
+        // non-reservation, non-payout rows (e.g. "Commission adjustment") -> attribution queue
+        if (!/reservation/i.test(type)) {
+          staged.push({ ...base, txn_type: "adjustment", is_revenue: false,
+            commission_amount: commission != null ? Math.abs(commission) : null,
+            net_amount: gross ?? num(cell(r, "Transaction amount")), recon_status: "needs_recon" });
+          continue;
+        }
         // reservation rows: include only status "Okay"
         if (status && !/okay|ok/i.test(status)) continue;
         if (payoutType.toLowerCase() === "net") {
+          // Booking.com reports commission + payments fee as NEGATIVE deductions;
+          // store them as positive cost magnitudes.
           staged.push({ ...base, txn_type: "reservation", is_revenue: true, collection_model: "channel",
-            gross_amount: gross, commission_amount: commission, commission_pct: commissionPct != null ? commissionPct / 100 : null,
-            payment_fee_amount: payFee, net_amount: txnAmt ?? gross });
+            gross_amount: gross, commission_amount: commission != null ? Math.abs(commission) : null,
+            commission_pct: commissionPct != null ? commissionPct / 100 : null,
+            payment_fee_amount: payFee != null ? Math.abs(payFee) : null, net_amount: txnAmt ?? gross });
         } else {
           // Gross / host-collected: commission "To be invoiced" -> a payable computed from %
           const pct = commissionPct != null ? commissionPct / 100 : 0.15;
