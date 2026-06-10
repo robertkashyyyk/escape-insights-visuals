@@ -26,7 +26,7 @@ export function CostGroups({
   const toggle = (k: string) => setOpen((p) => ({ ...p, [k]: !p[k] }));
   const pctOf = (v: number) => (grossRevenue > 0 ? `${((v / grossRevenue) * 100).toFixed(1)}%` : "—");
 
-  const CH_LABEL: Record<string, string> = { bookingcom: "Booking.com", airbnb: "Airbnb", direct: "Direct", vrbo: "Vrbo", deposit_fees: "Security deposit fees" };
+  const CH_LABEL: Record<string, string> = { bookingcom: "Booking.com", airbnb: "Airbnb", direct: "Direct", vrbo: "Vrbo", deposit_fees: "Deposit fees" };
   const channelLines = (obj: Record<string, number>): Line[] =>
     Object.entries(obj).filter(([, v]) => Math.abs(v) >= 0.005).sort((a, b) => b[1] - a[1])
       .map(([k, v]) => ({ label: CH_LABEL[k] ?? k, value: v }));
@@ -113,21 +113,21 @@ export function CostGroups({
                 </div>
                 <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "rotate-180" : ""}`} />
               </div>
-              <div className="mt-3 text-xs uppercase tracking-wide text-muted-foreground">{g.title}</div>
-              <div className="text-xl font-bold">{gbp(total)}</div>
+              <div className="mt-3 text-xs uppercase tracking-wide text-muted-foreground truncate">{g.title}</div>
+              <div className="text-xl font-bold tabular-nums truncate">{gbp(total)}</div>
               {g.tone === "cost" && <div className="text-[11px] text-muted-foreground">{pctOf(total)} of revenue</div>}
 
               <div className={`grid transition-all duration-200 ${isOpen ? "grid-rows-[1fr] opacity-100 mt-3" : "grid-rows-[0fr] opacity-0"}`}>
                 <div className="overflow-hidden">
                   <div className="space-y-1.5 border-t border-border/50 pt-2">
                     {g.lines.map((l) => (
-                      <div key={l.label} className="flex items-center justify-between gap-2 text-xs">
-                        <span className="text-muted-foreground">{l.label}</span>
-                        <span className="flex items-center gap-2 shrink-0">
+                      <div key={l.label} className="flex items-baseline justify-between gap-2 text-xs min-w-0">
+                        <span className="text-muted-foreground truncate min-w-0" title={l.label}>{l.label}</span>
+                        <span className="flex items-baseline gap-1.5 shrink-0 tabular-nums">
                           {g.tone === "cost" && !l.missing && l.value != null && grossRevenue > 0 && (
                             <span className="text-[10px] text-muted-foreground/70">{pctOf(Number(l.value))}</span>
                           )}
-                          <span className={l.missing ? "text-amber-400" : "text-foreground"}>
+                          <span className={`whitespace-nowrap ${l.missing ? "text-amber-400" : "text-foreground"}`}>
                             {l.missing || l.value == null ? "—" : gbp(Number(l.value))}
                           </span>
                         </span>
