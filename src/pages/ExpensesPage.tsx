@@ -316,6 +316,28 @@ function LaundryTab() {
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Apportioning scope: across all properties (default), or restricted to a
+  // hand-picked set of properties or whole regions. Restricting still weights
+  // by rooms-let (bookings × bedrooms) within the chosen set.
+  const [scope, setScope] = useState<"all" | "property" | "region">("all");
+  const [pickListings, setPickListings] = useState<string[]>([]);
+  const [pickRegions, setPickRegions] = useState<string[]>([]);
+
+  const { data: scopeListings = [] } = useQuery({
+    queryKey: ["laundry_scope_listings"],
+    queryFn: async () => {
+      const { data } = await supabase.from("listings").select("id, name, location_group").eq("status", "active").order("name");
+      return data ?? [];
+    },
+  });
+  const { data: scopeRegions = [] } = useQuery({
+    queryKey: ["laundry_scope_regions"],
+    queryFn: async () => {
+      const { data } = await supabase.from("location_groups").select("name").eq("archived", false).order("display_order");
+      return data ?? [];
+    },
+  });
+  const toggleIn = (arr: string[], id: string) => arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id];
 
   const { data: bills = [], isLoading } = useQuery({
     queryKey: ["laundry_bills"],
@@ -334,7 +356,18 @@ function LaundryTab() {
   const submit = async () => {
     if (!periodStart || !periodEnd || !total || !billDate) { toast.error("Please fill all required fields"); return; }
     if (periodStart > periodEnd) { toast.error("Start date must be before end date"); return; }
+    if (scope === "property" && pickListings.length === 0) { toast.error("Select at least one property"); return; }
+    if (scope === "region" && pickRegions.length === 0) { toast.error("Select at least one region"); return; }
     setSubmitting(true);
+
+    // Resolve the set of listing ids the bill is allowed to apportion across.
+    let allowedIds: Set<string> | null = null; // null = all properties
+    if (scope === "property") {
+      allowedIds = new Set(pickListings);
+    } else if (scope === "region") {
+      allowedIds = new Set((scopeListings as any[]).filter((l) => pickRegions.includes(l.location_group)).map((l) => l.id));
+      if (allowedIds.size === 0) { setSubmitting(false); toast.error("No active properties in the selected region(s)"); return; }
+    }
 
     const receipt_path = await uploadReceipt(file, user?.id ?? "");
     const totalNum = Number(total);
@@ -358,6 +391,7 @@ function LaundryTab() {
     const byListing = new Map<string, { name: string; bedrooms: number; bookings: number }>();
     (resv ?? []).forEach((r: any) => {
       if (!r.listing_id) return;
+      if (allowedIds && !allowedIds.has(r.listing_id)) return;
       const cur = byListing.get(r.listing_id) ?? { name: r.listings?.name ?? "Unknown", bedrooms: r.listings?.bedrooms ?? 0, bookings: 0 };
       cur.bookings += 1;
       byListing.set(r.listing_id, cur);
@@ -416,6 +450,52 @@ function LaundryTab() {
             <div><Label>Receipt</Label><Input type="file" accept="image/*,application/pdf" onChange={e => setFile(e.target.files?.[0] ?? null)} /></div>
             <div className="md:col-span-2"><Label>Notes</Label><Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} /></div>
           </div>
+
+          <div className="space-y-3 rounded-lg border border-border/40 p-3">
+            <div className="grid md:grid-cols-2 gap-3">
+              <div>
+                <Label>Apportion Across</Label>
+                <Select value={scope} onValueChange={(v: any) => setScope(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All properties (with bookings)</SelectItem>
+                    <SelectItem value="property">Selected properties</SelectItem>
+                    <SelectItem value="region">Selected regions</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Weighted by rooms let (bookings × bedrooms) within the chosen set.
+                </p>
+              </div>
+            </div>
+            {scope === "property" && (
+              <div>
+                <Label>Properties ({pickListings.length})</Label>
+                <div className="max-h-40 overflow-y-auto rounded-md border border-border/30 divide-y divide-border/20 mt-1">
+                  {(scopeListings as any[]).map((l) => (
+                    <label key={l.id} className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-muted/30">
+                      <input type="checkbox" checked={pickListings.includes(l.id)} onChange={() => setPickListings((p) => toggleIn(p, l.id))} className="accent-primary" />
+                      <span className="truncate">{l.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            {scope === "region" && (
+              <div>
+                <Label>Regions ({pickRegions.length})</Label>
+                <div className="max-h-40 overflow-y-auto rounded-md border border-border/30 divide-y divide-border/20 mt-1">
+                  {(scopeRegions as any[]).map((g) => (
+                    <label key={g.name} className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-muted/30">
+                      <input type="checkbox" checked={pickRegions.includes(g.name)} onChange={() => setPickRegions((p) => toggleIn(p, g.name))} className="accent-primary" />
+                      <span className="truncate">{g.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           <Button onClick={submit} disabled={submitting}>
             <Upload className="h-4 w-4" /> {submitting ? "Apportioning…" : "Upload & Apportion"}
           </Button>
