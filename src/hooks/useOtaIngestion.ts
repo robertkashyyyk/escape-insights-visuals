@@ -258,6 +258,19 @@ export function useOtaMutations() {
     onSuccess: invalidate,
   });
 
+  // Move a Stripe deposit (its charge + any refund, by Source) out of Security
+  // into Attribution — e.g. it wasn't really a deposit, or wasn't fully refunded
+  // (guest kept £X for damage), so both the in and out need allocating.
+  const sendDepositToAttribution = useMutation({
+    mutationFn: async (ref: string) => {
+      await db.from("ota_transactions")
+        .update({ recon_status: "needs_recon", statement_descriptor: "Stripe deposit — review" })
+        .eq("platform", "stripe").eq("reference_number", ref)
+        .in("statement_descriptor", ["Security deposit / hold", "Deposit refund"]);
+    },
+    onSuccess: invalidate,
+  });
+
   // Delete a batch and (via FK cascade) its staged transactions + attribution
   // decisions. Learned listing aliases persist.
   const deleteBatch = useMutation({
@@ -268,5 +281,5 @@ export function useOtaMutations() {
     onSuccess: invalidate,
   });
 
-  return { uploadCsv, confirmListing, confirmMatch, markNoReservation, attributionDecision, reopenAttribution, deleteBatch, invalidate };
+  return { uploadCsv, confirmListing, confirmMatch, markNoReservation, attributionDecision, reopenAttribution, sendDepositToAttribution, deleteBatch, invalidate };
 }

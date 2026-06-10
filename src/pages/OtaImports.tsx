@@ -52,6 +52,7 @@ function UploadCard() {
                 <SelectItem value="airbnb">Airbnb</SelectItem>
                 <SelectItem value="bookingcom">Booking.com</SelectItem>
                 <SelectItem value="stripe">Stripe (Direct)</SelectItem>
+                <SelectItem value="vrbo">Vrbo</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -411,6 +412,7 @@ function MatchedTab() {
 
 function SecurityTab() {
   const { data, isLoading } = useSecurityDeposits();
+  const m = useOtaMutations();
   const [month, setMonth] = useState<string>("all");
   const monthLabel = (m: string) => format(new Date(`${m}-01T00:00:00`), "MMM yyyy");
   const chip = (active: boolean) =>
@@ -463,7 +465,7 @@ function SecurityTab() {
         ) : (
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground border-b border-border">
-              <tr><th className="text-left p-3">Taken</th><th className="text-left p-3">Stripe charge</th><th className="text-right p-3">Held</th><th className="text-right p-3">Fee</th></tr>
+              <tr><th className="text-left p-3">Taken</th><th className="text-left p-3">Stripe charge</th><th className="text-right p-3">Held</th><th className="text-right p-3">Fee</th><th className="p-3"></th></tr>
             </thead>
             <tbody>
               {held.map((g) => (
@@ -472,6 +474,11 @@ function SecurityTab() {
                   <td className="p-3 font-mono text-xs text-muted-foreground">{g.ref}</td>
                   <td className="p-3 text-right">{fmtGBP(g.net)}</td>
                   <td className="p-3 text-right text-muted-foreground">{fmtGBP(g.fee)}</td>
+                  <td className="p-3 text-right">
+                    <Button size="sm" variant="outline" onClick={() => m.sendDepositToAttribution.mutate(g.ref, {
+                      onSuccess: () => toast.success("Sent to Attribution — allocate the in & out"),
+                    })}>→ Attribution</Button>
+                  </td>
                 </tr>
               ))}
             </tbody>

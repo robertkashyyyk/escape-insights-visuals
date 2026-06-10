@@ -246,7 +246,7 @@ Deno.serve(async (req) => {
             net_amount: gross });
         }
         trackPeriod(ci);
-      } else {
+      } else if (platform === "stripe") {
         // stripe (balance history)
         const type = (cell(r, "Type") ?? "").trim().toLowerCase();
         const amount = num(cell(r, "Amount"));
@@ -299,6 +299,27 @@ Deno.serve(async (req) => {
           // payout / refund_failure / other -> informational
           staged.push({ ...base, txn_type: "payout", is_revenue: false, net_amount: amount, recon_status: "excluded" });
         }
+      } else if (platform === "vrbo") {
+        // vrbo / homeaway — one row per booking. Commission is paid in arrears
+        // (host-collected), so revenue = gross and commission is a real cost.
+        const gross = num(cell(r, "Gross Sale Amount")) ?? num(cell(r, "Rent Amount"));
+        const commission = num(cell(r, "Commission"));
+        const ci = toDate(cell(r, "Check-in Date"));
+        const co = toDate(cell(r, "Check-out Date"));
+        const resvExtId = (cell(r, "Reservation External ID") ?? "").trim() || null;
+        const propId = (cell(r, "External Software Property ID") ?? "").trim() || null;
+        if (gross != null || resvExtId) {
+          staged.push({
+            platform, raw_row: rawObj, currency: (cell(r, "Currency") ?? "GBP").trim() || "GBP",
+            txn_type: "reservation", is_revenue: true, collection_model: "host",
+            confirmation_code: resvExtId, reference_number: resvExtId, external_listing_id: propId,
+            property_name_raw: (cell(r, "Property") ?? "").trim() || null,
+            guest_name: (cell(r, "Guest name") ?? "").trim() || null,
+            check_in: ci, check_out: co, nights: daysBetween(ci, co),
+            gross_amount: gross, commission_amount: commission != null ? Math.abs(commission) : null, net_amount: gross,
+          });
+          trackPeriod(ci);
+        }
       }
     }
 
@@ -312,9 +333,13 @@ Deno.serve(async (req) => {
     const batchId = batch.id;
 
     // ---- listing resolution + reservation matching (auto pass) ----
-    const { data: listings } = await admin.from("listings").select("id, name");
+    const { data: listings } = await admin.from("listings").select("id, name, hostaway_listing_id");
     const { data: aliases } = await admin.from("listing_aliases").select("raw_name, listing_id").eq("platform", platform);
     const aliasMap = new Map<string, string>((aliases ?? []).map((a: any) => [a.raw_name.toLowerCase(), a.listing_id]));
+    // Vrbo carries the PMS (Hostaway) property id as "External Software Property ID".
+    const hostawayListingMap = new Map<string, string>(
+      (listings ?? []).filter((l: any) => l.hostaway_listing_id != null).map((l: any) => [String(l.hostaway_listing_id), l.id]),
+    );
 
     // GLOBAL code map — the OTA confirmation/reference uniquely identifies a
     // reservation regardless of listing, so match on it FIRST and derive the
@@ -355,6 +380,11 @@ Deno.serve(async (req) => {
     };
 
     const resolveListing = (t: Stg): { id: string | null; suggest: string | null } => {
+      // 0. Vrbo External Software Property ID = Hostaway listing id (strong key)
+      if (t.external_listing_id) {
+        const hit = hostawayListingMap.get(String(t.external_listing_id));
+        if (hit) return { id: hit, suggest: null };
+      }
       // 1. alias on raw name
       if (t.property_name_raw) {
         const hit = aliasMap.get(t.property_name_raw.toLowerCase());
