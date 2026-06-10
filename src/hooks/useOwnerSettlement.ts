@@ -69,13 +69,25 @@ export function useOwnerSettlement(ownerId: string | null, periodStart: Date, pe
         const reservations = (resv ?? []) as any[];
         const resvIds = reservations.map((r) => r.id);
 
-        // OTA settlement truth for those reservations
-        const otaByResv = new Map<string, any>();
+        // OTA settlement truth for those reservations. A single reservation can
+        // match MULTIPLE OTA rows — e.g. the channel settlement row (carries the
+        // commission) plus one or more Stripe charge rows (carry card fees, zero
+        // commission), or a split payment across two Stripe charges. Aggregate
+        // them all: sum commission + card, and remember whether any row actually
+        // carried commission (so we know when to fall back to Hostaway's figure).
+        const otaByResv = new Map<string, { comm: number; card: number; hasComm: boolean }>();
         if (resvIds.length) {
           const { data: ota } = await db.from("ota_transactions")
             .select("matched_reservation_id, commission_amount, payment_fee_amount")
             .in("matched_reservation_id", resvIds).in("recon_status", ["auto_matched", "matched"]);
-          (ota ?? []).forEach((o: any) => { if (o.matched_reservation_id) otaByResv.set(o.matched_reservation_id, o); });
+          (ota ?? []).forEach((o: any) => {
+            if (!o.matched_reservation_id) return;
+            const cur = otaByResv.get(o.matched_reservation_id) ?? { comm: 0, card: 0, hasComm: false };
+            const c = Number(o.commission_amount ?? 0);
+            cur.comm += c; if (c > 0) cur.hasComm = true;
+            cur.card += Number(o.payment_fee_amount ?? 0);
+            otaByResv.set(o.matched_reservation_id, cur);
+          });
         }
         // Pro-rate fees by the same in-period night ratio as revenue (R1).
         const ratioFor = (r: any) => {
@@ -89,8 +101,11 @@ export function useOwnerSettlement(ownerId: string | null, periodStart: Date, pe
         for (const r of reservations) {
           const o = otaByResv.get(r.id);
           const ratio = ratioFor(r);
-          const comm = Number(o?.commission_amount ?? r.channel_commission ?? 0) * ratio;
-          const card = Number(o?.payment_fee_amount ?? 0) * ratio;
+          // Prefer the settlement file's commission, but only when a row actually
+          // carried one — otherwise (e.g. only a Stripe charge matched) fall back
+          // to Hostaway's channel_commission so the channel fee isn't lost.
+          const comm = (o?.hasComm ? o.comm : Number(r.channel_commission ?? 0)) * ratio;
+          const card = Number(o?.card ?? 0) * ratio;
           bookingFees += comm;
           cardProcessing += card;
           const ch = mapChannel(r.platform);
