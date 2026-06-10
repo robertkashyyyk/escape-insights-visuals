@@ -263,6 +263,32 @@ Deno.serve(async (req) => {
     const { data: aliases } = await admin.from("listing_aliases").select("raw_name, listing_id").eq("platform", platform);
     const aliasMap = new Map<string, string>((aliases ?? []).map((a: any) => [a.raw_name.toLowerCase(), a.listing_id]));
 
+    // GLOBAL code map — the OTA confirmation/reference uniquely identifies a
+    // reservation regardless of listing, so match on it FIRST and derive the
+    // listing from the matched reservation (no name-resolution needed).
+    const allCodes = Array.from(new Set(
+      staged.filter((s) => s.txn_type === "reservation")
+        .map((s) => s.confirmation_code || s.reference_number).filter(Boolean),
+    )) as string[];
+    const codeToResv = new Map<string, any>();
+    for (let i = 0; i < allCodes.length; i += 300) {
+      const { data } = await admin.from("reservations")
+        .select("id, listing_id, guest_name, check_in, check_out, total_amount, host_payout, channel_reservation_code, status")
+        .in("channel_reservation_code", allCodes.slice(i, i + 300));
+      (data ?? []).forEach((r: any) => { if (r.channel_reservation_code) codeToResv.set(r.channel_reservation_code, r); });
+    }
+    const learnedAliases: { platform: string; raw_name: string; listing_id: string }[] = [];
+    const learnAlias = (t: Stg, listingId: string) => {
+      if (t.property_name_raw) {
+        learnedAliases.push({ platform, raw_name: t.property_name_raw, listing_id: listingId });
+        aliasMap.set(t.property_name_raw.toLowerCase(), listingId); // benefit later rows in this batch
+      }
+      if (t.bookingcom_property_id) {
+        learnedAliases.push({ platform, raw_name: `pid:${t.bookingcom_property_id}`, listing_id: listingId });
+        aliasMap.set(`pid:${t.bookingcom_property_id}`.toLowerCase(), listingId);
+      }
+    };
+
     const resolveListing = (t: Stg): { id: string | null; suggest: string | null } => {
       // 1. alias on raw name
       if (t.property_name_raw) {
@@ -330,19 +356,21 @@ Deno.serve(async (req) => {
       };
 
       if (t.txn_type === "reservation") {
-        const { id: listingId, suggest } = resolveListing(t);
-        out.resolved_listing_id = listingId ?? suggest ?? null;
-
-        if (listingId) {
-          // PRIMARY (dormant): code match against channel_reservation_code
-          const code = t.confirmation_code || t.reference_number;
-          const resv = await getResv(listingId);
-          let matched: any = null, method = "composite", confidence = 0;
-          if (code) {
-            const codeHit = resv.find((r: any) => r.channel_reservation_code && r.channel_reservation_code === code);
-            if (codeHit) { matched = codeHit; method = "code"; confidence = 1.0; }
-          }
-          if (!matched) {
+        // 1) PRIMARY — global code match (listing comes from the reservation)
+        const code = t.confirmation_code || t.reference_number;
+        const codeHit = code ? codeToResv.get(code) : null;
+        if (codeHit) {
+          out.matched_reservation_id = codeHit.id;
+          out.resolved_listing_id = codeHit.listing_id;
+          out.match_method = "code"; out.match_confidence = 1.0; out.recon_status = "auto_matched";
+          learnAlias(t, codeHit.listing_id); // bootstrap the name/id alias for future name-only rows
+        } else {
+          // 2) resolve listing (alias / property id / fuzzy) then composite-score within it
+          const { id: listingId, suggest } = resolveListing(t);
+          const useListing = listingId ?? suggest;
+          out.resolved_listing_id = useListing ?? null;
+          if (useListing) {
+            const resv = await getResv(useListing);
             let best: { r: any; s: number } | null = null;
             let exactDatePairs = 0;
             for (const r of resv) {
@@ -350,30 +378,26 @@ Deno.serve(async (req) => {
               if (t.check_in && t.check_out && r.check_in === t.check_in && r.check_out === t.check_out) exactDatePairs++;
               if (!best || s > best.s) best = { r, s };
             }
+            let confidence = 0, matched: any = null;
             if (best) {
-              // uniqueness bonus: sole reservation with the exact stay dates
               let s = best.s;
               if (exactDatePairs === 1 && t.check_in && t.check_out &&
                   best.r.check_in === t.check_in && best.r.check_out === t.check_out) s = Math.min(1, s + 0.15);
-              matched = best.r; confidence = Math.round(s * 1000) / 1000; method = "composite";
+              matched = best.r; confidence = Math.round(s * 1000) / 1000;
             }
-          }
-          if (method === "code") {
-            out.matched_reservation_id = matched.id; out.match_method = "code";
-            out.match_confidence = 1.0; out.recon_status = "auto_matched";
-          } else if (matched && confidence >= 0.85) {
-            out.matched_reservation_id = matched.id; out.match_method = "composite";
-            out.match_confidence = confidence; out.recon_status = "auto_matched";
-          } else if (matched && confidence >= 0.55) {
-            out.matched_reservation_id = matched.id; out.match_method = "composite";
-            out.match_confidence = confidence; out.recon_status = "needs_recon"; // best candidate suggested
+            if (matched && confidence >= 0.85) {
+              out.matched_reservation_id = matched.id; out.match_method = "composite";
+              out.match_confidence = confidence; out.recon_status = "auto_matched";
+              if (listingId == null) learnAlias(t, useListing); // confident match on a fuzzy listing -> learn it
+            } else if (matched && confidence >= 0.55) {
+              out.matched_reservation_id = matched.id; out.match_method = "composite";
+              out.match_confidence = confidence; out.recon_status = "needs_recon";
+            } else {
+              out.match_confidence = matched ? confidence : 0; out.recon_status = "needs_recon";
+            }
           } else {
-            out.match_confidence = matched ? confidence : 0;
-            out.recon_status = "unmatched";
+            out.recon_status = "needs_recon";
           }
-        } else {
-          // listing unresolved (suggestion only or none) -> human resolves listing first
-          out.recon_status = "needs_recon";
         }
       } else if (t.txn_type === "payout") {
         out.recon_status = "excluded"; // informational, never matched
@@ -388,6 +412,13 @@ Deno.serve(async (req) => {
     for (let i = 0; i < rowsToInsert.length; i += 500) {
       const { error } = await admin.from("ota_transactions").insert(rowsToInsert.slice(i, i + 500));
       if (error) throw error;
+    }
+
+    // persist aliases learned from confident matches (bootstraps name-only matching)
+    if (learnedAliases.length) {
+      const seen = new Set<string>();
+      const uniq = learnedAliases.filter((a) => { const k = a.raw_name.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+      await admin.from("listing_aliases").upsert(uniq, { onConflict: "platform,raw_name", ignoreDuplicates: true });
     }
 
     // summary
