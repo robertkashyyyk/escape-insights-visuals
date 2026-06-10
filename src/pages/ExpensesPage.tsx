@@ -14,7 +14,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
-import { Receipt, ChevronDown, Plus, Upload } from "lucide-react";
+import { Receipt, ChevronDown, Plus, Upload, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { TurnoverRatesTab } from "@/components/expenses/TurnoverRatesTab";
 import { UtilitiesTab } from "@/components/expenses/UtilitiesTab";
@@ -142,6 +142,15 @@ function ConsumablesTab() {
     else qc.invalidateQueries({ queryKey: ["consumables"] });
   };
 
+  const remove = async (id: string, label: string) => {
+    if (!window.confirm(`Delete consumable entry "${label}"? This cannot be undone.`)) return;
+    const { error } = await supabase.from("expense_consumables").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Entry deleted");
+    qc.invalidateQueries({ queryKey: ["consumables"] });
+    qc.invalidateQueries({ queryKey: ["owner_cost_categories"] });
+  };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -252,11 +261,12 @@ function ConsumablesTab() {
                 <TableHead>Allocation</TableHead>
                 <TableHead>Submitted By</TableHead>
                 <TableHead>Reimbursed</TableHead>
+                <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Loading…</TableCell></TableRow>}
-              {!isLoading && entries.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">No entries yet.</TableCell></TableRow>}
+              {isLoading && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Loading…</TableCell></TableRow>}
+              {!isLoading && entries.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">No entries yet.</TableCell></TableRow>}
               {entries.map((e: any) => (
                 <TableRow key={e.id}>
                   <TableCell>{format(new Date(e.purchase_date), "dd MMM yyyy")}</TableCell>
@@ -275,6 +285,12 @@ function ConsumablesTab() {
                     ) : (
                       <Badge variant="secondary">N/A</Badge>
                     )}
+                  </TableCell>
+                  <TableCell>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => remove(e.id, `${e.supplier} ${fmtGbp(Number(e.receipt_value))}`)} title="Delete entry">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -376,6 +392,16 @@ function LaundryTab() {
     qc.invalidateQueries({ queryKey: ["laundry_bills"] });
   };
 
+  const removeBill = async (bill: any) => {
+    if (!window.confirm(`Delete laundry bill "${bill.supplier}" (${fmtGbp(Number(bill.total_amount))})? This also removes its property allocations and cannot be undone.`)) return;
+    await supabase.from("expense_laundry_allocations").delete().eq("bill_id", bill.id);
+    const { error } = await supabase.from("expense_laundry_bills").delete().eq("id", bill.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Laundry bill deleted");
+    qc.invalidateQueries({ queryKey: ["laundry_bills"] });
+    qc.invalidateQueries({ queryKey: ["owner_cost_categories"] });
+  };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -402,32 +428,38 @@ function LaundryTab() {
         {!isLoading && bills.length === 0 && (
           <Card><CardContent className="p-8 text-center text-muted-foreground">No laundry bills uploaded yet.</CardContent></Card>
         )}
-        {bills.map((bill: any) => <BillCard key={bill.id} bill={bill} />)}
+        {bills.map((bill: any) => <BillCard key={bill.id} bill={bill} onDelete={() => removeBill(bill)} />)}
       </div>
     </div>
   );
 }
 
-function BillCard({ bill }: { bill: any }) {
+function BillCard({ bill, onDelete }: { bill: any; onDelete: () => void }) {
   const [open, setOpen] = useState(false);
   const allocTotal = (bill.allocations ?? []).reduce((s: number, a: any) => s + Number(a.allocated_amount), 0);
   return (
     <Card>
       <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger asChild>
-          <button className="w-full flex items-center justify-between p-4 hover:bg-muted/30 text-left">
-            <div className="space-y-1">
-              <div className="flex items-center gap-3">
-                <span className="font-semibold">{bill.supplier}</span>
-                <Badge variant="secondary">{fmtGbp(Number(bill.total_amount))}</Badge>
+        <div className="flex items-center">
+          <CollapsibleTrigger asChild>
+            <button className="flex-1 flex items-center justify-between p-4 hover:bg-muted/30 text-left">
+              <div className="space-y-1">
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold">{bill.supplier}</span>
+                  <Badge variant="secondary">{fmtGbp(Number(bill.total_amount))}</Badge>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Billed {format(new Date(bill.bill_date), "dd MMM yyyy")} · Period {format(new Date(bill.period_start), "dd MMM")} – {format(new Date(bill.period_end), "dd MMM yyyy")} · {(bill.allocations ?? []).length} properties
+                </div>
               </div>
-              <div className="text-xs text-muted-foreground">
-                Billed {format(new Date(bill.bill_date), "dd MMM yyyy")} · Period {format(new Date(bill.period_start), "dd MMM")} – {format(new Date(bill.period_end), "dd MMM yyyy")} · {(bill.allocations ?? []).length} properties
-              </div>
-            </div>
-            <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
-          </button>
-        </CollapsibleTrigger>
+              <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+            </button>
+          </CollapsibleTrigger>
+          <Button size="icon" variant="ghost" className="h-8 w-8 mr-3 text-muted-foreground hover:text-destructive shrink-0"
+            onClick={onDelete} title="Delete bill">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
         <CollapsibleContent>
           <CardContent className="pt-0">
             <div className="text-xs text-muted-foreground italic mb-2">
