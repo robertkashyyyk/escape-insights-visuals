@@ -313,7 +313,17 @@ function LaundryTab() {
   const [periodEnd, setPeriodEnd] = useState("");
   const [supplier, setSupplier] = useState("Laundry Service");
   const [total, setTotal] = useState("");
+  const [markupFixed, setMarkupFixed] = useState("");
+  const [markupPct, setMarkupPct] = useState("");
   const [notes, setNotes] = useState("");
+
+  // Fixed fee is added to the invoice first, then the percentage is applied on
+  // top — e.g. £1,000 + £0 fixed + 2% = £1,020. The grossed-up figure is what
+  // gets apportioned across properties.
+  const baseTotal = Number(total) || 0;
+  const fixedAdd = Number(markupFixed) || 0;
+  const pctAdd = Number(markupPct) || 0;
+  const adjustedTotal = Math.round((baseTotal + fixedAdd) * (1 + pctAdd / 100) * 100) / 100;
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   // Apportioning scope: across all properties (default), or restricted to a
@@ -370,11 +380,16 @@ function LaundryTab() {
     }
 
     const receipt_path = await uploadReceipt(file, user?.id ?? "");
-    const totalNum = Number(total);
+    const totalNum = adjustedTotal;
+    // Keep an audit trail of how the apportioned figure was derived.
+    const markupNote = (fixedAdd !== 0 || pctAdd !== 0)
+      ? `Invoice £${baseTotal.toFixed(2)}${fixedAdd ? ` + £${fixedAdd.toFixed(2)} fixed` : ""}${pctAdd ? ` + ${pctAdd}%` : ""} = £${totalNum.toFixed(2)} apportioned`
+      : null;
+    const finalNotes = [notes || null, markupNote].filter(Boolean).join(" · ") || null;
 
     const { data: bill, error: bErr } = await supabase.from("expense_laundry_bills").insert({
       bill_date: billDate, period_start: periodStart, period_end: periodEnd,
-      supplier, total_amount: totalNum, notes: notes || null, receipt_path,
+      supplier, total_amount: totalNum, notes: finalNotes, receipt_path,
       created_by: user?.id,
     }).select().single();
 
@@ -422,7 +437,7 @@ function LaundryTab() {
 
     setSubmitting(false);
     toast.success("Laundry bill uploaded and apportioned");
-    setTotal(""); setNotes(""); setFile(null);
+    setTotal(""); setMarkupFixed(""); setMarkupPct(""); setNotes(""); setFile(null);
     qc.invalidateQueries({ queryKey: ["laundry_bills"] });
   };
 
@@ -448,8 +463,16 @@ function LaundryTab() {
             <div><Label>Period End</Label><Input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} /></div>
             <div><Label>Total Invoice Amount (£)</Label><Input type="number" step="0.01" value={total} onChange={e => setTotal(e.target.value)} /></div>
             <div><Label>Receipt</Label><Input type="file" accept="image/*,application/pdf" onChange={e => setFile(e.target.files?.[0] ?? null)} /></div>
+            <div><Label>Fixed Fee Addition (£)</Label><Input type="number" step="0.01" placeholder="0.00" value={markupFixed} onChange={e => setMarkupFixed(e.target.value)} /></div>
+            <div><Label>Percentage Fee (%)</Label><Input type="number" step="0.01" placeholder="0" value={markupPct} onChange={e => setMarkupPct(e.target.value)} /></div>
             <div className="md:col-span-2"><Label>Notes</Label><Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} /></div>
           </div>
+          {(fixedAdd !== 0 || pctAdd !== 0) && baseTotal > 0 && (
+            <div className="text-xs text-muted-foreground">
+              Apportioning <span className="font-semibold text-foreground">{fmtGbp(adjustedTotal)}</span>
+              {" "}(£{baseTotal.toFixed(2)}{fixedAdd ? ` + £${fixedAdd.toFixed(2)} fixed` : ""}{pctAdd ? ` + ${pctAdd}%` : ""}) across properties.
+            </div>
+          )}
 
           <div className="space-y-3 rounded-lg border border-border/40 p-3">
             <div className="grid md:grid-cols-2 gap-3">
@@ -554,6 +577,7 @@ function BillCard({ bill, onDelete }: { bill: any; onDelete: () => void }) {
                   <TableHead className="text-right">Rooms Let</TableHead>
                   <TableHead className="text-right">Share %</TableHead>
                   <TableHead className="text-right">Allocated</TableHead>
+                  <TableHead className="text-right">Per booking</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -565,11 +589,15 @@ function BillCard({ bill, onDelete }: { bill: any; onDelete: () => void }) {
                     <TableCell className="text-right">{a.rooms_let}</TableCell>
                     <TableCell className="text-right">{(Number(a.allocation_pct) * 100).toFixed(2)}%</TableCell>
                     <TableCell className="text-right font-medium">{fmtGbp(Number(a.allocated_amount))}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      {Number(a.bookings_in_period) > 0 ? fmtGbp(Number(a.allocated_amount) / Number(a.bookings_in_period)) : "—"}
+                    </TableCell>
                   </TableRow>
                 ))}
                 <TableRow className="font-semibold bg-muted/40">
                   <TableCell colSpan={5}>Total</TableCell>
                   <TableCell className="text-right">{fmtGbp(allocTotal)}</TableCell>
+                  <TableCell></TableCell>
                 </TableRow>
               </TableBody>
             </Table>
