@@ -517,6 +517,7 @@ function SecurityTab() {
 // each (Source id + both payment references + the two amounts), split by month.
 function LedgerTab() {
   const { data } = useSecurityDeposits();
+  const m = useOtaMutations();
   const [month, setMonth] = useState<string>("all");
   const monthLabel = (m: string) => format(new Date(`${m}-01T00:00:00`), "MMM yyyy");
   const chip = (active: boolean) =>
@@ -547,6 +548,7 @@ function LedgerTab() {
                 <th className="text-left p-3">Payment ref (out)</th>
                 <th className="text-right p-3">In</th>
                 <th className="text-right p-3">Out</th>
+                <th className="p-3"></th>
               </tr>
             </thead>
             <tbody>
@@ -558,6 +560,12 @@ function LedgerTab() {
                   <td className="p-3 font-mono text-xs text-muted-foreground">{p.outRefs.join(", ") || "—"}</td>
                   <td className="p-3 text-right text-green-400">{fmtGBP(p.inTotal)}</td>
                   <td className="p-3 text-right text-red-400">{fmtGBP(-p.outTotal)}</td>
+                  <td className="p-3 text-right">
+                    <Button size="sm" variant="ghost" className="text-muted-foreground" title="Allocate this deposit's card fee to a property"
+                      onClick={() => m.sendDepositToAttribution.mutate(p.ref, {
+                        onSuccess: () => toast.success("Sent to Attribution — allocate to a property"),
+                      })}>→ Attribution</Button>
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -166,6 +166,55 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ---- attribute security-deposit card fees to a listing (surname + stay date) ----
+    // A deposit isn't revenue, but its card fee is a real cost that should land on
+    // the owner statement. Resolve the listing only when the guest surname + a
+    // tight date window maps to exactly ONE listing; otherwise leave it for manual
+    // attribution (Security → Attribution). recon_status stays 'excluded'.
+    for (const s of staged) {
+      if (s.statement_descriptor !== "Security deposit / hold" || s.resolved_listing_id || !s.guest_name || !s.check_in) continue;
+      const surname = norm(s.guest_name).split(" ").pop();
+      if (!surname || surname.length < 3) continue;
+      const lo = new Date(s.check_in); lo.setDate(lo.getDate() - 3);
+      const hi = new Date(s.check_in); hi.setDate(hi.getDate() + 3);
+      const { data: cands } = await admin.from("reservations")
+        .select("id, listing_id, guest_name, check_in")
+        .eq("status", "confirmed")
+        .gte("check_in", lo.toISOString().slice(0, 10)).lte("check_in", hi.toISOString().slice(0, 10))
+        .ilike("guest_name", `%${surname}%`);
+      const rows = (cands ?? []).filter((r: any) => norm(r.guest_name).split(" ").pop() === surname);
+      const uniqListings = Array.from(new Set(rows.map((r: any) => r.listing_id)));
+      if (uniqListings.length === 1) {
+        s.resolved_listing_id = uniqListings[0];
+        s.matched_reservation_id = rows[0].id;
+        s.match_method = "composite"; s.match_confidence = 0.7;
+      }
+    }
+
+    // ---- preserve human decisions across re-syncs ----
+    // The upsert replaces whole rows, so without this a re-run would wipe a manual
+    // attribution (resolved listing chosen in the Attribution queue). Keep any
+    // existing human-confirmed listing for the same Stripe txn id.
+    const extIds = staged.map((s) => s.external_txn_id);
+    const existingMap = new Map<string, any>();
+    for (let i = 0; i < extIds.length; i += 300) {
+      const { data } = await admin.from("ota_transactions")
+        .select("external_txn_id, resolved_listing_id, matched_reservation_id, recon_status, match_method, match_confidence")
+        .in("external_txn_id", extIds.slice(i, i + 300));
+      (data ?? []).forEach((r: any) => existingMap.set(r.external_txn_id, r));
+    }
+    for (const s of staged) {
+      const ex = existingMap.get(s.external_txn_id);
+      const humanDecided = ex && (ex.match_method === "manual" || ex.recon_status === "matched");
+      if (humanDecided && ex.resolved_listing_id) {
+        s.resolved_listing_id = ex.resolved_listing_id;
+        s.matched_reservation_id = ex.matched_reservation_id ?? s.matched_reservation_id;
+        s.recon_status = ex.recon_status;
+        s.match_method = ex.match_method ?? s.match_method;
+        s.match_confidence = ex.match_confidence ?? s.match_confidence;
+      }
+    }
+
     // ---- upsert (dedup on external_txn_id) ----
     for (let i = 0; i < staged.length; i += 500) {
       const { error } = await admin.from("ota_transactions").upsert(staged.slice(i, i + 500), { onConflict: "external_txn_id", ignoreDuplicates: false });
@@ -176,7 +225,8 @@ Deno.serve(async (req) => {
     return json({ ok: true, fetched: bts.length, upserted: staged.length, days,
       reservations: staged.filter((s) => s.txn_type === "reservation").length,
       auto_matched: staged.filter((s) => s.recon_status === "auto_matched").length,
-      deposits: staged.filter((s) => s.statement_descriptor === "Security deposit / hold").length });
+      deposits: staged.filter((s) => s.statement_descriptor === "Security deposit / hold").length,
+      deposits_attributed: staged.filter((s) => s.statement_descriptor === "Security deposit / hold" && s.resolved_listing_id).length });
   } catch (e) {
     return json({ error: String((e as any)?.message ?? e) }, 500);
   }

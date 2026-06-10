@@ -104,7 +104,7 @@ export function useOwnerSettlement(ownerId: string | null, periodStart: Date, pe
         const { data: depRows } = await db.from("ota_transactions")
           .select("payment_fee_amount")
           .eq("platform", "stripe").eq("txn_type", "adjustment")
-          .ilike("statement_descriptor", "%security deposit%")
+          .ilike("statement_descriptor", "%deposit%")
           .gt("payment_fee_amount", 0)
           .in("resolved_listing_id", listingIds)
           .gte("check_in", startStr).lte("check_in", endStr);
