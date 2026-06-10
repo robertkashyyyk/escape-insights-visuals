@@ -492,8 +492,9 @@ Deno.serve(async (req) => {
       } else if (t.txn_type === "payout") {
         out.recon_status = "excluded"; // informational, never matched
       } else {
-        // resolution / adjustment -> attribution queue (P4)
-        out.recon_status = "needs_recon";
+        // resolution / adjustment -> attribution queue, UNLESS already resolved
+        // upstream (e.g. an excluded Stripe security deposit / refund).
+        if (out.recon_status !== "excluded") out.recon_status = "needs_recon";
       }
       rowsToInsert.push(out);
     }

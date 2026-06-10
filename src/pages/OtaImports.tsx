@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import {
   useOtaBatches, useOtaTransactions, useOtaMutations, useListings, fetchReservationCandidates, ListingLite,
-  useAttributionDecisions,
+  useAttributionDecisions, useSecurityDeposits,
 } from "@/hooks/useOtaIngestion";
 import {
   OtaTransaction, OtaPlatform, ResvCandidate, scoreCandidate, fuzzyListingScore, fmtGBP, reconBadgeClass,
@@ -404,10 +404,69 @@ function MatchedTab() {
   );
 }
 
+function SecurityTab() {
+  const { data, isLoading } = useSecurityDeposits();
+  const held = data?.held ?? [], returned = data?.returned ?? [], refundOnly = data?.refundOnly ?? [];
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <Card><CardContent className="p-4">
+          <div className="text-xs text-muted-foreground">Held (awaiting return)</div>
+          <div className="text-lg font-bold">{fmtGBP(data?.totalHeld ?? 0)}</div>
+          <div className="text-xs text-muted-foreground">{held.length} deposit{held.length === 1 ? "" : "s"}</div>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <div className="text-xs text-muted-foreground">Returned (paired in/out)</div>
+          <div className="text-lg font-bold">{returned.length}</div>
+          <div className="text-xs text-muted-foreground">net £0</div>
+        </CardContent></Card>
+        <Card><CardContent className="p-4">
+          <div className="text-xs text-muted-foreground">Deposit card fees</div>
+          <div className="text-lg font-bold">{fmtGBP(data?.totalFees ?? 0)}</div>
+          <div className="text-xs text-muted-foreground">always charged</div>
+        </CardContent></Card>
+      </div>
+
+      {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
+
+      <Card><CardContent className="p-0">
+        <div className="p-3 text-sm font-semibold border-b border-border">Held deposits — carry to next month until refunded</div>
+        {held.length === 0 ? (
+          <div className="p-6 text-center text-muted-foreground text-sm">No deposits currently held.</div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="text-xs text-muted-foreground border-b border-border">
+              <tr><th className="text-left p-3">Taken</th><th className="text-left p-3">Stripe charge</th><th className="text-right p-3">Held</th><th className="text-right p-3">Fee</th></tr>
+            </thead>
+            <tbody>
+              {held.map((g) => (
+                <tr key={g.ref} className="border-b border-border/40">
+                  <td className="p-3">{g.date ? format(new Date(g.date), "dd MMM yyyy") : "—"}</td>
+                  <td className="p-3 font-mono text-xs text-muted-foreground">{g.ref}</td>
+                  <td className="p-3 text-right">{fmtGBP(g.net)}</td>
+                  <td className="p-3 text-right text-muted-foreground">{fmtGBP(g.fee)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </CardContent></Card>
+
+      {refundOnly.length > 0 && (
+        <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-400">
+          <AlertTriangle className="h-4 w-4" />
+          <span>{refundOnly.length} refund{refundOnly.length === 1 ? "" : "s"} with no matching charge in the data — the deposit was likely taken in a prior period (cross-month).</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function OtaImports() {
   const { data: recon = [] } = useOtaTransactions({ statuses: ["needs_recon", "unmatched"], revenueOnly: true });
   const { data: attrib = [] } = useOtaTransactions({ statuses: ["needs_recon"], nonRevenueOnly: true });
   const { data: matched = [] } = useOtaTransactions({ statuses: ["auto_matched", "matched"], revenueOnly: true });
+  const { data: sec } = useSecurityDeposits();
   return (
     <AppLayout>
       <div className="p-6 space-y-6 max-w-6xl mx-auto">
@@ -425,11 +484,13 @@ export default function OtaImports() {
             <TabsTrigger value="matched">Matched ({matched.length})</TabsTrigger>
             <TabsTrigger value="recon">Recon Queue ({recon.length})</TabsTrigger>
             <TabsTrigger value="attribution">Attribution ({attrib.length})</TabsTrigger>
+            <TabsTrigger value="security">Security ({sec?.held.length ?? 0})</TabsTrigger>
           </TabsList>
           <TabsContent value="batches" className="mt-4"><BatchesTab /></TabsContent>
           <TabsContent value="matched" className="mt-4"><MatchedTab /></TabsContent>
           <TabsContent value="recon" className="mt-4"><ReconTab /></TabsContent>
           <TabsContent value="attribution" className="mt-4"><AttributionTab /></TabsContent>
+          <TabsContent value="security" className="mt-4"><SecurityTab /></TabsContent>
         </Tabs>
       </div>
     </AppLayout>

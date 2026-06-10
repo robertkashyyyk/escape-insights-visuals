@@ -90,12 +90,55 @@ export function useAttributionDecisions() {
   });
 }
 
+// ── Security deposits (Stripe) — one-in/one-out audit, paired by charge id ──
+export interface SecurityDeposit {
+  ref: string; charge: number; refund: number; net: number; fee: number;
+  date: string | null; status: "held" | "returned" | "refund_only";
+}
+export function useSecurityDeposits() {
+  return useQuery({
+    queryKey: ["security_deposits"],
+    queryFn: async (): Promise<{ held: SecurityDeposit[]; returned: SecurityDeposit[]; refundOnly: SecurityDeposit[]; totalHeld: number; totalFees: number }> => {
+      // All Stripe deposit charges + deposit refunds, across every batch (so a
+      // May charge pairs with a June refund). Grouped by Stripe charge id.
+      const { data } = await db.from("ota_transactions")
+        .select("reference_number, net_amount, payment_fee_amount, check_in, statement_descriptor")
+        .eq("platform", "stripe").eq("txn_type", "adjustment").eq("is_revenue", false)
+        .in("statement_descriptor", ["Security deposit / hold", "Deposit refund"]);
+      const groups = new Map<string, SecurityDeposit>();
+      (data ?? []).forEach((r: any) => {
+        const ref = r.reference_number ?? "(none)";
+        const g = groups.get(ref) ?? { ref, charge: 0, refund: 0, net: 0, fee: 0, date: null, status: "held" };
+        const amt = Number(r.net_amount ?? 0);
+        if (amt >= 0) g.charge += amt; else g.refund += -amt;
+        g.fee += Number(r.payment_fee_amount ?? 0);
+        if (r.check_in && (!g.date || r.check_in < g.date)) g.date = r.check_in;
+        groups.set(ref, g);
+      });
+      const held: SecurityDeposit[] = [], returned: SecurityDeposit[] = [], refundOnly: SecurityDeposit[] = [];
+      for (const g of groups.values()) {
+        g.net = Math.round((g.charge - g.refund) * 100) / 100;
+        if (Math.abs(g.net) < 1) { g.status = "returned"; returned.push(g); }
+        else if (g.charge > 0) { g.status = "held"; held.push(g); }
+        else { g.status = "refund_only"; refundOnly.push(g); }
+      }
+      held.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
+      return {
+        held, returned, refundOnly,
+        totalHeld: Math.round(held.reduce((s, g) => s + g.net, 0) * 100) / 100,
+        totalFees: Math.round([...held, ...returned].reduce((s, g) => s + g.fee, 0) * 100) / 100,
+      };
+    },
+  });
+}
+
 export function useOtaMutations() {
   const qc = useQueryClient();
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["ota_transactions"] });
     qc.invalidateQueries({ queryKey: ["ota_batches"] });
     qc.invalidateQueries({ queryKey: ["attribution_decisions"] });
+    qc.invalidateQueries({ queryKey: ["security_deposits"] });
   };
 
   const uploadCsv = useMutation({
