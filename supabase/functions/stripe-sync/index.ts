@@ -87,11 +87,14 @@ Deno.serve(async (req) => {
       const created = dateOf(bt.created);
       const ch = chargeIdOf(bt);
       const resvId = extractResvId(bt);
+      const src = bt.source && typeof bt.source === "object" ? bt.source : null;
+      const billName = src?.billing_details?.name ?? (typeof src?.customer === "object" ? src.customer?.name : null) ?? null;
+      const billEmail = src?.billing_details?.email ?? src?.receipt_email ?? null;
       const t = (bt.type ?? "").toLowerCase();
       const base: any = {
-        batch_id: batchId, platform: "stripe", external_txn_id: bt.id,
+        batch_id: batchId, platform: "stripe", external_txn_id: bt.id, guest_name: billName,
         reference_number: ch, check_in: created, currency: (bt.currency ?? "gbp").toUpperCase(),
-        raw_row: { id: bt.id, Source: ch, Type: bt.type, Amount: String(amount ?? ""), Fee: String(fee), Net: String(net), Reservation_Id: resvId ?? "" },
+        raw_row: { id: bt.id, Source: ch, Type: bt.type, Amount: String(amount ?? ""), Fee: String(fee), Net: String(net), Reservation_Id: resvId ?? "", Customer: billName ?? "", Email: billEmail ?? "" },
         match_method: "none", match_confidence: null, resolved_listing_id: null, matched_reservation_id: null,
         commission_amount: null, commission_pct: null, vat: null, tax: null,
       };
@@ -130,6 +133,37 @@ Deno.serve(async (req) => {
         } else s.recon_status = "needs_recon";
       }
       delete s.stripe_resv_id;
+    }
+
+    // ---- auto-attribute unlinked charges by guest name + amount ----
+    // The API gives us the customer name (the CSV didn't). An exact full-name +
+    // amount match to a single confirmed reservation auto-attributes it; a sole
+    // surname+amount candidate is suggested in the Recon queue; else it stays for
+    // manual attribution.
+    const norm = (x: string | null) => (x ?? "").toLowerCase().replace(/[^a-z ]/g, "").replace(/\s+/g, " ").trim();
+    for (const s of staged) {
+      if (s.statement_descriptor !== "Stripe charge — review" || !s.guest_name || s.net_amount == null) continue;
+      const amt = Number(s.net_amount);
+      const surname = norm(s.guest_name).split(" ").pop();
+      if (!surname || surname.length < 2) continue;
+      const { data: cands } = await admin.from("reservations")
+        .select("id, listing_id, guest_name, total_amount, status")
+        .eq("status", "confirmed").gte("total_amount", amt - 2).lte("total_amount", amt + 2)
+        .ilike("guest_name", `%${surname}%`);
+      const rows = cands ?? [];
+      const exact = rows.filter((r: any) => norm(r.guest_name) === norm(s.guest_name));
+      const pick = exact.length === 1 ? exact[0] : (rows.length === 1 ? rows[0] : null);
+      if (pick) {
+        const confident = exact.length === 1;
+        Object.assign(s, {
+          txn_type: "reservation", is_revenue: true, collection_model: "channel",
+          gross_amount: amt, commission_amount: 0, net_amount: amt,
+          matched_reservation_id: pick.id, resolved_listing_id: pick.listing_id,
+          match_method: "composite", match_confidence: confident ? 0.95 : 0.7,
+          recon_status: confident ? "auto_matched" : "needs_recon",
+          statement_descriptor: confident ? "Stripe (matched by name + amount)" : "Stripe charge — review",
+        });
+      }
     }
 
     // ---- upsert (dedup on external_txn_id) ----
