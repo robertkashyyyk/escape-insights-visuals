@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { differenceInDays, parseISO, format, startOfMonth, endOfMonth, subMonths, addMonths, startOfDay, addDays } from "date-fns";
 import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
+import { periodRevenue, nightsInPeriod as canonicalNightsInPeriod } from "@/lib/metrics";
 
 export interface ReportPropertyRow {
   listingId: string;
@@ -53,13 +54,9 @@ export interface MonthlyReportData {
   revenueByChannel: Record<string, number>;
 }
 
+// Delegate to the canonical helper so nights match every other view (end-inclusive).
 function nightsInRange(checkIn: string, checkOut: string, rangeStart: Date, rangeEnd: Date): number {
-  const ci = parseISO(checkIn);
-  const co = parseISO(checkOut);
-  const start = ci < rangeStart ? rangeStart : ci;
-  const end = co > rangeEnd ? rangeEnd : co;
-  const diff = differenceInDays(end, start);
-  return Math.max(0, diff);
+  return canonicalNightsInPeriod(checkIn, checkOut, format(rangeStart, "yyyy-MM-dd"), format(rangeEnd, "yyyy-MM-dd"));
 }
 
 // Engine R1: recognise only the in-period portion of a booking's gross.
@@ -67,11 +64,9 @@ function nightsInRange(checkIn: string, checkOut: string, rangeStart: Date, rang
 // how the manual report splits e.g. a 30 Apr–2 May booking across the two months.
 // whole_in_attributed_month counts the full gross in the overlapping month.
 function recognisedRevenue(r: any, rangeStart: Date, rangeEnd: Date, prorate: boolean): number {
-  const gross = getGrossRevenue(r);
-  if (!prorate) return gross;
-  const bookingNights = Math.max(1, differenceInDays(parseISO(r.check_out), parseISO(r.check_in)));
-  const nip = nightsInRange(r.check_in, r.check_out, rangeStart, rangeEnd);
-  return gross * (nip / bookingNights);
+  if (!prorate) return getGrossRevenue(r);
+  // Canonical prorate (gross apportioned by nights-in-period) — single source of truth.
+  return periodRevenue(r, format(rangeStart, "yyyy-MM-dd"), format(rangeEnd, "yyyy-MM-dd"));
 }
 
 export function useMonthlyReport(ownerId: string | null, periodStart: Date, periodEnd: Date) {

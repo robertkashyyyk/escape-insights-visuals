@@ -244,8 +244,8 @@ export function ReservationsTable() {
     <div className="space-y-4">
       {/* Summary Stats */}
       <div className="flex flex-wrap gap-3">
-        <StatPill label="Total Bookings" value={totalBookings.toLocaleString()} />
-        <StatPill label="Total Revenue" value={`£${totalRevenue.toLocaleString("en-GB", { maximumFractionDigits: 0 })}`} />
+        <StatPill label="Listed Bookings" value={totalBookings.toLocaleString()} />
+        <StatPill label="Booking Value (gross)" value={`£${totalRevenue.toLocaleString("en-GB", { maximumFractionDigits: 0 })}`} />
         <StatPill label="Avg Nights" value={avgNights.toFixed(1)} />
         <StatPill label="Avg Lead Time" value={`${Math.round(avgLeadTime)} days`} />
       </div>

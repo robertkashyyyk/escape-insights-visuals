@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { differenceInDays, parseISO } from "date-fns";
-import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
+import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
+import { periodRevenue } from "@/lib/metrics";
 
 export type DateMode = "check_in" | "created";
 
@@ -65,7 +66,8 @@ export function useOwnerPerformance(year: number, dateMode: DateMode = "check_in
         if (!ownerId) continue;
         if (!ownerAgg[ownerId]) ownerAgg[ownerId] = { revenue: 0, nights: 0, bookings: 0, monthly: new Array(12).fill(0) };
         const nights = Math.max(1, differenceInDays(parseISO(r.check_out), parseISO(r.check_in)));
-        const rev = getNetRevenue(r as any);
+        // Canonical: by check-in = gross clipped to the year; by booking-date = full gross.
+        const rev = dateMode === "created" ? getGrossRevenue(r as any) : periodRevenue(r as any, yearStart, yearEnd);
         ownerAgg[ownerId].revenue += rev;
         ownerAgg[ownerId].nights += nights;
         ownerAgg[ownerId].bookings += 1;
