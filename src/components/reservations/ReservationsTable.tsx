@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ArrowUpDown, ChevronLeft, ChevronRight, Package } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Search, ArrowUpDown, ChevronLeft, ChevronRight, ChevronDown, Package, Check } from "lucide-react";
 import { differenceInDays, format, parseISO } from "date-fns";
 import { useLocationGroups } from "@/hooks/useLocationGroups";
 import { BookingRequestsDialog } from "@/components/requests/BookingRequestsDialog";
@@ -18,6 +19,7 @@ type SortKey = "guest_name" | "property" | "check_in" | "check_out" | "nights" |
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 250];
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 
 
@@ -36,7 +38,9 @@ export function ReservationsTable() {
   const [search, setSearch] = useState("");
   const [timeFilter, setTimeFilter] = useState<"all" | "future" | "past">("all");
   const [yearFilter, setYearFilter] = useState("all");
-  const [propertyFilter, setPropertyFilter] = useState("all");
+  const [monthFilter, setMonthFilter] = useState("all");
+  const [propertyFilter, setPropertyFilter] = useState<string[]>([]);
+  const [ownerFilter, setOwnerFilter] = useState("all");
   const [locationFilter, setLocationFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [platformFilter, setPlatformFilter] = useState("all");
@@ -72,7 +76,7 @@ export function ReservationsTable() {
       while (true) {
         const { data, error } = await supabase
           .from("reservations")
-          .select("*, listings(id, name, location_group)")
+          .select("*, listings(id, name, location_group, property_owners(id, name))")
           .order("check_in", { ascending: false })
           .range(offset, offset + batchSize - 1);
         if (error) throw error;
@@ -86,14 +90,17 @@ export function ReservationsTable() {
   });
 
   // Derive filter options from data
-  const { propertyOptions, platformOptions, yearOptions } = useMemo(() => {
-    if (!reservations) return { propertyOptions: [], platformOptions: [], yearOptions: [] };
+  const { propertyOptions, platformOptions, yearOptions, ownerOptions } = useMemo(() => {
+    if (!reservations) return { propertyOptions: [], platformOptions: [], yearOptions: [], ownerOptions: [] };
     const props = new Map<string, string>();
     const plats = new Set<string>();
     const years = new Set<number>();
+    const owners = new Map<string, string>();
     for (const r of reservations) {
       const listing = r.listings as any;
       if (listing?.id && listing?.name) props.set(listing.id, listing.name);
+      const owner = listing?.property_owners as any;
+      if (owner?.id && owner?.name) owners.set(owner.id, owner.name);
       if (r.platform) plats.add(r.platform);
       const yr = parseISO(r.check_in).getFullYear();
       if (!isNaN(yr)) years.add(yr);
@@ -102,6 +109,7 @@ export function ReservationsTable() {
       propertyOptions: [...props.entries()].sort((a, b) => a[1].localeCompare(b[1])),
       platformOptions: [...plats].sort(),
       yearOptions: [...years].sort((a, b) => a - b),
+      ownerOptions: [...owners.entries()].sort((a, b) => a[1].localeCompare(b[1])),
     };
   }, [reservations]);
 
@@ -113,6 +121,7 @@ export function ReservationsTable() {
         ? Math.max(0, differenceInDays(parseISO(r.check_in), parseISO(r.reservation_date)))
         : null;
       const listing = r.listings as any;
+      const owner = listing?.property_owners as any;
       return {
         ...r,
         nights,
@@ -120,7 +129,10 @@ export function ReservationsTable() {
         propertyName: listing?.name || "—",
         propertyId: listing?.id || null,
         locationGroup: listing?.location_group || null,
+        ownerId: owner?.id || null,
+        ownerName: owner?.name || null,
         year: parseISO(r.check_in).getFullYear(),
+        monthNum: parseISO(r.check_in).getMonth() + 1,
       };
     });
   }, [reservations]);
@@ -145,7 +157,9 @@ export function ReservationsTable() {
 
     // Filters
     if (yearFilter !== "all") rows = rows.filter((r) => r.year === parseInt(yearFilter));
-    if (propertyFilter !== "all") rows = rows.filter((r) => r.propertyId === propertyFilter);
+    if (monthFilter !== "all") rows = rows.filter((r) => r.monthNum === parseInt(monthFilter));
+    if (propertyFilter.length > 0) rows = rows.filter((r) => r.propertyId && propertyFilter.includes(r.propertyId));
+    if (ownerFilter !== "all") rows = rows.filter((r) => r.ownerId === ownerFilter);
     if (locationFilter !== "all") rows = rows.filter((r) => (r.locationGroup || "Other") === locationFilter);
     if (statusFilter !== "all") rows = rows.filter((r) => r.status.toLowerCase() === statusFilter.toLowerCase());
     if (platformFilter !== "all") rows = rows.filter((r) => r.platform === platformFilter);
@@ -169,7 +183,7 @@ export function ReservationsTable() {
     });
 
     return rows;
-  }, [processedRows, search, timeFilter, todayStr, yearFilter, propertyFilter, locationFilter, statusFilter, platformFilter, sortKey, sortDir]);
+  }, [processedRows, search, timeFilter, todayStr, yearFilter, monthFilter, propertyFilter, ownerFilter, locationFilter, statusFilter, platformFilter, sortKey, sortDir]);
 
   // Stats
   const totalBookings = filtered.length;
@@ -195,12 +209,14 @@ export function ReservationsTable() {
     setPage(0);
   };
 
-  const hasFilters = timeFilter !== "all" || yearFilter !== "all" || propertyFilter !== "all" || locationFilter !== "all" || statusFilter !== "all" || platformFilter !== "all";
+  const hasFilters = timeFilter !== "all" || yearFilter !== "all" || monthFilter !== "all" || propertyFilter.length > 0 || ownerFilter !== "all" || locationFilter !== "all" || statusFilter !== "all" || platformFilter !== "all";
 
   const clearFilters = () => {
     setTimeFilter("all");
     setYearFilter("all");
-    setPropertyFilter("all");
+    setMonthFilter("all");
+    setPropertyFilter([]);
+    setOwnerFilter("all");
     setLocationFilter("all");
     setStatusFilter("all");
     setPlatformFilter("all");
@@ -261,11 +277,18 @@ export function ReservationsTable() {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
         <FilterSelect value={yearFilter} onChange={(v) => { setYearFilter(v); setPage(0); }} placeholder="Year" options={[{ value: "all", label: "All Years" }, ...yearOptions.map((y) => ({ value: String(y), label: String(y) }))]} />
-        <FilterSelect
-          value={propertyFilter}
+        <FilterSelect value={monthFilter} onChange={(v) => { setMonthFilter(v); setPage(0); }} placeholder="Month" options={[{ value: "all", label: "All Months" }, ...MONTHS.map((m, i) => ({ value: String(i + 1), label: m }))]} />
+        <MultiSelectFilter
+          values={propertyFilter}
           onChange={(v) => { setPropertyFilter(v); setPage(0); }}
-          placeholder="Property"
-          options={[{ value: "all", label: "All Properties" }, ...propertyOptions.map(([id, name]) => ({ value: id, label: name }))]}
+          placeholder="All Properties"
+          options={propertyOptions.map(([id, name]) => ({ value: id, label: name }))}
+        />
+        <FilterSelect
+          value={ownerFilter}
+          onChange={(v) => { setOwnerFilter(v); setPage(0); }}
+          placeholder="Owner"
+          options={[{ value: "all", label: "All Owners" }, ...ownerOptions.map(([id, name]) => ({ value: id, label: name }))]}
         />
         <FilterSelect
           value={locationFilter}
@@ -473,5 +496,53 @@ function FilterSelect({ value, onChange, placeholder, options }: {
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+function MultiSelectFilter({ values, onChange, placeholder, options }: {
+  values: string[];
+  onChange: (v: string[]) => void;
+  placeholder: string;
+  options: { value: string; label: string }[];
+}) {
+  const [q, setQ] = useState("");
+  const toggle = (val: string) =>
+    onChange(values.includes(val) ? values.filter((x) => x !== val) : [...values, val]);
+  const label = values.length === 0 ? placeholder : `${values.length} selected`;
+  const filtered = options.filter((o) => o.label.toLowerCase().includes(q.toLowerCase()));
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="w-[170px] h-8 text-xs justify-between font-normal">
+          <span className="truncate">{label}</span>
+          <ChevronDown className="h-3.5 w-3.5 opacity-60 shrink-0" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[240px] p-0" align="start">
+        <div className="p-2 border-b border-border/40">
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="h-7 text-xs" />
+        </div>
+        {values.length > 0 && (
+          <button onClick={() => onChange([])} className="w-full text-left px-3 py-1.5 text-[11px] text-primary hover:bg-muted/40 border-b border-border/30">
+            Clear {values.length} selected
+          </button>
+        )}
+        <div className="max-h-64 overflow-y-auto py-1">
+          {filtered.length === 0 ? (
+            <p className="px-3 py-2 text-[11px] text-muted-foreground">No matches</p>
+          ) : filtered.map((o) => {
+            const checked = values.includes(o.value);
+            return (
+              <button key={o.value} onClick={() => toggle(o.value)} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted/40 text-left">
+                <span className={`h-4 w-4 shrink-0 rounded border flex items-center justify-center ${checked ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>
+                  {checked && <Check className="h-3 w-3" />}
+                </span>
+                <span className="truncate">{o.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
