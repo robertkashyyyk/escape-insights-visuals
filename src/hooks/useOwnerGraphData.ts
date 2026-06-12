@@ -8,7 +8,8 @@ import {
   eachDayOfInterval, eachWeekOfInterval, eachMonthOfInterval,
   eachQuarterOfInterval, addYears, isBefore, isAfter, endOfDay
 } from "date-fns";
-import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
+import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
+import { periodRevenue } from "@/lib/metrics";
 
 export type ZoomLevel = "Day" | "Week" | "Month" | "Quarter" | "Year";
 
@@ -160,7 +161,8 @@ export function useOwnerGraphData(
           const calcValue = (set: any[]) => {
             switch (base) {
               case "revenue":
-                return Math.round(set.reduce((s: number, r: any) => s + getNetRevenue(r), 0) * 100) / 100;
+                // Canonical: by check-in = gross clipped to the bucket; by booking-date = full gross.
+                return Math.round(set.reduce((s: number, r: any) => s + (isCreated ? getGrossRevenue(r) : periodRevenue(r, bStartStr, bEndStr)), 0) * 100) / 100;
               case "bookings":
                 return set.length;
               case "nights": {
@@ -185,7 +187,7 @@ export function useOwnerGraphData(
                 } else {
                   nights = set.reduce((s: number, r: any) => s + nightsInRange(new Date(r.check_in), new Date(r.check_out), bStart, bEnd), 0);
                 }
-                const rev = Math.round(set.reduce((s: number, r: any) => s + getNetRevenue(r), 0) * 100) / 100;
+                const rev = Math.round(set.reduce((s: number, r: any) => s + (isCreated ? getGrossRevenue(r) : periodRevenue(r, bStartStr, bEndStr)), 0) * 100) / 100;
                 return nights > 0 ? Math.round((rev / nights) * 100) / 100 : 0;
               }
               default: return 0;

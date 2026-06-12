@@ -8,7 +8,8 @@ import {
   subYears, addWeeks, addMonths, addQuarters, addYears,
   format,
 } from "date-fns";
-import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
+import { REVENUE_FIELDS } from "@/lib/revenue";
+import { periodRevenue, overlapsPeriod } from "@/lib/metrics";
 
 export type OwnerPeriodType = "Week" | "Month" | "Quarter" | "Year";
 export type OwnerDateMode = "check_in" | "created";
@@ -268,13 +269,16 @@ export function useOwnerPortalData(
         const thisPeriodRes = propRes.filter((r) => inPeriod(r, periodStartStr, periodEndStr));
         const prevPeriodRes = propRes.filter((r) => inPeriod(r, prevStartStr, prevEndStr));
 
-        const revenueThisYear = thisPeriodRes.reduce((s, r) => s + getNetRevenue(r) * r._revenue_factor, 0);
-        const revenuePrevYear = prevPeriodRes.reduce((s, r) => s + getNetRevenue(r) * r._revenue_factor, 0);
+        const revenueThisYear = thisPeriodRes.reduce((s, r) => s + periodRevenue(r, periodStartStr, periodEndStr) * r._revenue_factor, 0);
+        const revenuePrevYear = prevPeriodRes.reduce((s, r) => s + periodRevenue(r, prevStartStr, prevEndStr) * r._revenue_factor, 0);
 
-        const monthlyRevenue = Array.from({ length: 12 }, (_, m) =>
-          propRes.filter((r) => r.year === currentYear && r.month === m + 1)
-            .reduce((s, r) => s + getNetRevenue(r) * r._revenue_factor, 0)
-        );
+        const monthlyRevenue = Array.from({ length: 12 }, (_, m) => {
+          const ms = `${currentYear}-${String(m + 1).padStart(2, "0")}-01`;
+          const me = new Date(Date.UTC(currentYear, m + 1, 0)).toISOString().slice(0, 10);
+          return propRes
+            .filter((r) => overlapsPeriod(r.check_in, r.check_out, ms, me))
+            .reduce((s, r) => s + periodRevenue(r, ms, me) * r._revenue_factor, 0);
+        });
 
         // Clip nights to period — prevents cross-month bleed and overlap > calendar
         const totalNights = thisPeriodRes.reduce(
@@ -295,7 +299,7 @@ export function useOwnerPortalData(
             check_out: r.check_out,
             nights_total: nightsBetween(r.check_in, r.check_out),
             nights_in_period: nightsInPeriod(r.check_in, r.check_out, periodStartStr, periodEndStr),
-            revenue: getNetRevenue(r) * r._revenue_factor,
+            revenue: periodRevenue(r, periodStartStr, periodEndStr) * r._revenue_factor,
             revenue_factor: r._revenue_factor,
             platform: r.platform ?? null,
             is_bundle_expansion: r._is_bundle_expansion,
@@ -344,7 +348,7 @@ export function useOwnerPortalData(
         const propRes = expanded.filter((r) => r._listing_id === l.id && inPeriod(r, prevStartStr, prevEndStr));
         propRes.forEach((r) => {
           prevNightsAll += nightsInPeriod(r.check_in, r.check_out, prevStartStr, prevEndStr);
-          prevRevenueAll += getNetRevenue(r) * r._revenue_factor;
+          prevRevenueAll += periodRevenue(r, prevStartStr, prevEndStr) * r._revenue_factor;
         });
       });
       const prevYearOccupancy = nonBundleCount > 0
