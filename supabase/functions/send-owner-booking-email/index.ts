@@ -10,7 +10,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { reservation_id, event, to: toOverride, force } = await req.json(); // event: "new" | "cancelled"
+    const { reservation_id, event } = await req.json(); // event: "new" | "cancelled"
     if (!reservation_id) return json({ skipped: "no reservation_id" });
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -29,8 +29,8 @@ Deno.serve(async (req) => {
       supabase.from("property_owners").select("name, email").eq("id", listing.owner_id).maybeSingle(),
       supabase.from("owner_notification_prefs").select("notify_bookings").eq("owner_id", listing.owner_id).maybeSingle(),
     ]);
-    if (!force && !prefs?.notify_bookings) return json({ skipped: "owner not opted in" });
-    const recipient = (toOverride as string) || owner?.email;
+    if (!prefs?.notify_bookings) return json({ skipped: "owner not opted in" });
+    const recipient = owner?.email;
     if (!recipient) return json({ skipped: "no recipient" });
 
     const firstName = (r.guest_name || "Guest").trim().split(/\s+/)[0];
