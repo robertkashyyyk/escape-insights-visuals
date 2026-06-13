@@ -10,7 +10,7 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
-    const { owner_id, period = "monthly", to: toOverride, force } = await req.json();
+    const { owner_id, period = "monthly" } = await req.json();
     if (!owner_id) return json({ skipped: "no owner_id" });
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -20,8 +20,8 @@ Deno.serve(async (req) => {
       supabase.from("owner_notification_prefs").select("notify_orin").eq("owner_id", owner_id).maybeSingle(),
       supabase.from("listings").select("id, name, is_bundle").eq("owner_id", owner_id),
     ]);
-    if (!force && !prefs?.notify_orin) return json({ skipped: "owner not opted in" });
-    const recipient = (toOverride as string) || owner?.email;
+    if (!prefs?.notify_orin) return json({ skipped: "owner not opted in" });
+    const recipient = owner?.email;
     if (!recipient) return json({ skipped: "no recipient" });
 
     const props = (listings ?? []).filter((l: any) => !l.is_bundle);
