@@ -25,6 +25,7 @@ export default function OwnerReservations() {
   const { isPreviewMode, selectedOwnerId, selectedOwnerName } = useOwnerPreview();
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("upcoming");
+  const [sortBy, setSortBy] = useState<string>("check_in_desc");
 
   const { data, isLoading } = useQuery({
     queryKey: ["owner_reservations", isPreviewMode ? selectedOwnerId : user?.id],
@@ -76,8 +77,16 @@ export default function OwnerReservations() {
       list = list.filter((r: any) => r.check_out < today);
     }
 
+    const [field, dir] = sortBy.split("_").length === 3
+      ? [sortBy.slice(0, sortBy.lastIndexOf("_")), sortBy.slice(sortBy.lastIndexOf("_") + 1)]
+      : ["check_in", "desc"];
+    list = [...list].sort((a: any, b: any) => {
+      const cmp = String(a[field] ?? "").localeCompare(String(b[field] ?? ""));
+      return dir === "asc" ? cmp : -cmp;
+    });
+
     return list;
-  }, [data, propertyFilter, dateFilter, today]);
+  }, [data, propertyFilter, dateFilter, today, sortBy]);
 
   const getPropertyName = (listingId: string) =>
     data?.listings.find((l) => l.id === listingId)?.name || "Property";
@@ -125,6 +134,17 @@ export default function OwnerReservations() {
               <SelectItem value="upcoming">Upcoming</SelectItem>
               <SelectItem value="past">Past</SelectItem>
               <SelectItem value="all">All dates</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-[180px] h-9 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="check_in_desc">Check-in (newest)</SelectItem>
+              <SelectItem value="check_in_asc">Check-in (oldest)</SelectItem>
+              <SelectItem value="check_out_desc">Check-out (newest)</SelectItem>
+              <SelectItem value="check_out_asc">Check-out (oldest)</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { differenceInDays, parseISO, format, startOfMonth, endOfMonth, subMonths, addMonths, startOfDay, addDays } from "date-fns";
+import { differenceInDays, parseISO, format, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
 import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 import { periodRevenue, nightsInPeriod as canonicalNightsInPeriod } from "@/lib/metrics";
 
@@ -83,12 +83,14 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
 
       const { data: listings } = await supabase
         .from("listings")
-        .select("id, name, status")
+        .select("id, name, status, is_bundle")
         .eq("owner_id", ownerId!);
       if (!listings?.length) return null;
 
       const listingIds = listings.map((l) => l.id);
-      const activeCount = listings.filter((l) => l.status === "active").length;
+      // Occupancy denominator excludes bundles (virtual listings) so it mirrors the
+      // owner Portfolio — otherwise the bundle double-counts available property-nights.
+      const activeCount = listings.filter((l) => l.status === "active" && !(l as any).is_bundle).length;
 
       const startStr = format(periodStart, "yyyy-MM-dd");
       const endStr = format(periodEnd, "yyyy-MM-dd");
@@ -175,13 +177,9 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
       // Revenue recognition (default prorate_by_nights) — apportion boundary stays.
       const prorate = ((owner as any).revenue_recognition ?? "prorate_by_nights") !== "whole_in_attributed_month";
 
-      // Night-counting needs an EXCLUSIVE upper bound: the last night of the month
-      // (e.g. 31 May, checkout 1 Jun) belongs to the period. endOfMonth is
-      // 23:59:59 of the last day, so clamping a 1-Jun checkout to it drops that
-      // final night. Use the first moment of the day after the period instead.
-      const periodEndExcl = addDays(startOfDay(periodEnd), 1);
-      const prevEndExcl = addDays(startOfDay(prevEnd), 1);
-
+      // Period bounds go straight to the canonical helpers (src/lib/metrics),
+      // which treat periodEnd as the LAST DAY INCLUSIVE and add the final night
+      // themselves — so 31 May (checkout 1 Jun) is counted without any manual +1.
       // Current period aggregation per property + per channel
       const mapChannel = (p: string | null): string => {
         const s = (p ?? "").toLowerCase();
@@ -194,8 +192,8 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
       const byListing: Record<string, { revenue: number; nights: number }> = {};
       const revenueByChannel: Record<string, number> = {};
       for (const r of currentRows) {
-        const nights = nightsInRange(r.check_in, r.check_out, periodStart, periodEndExcl);
-        const rev = recognisedRevenue(r, periodStart, periodEndExcl, prorate);
+        const nights = nightsInRange(r.check_in, r.check_out, periodStart, periodEnd);
+        const rev = recognisedRevenue(r, periodStart, periodEnd, prorate);
         if (!byListing[r.listing_id]) byListing[r.listing_id] = { revenue: 0, nights: 0 };
         byListing[r.listing_id].revenue += rev;
         byListing[r.listing_id].nights += nights;
@@ -218,8 +216,8 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
       let prevTotalNights = 0;
       const prevByListing: Record<string, { revenue: number }> = {};
       for (const r of prevRows) {
-        const nights = nightsInRange(r.check_in, r.check_out, prevStart, prevEndExcl);
-        const rev = recognisedRevenue(r, prevStart, prevEndExcl, prorate);
+        const nights = nightsInRange(r.check_in, r.check_out, prevStart, prevEnd);
+        const rev = recognisedRevenue(r, prevStart, prevEnd, prorate);
         prevTotalRevenue += rev;
         prevTotalNights += nights;
         if (!prevByListing[r.listing_id]) prevByListing[r.listing_id] = { revenue: 0 };

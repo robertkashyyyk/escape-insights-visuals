@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { differenceInDays, format, parseISO, startOfDay, addDays } from "date-fns";
+import { differenceInDays, format } from "date-fns";
+import { nightsBetween, nightsInPeriod, overlapsPeriod } from "@/lib/metrics";
 
 // Layers the gross-model settlement onto the owner report:
 //  - Booking Fees + Card Processing as REAL cost lines (OTA settlement truth,
@@ -89,17 +90,13 @@ export function useOwnerSettlement(ownerId: string | null, periodStart: Date, pe
             otaByResv.set(o.matched_reservation_id, cur);
           });
         }
-        // Pro-rate fees by the same in-period night ratio as revenue (R1).
-        // Exclusive upper bound so the last night of the month (checkout on the
-        // 1st) is counted — matches useMonthlyReport's revenue pro-rating.
-        const periodEndExcl = addDays(startOfDay(periodEnd), 1);
+        // Pro-rate fees by the same in-period night ratio as revenue (R1), via the
+        // canonical metrics helpers — single source of truth, end-day inclusive.
         const ratioFor = (r: any) => {
           if (!prorate) return 1;
-          const bn = Math.max(1, differenceInDays(parseISO(r.check_out), parseISO(r.check_in)));
-          const ci = parseISO(r.check_in), co = parseISO(r.check_out);
-          const s = ci < periodStart ? periodStart : ci;
-          const e = co > periodEndExcl ? periodEndExcl : co;
-          return Math.max(0, differenceInDays(e, s)) / bn;
+          const total = nightsBetween(r.check_in, r.check_out);
+          if (total <= 0) return overlapsPeriod(r.check_in, r.check_out, startStr, endStr) ? 1 : 0;
+          return nightsInPeriod(r.check_in, r.check_out, startStr, endStr) / total;
         };
         for (const r of reservations) {
           const o = otaByResv.get(r.id);

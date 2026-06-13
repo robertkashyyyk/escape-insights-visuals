@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfMonth, addMonths, format, subYears, differenceInDays } from "date-fns";
-import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
+import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
 interface ForecastMonth {
   month: string;
@@ -64,7 +64,7 @@ export function useRevenueForecaster() {
           const ci = new Date(r.check_in);
           if (ci >= monthStart && ci < monthEnd) {
             const grp = listingMap.get(r.listing_id) ?? "Unknown";
-            otbByGroup.set(grp, (otbByGroup.get(grp) ?? 0) + getNetRevenue(r as any));
+            otbByGroup.set(grp, (otbByGroup.get(grp) ?? 0) + getGrossRevenue(r as any));
           }
         });
 
@@ -77,7 +77,7 @@ export function useRevenueForecaster() {
           const ci = new Date(r.check_in);
           if (ci >= lyMonthStart && ci < lyMonthEnd) {
             const grp = listingMap.get(r.listing_id) ?? "Unknown";
-            const amt = getNetRevenue(r as any);
+            const amt = getGrossRevenue(r as any);
             lyFinalByGroup.set(grp, (lyFinalByGroup.get(grp) ?? 0) + amt);
             if (r.reservation_date && r.reservation_date <= lyCutoff) {
               lyOtbByGroup.set(grp, (lyOtbByGroup.get(grp) ?? 0) + amt);
