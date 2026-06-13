@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,6 +35,7 @@ export default function OwnerGraphs() {
   const [zoom, setZoom] = useState<ZoomLevel>("Month");
   const [selectedMetrics, setSelectedMetrics] = useState<GraphMetric[]>(["revenue_checkin"]);
   const [filterListing, setFilterListing] = useState<string>("all");
+  const [compare, setCompare] = useState(false);
 
   // Fetch owner's listings for the property filter dropdown
   const { data: ownerListings } = useQuery({
@@ -52,7 +53,26 @@ export default function OwnerGraphs() {
 
   const { from, to } = getPeriodRange(periodType, periodRef);
   const label = getPeriodLabel(periodType, periodRef, now);
-  const { data: chartData, isLoading } = useOwnerGraphData(selectedMetrics, from, to, zoom, filterListing === "all" ? null : filterListing);
+  const listingArg = filterListing === "all" ? null : filterListing;
+  const { data: chartData, isLoading } = useOwnerGraphData(selectedMetrics, from, to, zoom, listingArg);
+
+  // Compare: same period one year earlier, overlaid as "(Prev Yr)" series.
+  const prevRef = useMemo(() => { const d = new Date(periodRef); d.setFullYear(d.getFullYear() - 1); return d; }, [periodRef]);
+  const { from: prevFrom, to: prevTo } = getPeriodRange(periodType, prevRef);
+  const { data: prevChartData } = useOwnerGraphData(selectedMetrics, prevFrom, prevTo, zoom, listingArg, compare);
+
+  // Merge prev-year values onto the current buckets by index (same period length + zoom).
+  const mergedData = useMemo(() => {
+    if (!chartData) return chartData;
+    if (!compare || !prevChartData) return chartData;
+    return chartData.map((row: any, i: number) => {
+      const prev = prevChartData[i] as any;
+      if (!prev) return row;
+      const withPrev: any = { ...row };
+      for (const m of selectedMetrics) withPrev[`${m}_prev`] = prev[m];
+      return withPrev;
+    });
+  }, [chartData, prevChartData, compare, selectedMetrics]);
 
   const canGoForward = (() => {
     const next = shiftPeriod(periodRef, periodType, 1);
@@ -143,6 +163,12 @@ export default function OwnerGraphs() {
             </div>
           </div>
 
+          {/* Compare to previous year */}
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+            <input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} className="accent-primary" />
+            Compare to prev year
+          </label>
+
           {/* Property Filter */}
           <div className="sm:ml-auto">
             <Select value={filterListing} onValueChange={setFilterListing}>
@@ -191,7 +217,7 @@ export default function OwnerGraphs() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={420}>
-                <ComposedChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
+                <ComposedChart data={mergedData ?? chartData} margin={{ top: 5, right: 20, bottom: 5, left: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.3)" />
                   <XAxis dataKey="label" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                   <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
@@ -218,27 +244,25 @@ export default function OwnerGraphs() {
                     const opt = METRIC_OPTIONS.find(o => o.value === m);
                     const color = METRIC_COLORS[m];
                     const isCheckin = m.endsWith("_checkin");
+                    const els: any[] = [];
 
                     if (isLineMetric(m)) {
-                      const elements = [
-                        <Line key={m} type="monotone" dataKey={m} name={opt?.label} stroke={color} strokeWidth={2} dot={false} />
-                      ];
+                      els.push(<Line key={m} type="monotone" dataKey={m} name={opt?.label} stroke={color} strokeWidth={2} dot={false} />);
                       if (isCheckin) {
-                        elements.push(
-                          <Line key={`${m}_pipeline`} type="monotone" dataKey={`${m}_pipeline`} name={`${opt?.label} (Pipeline)`} stroke={color} strokeWidth={2} strokeDasharray="5 5" dot={false} opacity={0.4} />
-                        );
+                        els.push(<Line key={`${m}_pipeline`} type="monotone" dataKey={`${m}_pipeline`} name={`${opt?.label} (Pipeline)`} stroke={color} strokeWidth={2} strokeDasharray="5 5" dot={false} opacity={0.4} />);
                       }
-                      return elements;
+                    } else if (isCheckin) {
+                      els.push(<Bar key={m} dataKey={m} name={opt?.label} fill={color} stackId={`stack_${m}`} radius={[0, 0, 0, 0]} />);
+                      els.push(<Bar key={`${m}_pipeline`} dataKey={`${m}_pipeline`} name={`${opt?.label} (Pipeline)`} fill={color} stackId={`stack_${m}`} opacity={0.3} radius={[3, 3, 0, 0]} />);
+                    } else {
+                      els.push(<Bar key={m} dataKey={m} name={opt?.label} fill={color} radius={[3, 3, 0, 0]} />);
                     }
 
-                    if (isCheckin) {
-                      return [
-                        <Bar key={m} dataKey={m} name={opt?.label} fill={color} stackId={`stack_${m}`} radius={[0, 0, 0, 0]} />,
-                        <Bar key={`${m}_pipeline`} dataKey={`${m}_pipeline`} name={`${opt?.label} (Pipeline)`} fill={color} stackId={`stack_${m}`} opacity={0.3} radius={[3, 3, 0, 0]} />,
-                      ];
+                    // Previous-year overlay (dashed line) when Compare is on.
+                    if (compare) {
+                      els.push(<Line key={`${m}_prev`} type="monotone" dataKey={`${m}_prev`} name={`${opt?.label} (Prev Yr)`} stroke={color} strokeWidth={2} strokeDasharray="2 3" dot={false} opacity={0.55} />);
                     }
-
-                    return [<Bar key={m} dataKey={m} name={opt?.label} fill={color} radius={[3, 3, 0, 0]} />];
+                    return els;
                   })}
                 </ComposedChart>
               </ResponsiveContainer>
