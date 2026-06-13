@@ -82,7 +82,7 @@ export function OwnerProfileMenu() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <OwnerSettingsDialog ownerId={owner?.id ?? null} open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <OwnerSettingsDialog ownerId={owner?.id ?? null} open={settingsOpen} onOpenChange={setSettingsOpen} canChangePassword={!isPreviewMode} />
     </>
   );
 }

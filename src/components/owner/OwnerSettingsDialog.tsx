@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
 interface Prefs {
@@ -14,9 +15,23 @@ interface Prefs {
   orin_frequency: "weekly" | "monthly" | "both";
 }
 
-export function OwnerSettingsDialog({ ownerId, open, onOpenChange }: { ownerId: string | null; open: boolean; onOpenChange: (o: boolean) => void; }) {
+export function OwnerSettingsDialog({ ownerId, open, onOpenChange, canChangePassword = false }: { ownerId: string | null; open: boolean; onOpenChange: (o: boolean) => void; canChangePassword?: boolean; }) {
   const [prefs, setPrefs] = useState<Prefs>({ notify_bookings: false, notify_orin: false, orin_frequency: "weekly" });
   const [saving, setSaving] = useState(false);
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+
+  const changePassword = async () => {
+    if (newPw.length < 8) { toast.error("Password must be at least 8 characters"); return; }
+    if (newPw !== confirmPw) { toast.error("Passwords don't match"); return; }
+    setPwSaving(true);
+    const { error } = await supabase.auth.updateUser({ password: newPw });
+    setPwSaving(false);
+    if (error) { toast.error("Could not update password", { description: error.message }); return; }
+    toast.success("Password updated");
+    setNewPw(""); setConfirmPw("");
+  };
 
   const { data } = useQuery({
     queryKey: ["owner_prefs", ownerId],
@@ -75,6 +90,17 @@ export function OwnerSettingsDialog({ ownerId, open, onOpenChange }: { ownerId: 
               </div>
             )}
           </div>
+
+          {canChangePassword && (
+            <div className="space-y-2.5 border-t border-border/30 pt-4">
+              <Label className="text-sm">Change password</Label>
+              <Input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="New password" autoComplete="new-password" />
+              <Input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} placeholder="Confirm new password" autoComplete="new-password" />
+              <Button size="sm" variant="outline" onClick={changePassword} disabled={pwSaving || !newPw} className="w-full">
+                {pwSaving ? "Updating…" : "Update password"}
+              </Button>
+            </div>
+          )}
 
           <p className="text-[10px] text-muted-foreground border-t border-border/30 pt-3">
             Emails come from Escape Grids and never include exact £ revenue figures.
