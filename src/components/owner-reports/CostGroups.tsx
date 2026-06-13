@@ -108,7 +108,7 @@ export function CostGroups({
               key={g.key}
               onClick={() => toggle(g.key)}
               style={isOpen ? { borderColor: `hsl(var(--${g.color}) / 0.55)`, backgroundColor: `hsl(var(--${g.color}) / 0.05)` } : undefined}
-              className={`text-left rounded-xl border p-4 transition-colors ${isOpen ? "" : "border-border/60 hover:border-border bg-card/40"}`}
+              className={`flex flex-col text-left rounded-xl border p-4 transition-colors ${isOpen ? "" : "border-border/60 hover:border-border bg-card/40"}`}
             >
               <div className="flex items-center justify-between">
                 <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: `hsl(var(--${g.color}) / 0.15)` }}>
