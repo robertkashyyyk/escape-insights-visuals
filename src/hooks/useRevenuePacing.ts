@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfMonth, endOfMonth, subYears, differenceInDays, format, addDays, subDays } from "date-fns";
-import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
+import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
 interface PacingData {
   currentOTB: number;
@@ -83,7 +83,7 @@ function buildVelocityData(
     .filter((r) => r.reservation_date)
     .map((r) => ({
       daysOut: differenceInDays(monthStart, new Date(r.reservation_date)),
-      amount: getNetRevenue(r),
+      amount: getGrossRevenue(r),
     }))
     .filter((p) => p.daysOut >= 0 && p.daysOut <= maxDaysBack);
 
@@ -147,10 +147,10 @@ export function useRevenuePacing(targetMonth: Date) {
         fetchListings(),
       ]);
 
-      const currentOTB = currentRes.reduce((s, r) => s + getNetRevenue(r), 0);
+      const currentOTB = currentRes.reduce((s, r) => s + getGrossRevenue(r), 0);
       const currentBookingCount = currentRes.length;
-      const samePointLastYear = lyAtPointRes.reduce((s, r) => s + getNetRevenue(r), 0);
-      const lastYearFinal = lyFinalRes.reduce((s, r) => s + getNetRevenue(r), 0);
+      const samePointLastYear = lyAtPointRes.reduce((s, r) => s + getGrossRevenue(r), 0);
+      const lastYearFinal = lyFinalRes.reduce((s, r) => s + getGrossRevenue(r), 0);
 
       const pacingPct =
         samePointLastYear > 0
@@ -164,12 +164,12 @@ export function useRevenuePacing(targetMonth: Date) {
 
       const currentByListing: Record<string, number> = {};
       for (const r of currentRes) {
-        currentByListing[r.listing_id] = (currentByListing[r.listing_id] || 0) + getNetRevenue(r);
+        currentByListing[r.listing_id] = (currentByListing[r.listing_id] || 0) + getGrossRevenue(r);
       }
 
       const lyByListing: Record<string, number> = {};
       for (const r of lyAtPointRes) {
-        lyByListing[r.listing_id] = (lyByListing[r.listing_id] || 0) + getNetRevenue(r);
+        lyByListing[r.listing_id] = (lyByListing[r.listing_id] || 0) + getGrossRevenue(r);
       }
 
       const allListingIds = new Set([...Object.keys(currentByListing), ...Object.keys(lyByListing)]);
@@ -273,9 +273,9 @@ export function usePortfolioPacing(months: Date[]) {
           fetchAllReservations(format(lyMs, "yyyy-MM-dd"), format(lyMe, "yyyy-MM-dd")),
         ]);
 
-        const currentOTB = cur.reduce((s, r) => s + getNetRevenue(r), 0);
-        const samePointLY = lyPoint.reduce((s, r) => s + getNetRevenue(r), 0);
-        const lastYearFinal = lyFinal.reduce((s, r) => s + getNetRevenue(r), 0);
+        const currentOTB = cur.reduce((s, r) => s + getGrossRevenue(r), 0);
+        const samePointLY = lyPoint.reduce((s, r) => s + getGrossRevenue(r), 0);
+        const lastYearFinal = lyFinal.reduce((s, r) => s + getGrossRevenue(r), 0);
         const pacingPct = samePointLY > 0 ? (currentOTB / samePointLY) * 100 : currentOTB > 0 ? 999 : 0;
 
         return {

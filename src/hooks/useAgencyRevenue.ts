@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
+import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
 interface MonthlyData {
   month: string;
@@ -68,7 +68,7 @@ export function useAgencyRevenue() {
         if (!listing) return;
         const ownerInfo = ownerMap.get(listing.owner_id);
         const effectiveRate = ownerInfo?.effectiveRate ?? 0;
-        const total = getNetRevenue(r);
+        const total = getGrossRevenue(r);
         const agencyRev = total * (effectiveRate / 100);
 
         totalYTD += agencyRev;

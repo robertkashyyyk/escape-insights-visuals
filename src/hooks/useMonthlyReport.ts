@@ -83,12 +83,14 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
 
       const { data: listings } = await supabase
         .from("listings")
-        .select("id, name, status")
+        .select("id, name, status, is_bundle")
         .eq("owner_id", ownerId!);
       if (!listings?.length) return null;
 
       const listingIds = listings.map((l) => l.id);
-      const activeCount = listings.filter((l) => l.status === "active").length;
+      // Occupancy denominator excludes bundles (virtual listings) so it mirrors the
+      // owner Portfolio — otherwise the bundle double-counts available property-nights.
+      const activeCount = listings.filter((l) => l.status === "active" && !(l as any).is_bundle).length;
 
       const startStr = format(periodStart, "yyyy-MM-dd");
       const endStr = format(periodEnd, "yyyy-MM-dd");

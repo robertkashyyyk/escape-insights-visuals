@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { differenceInDays } from "date-fns";
-import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
+import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
 type SeasonBucket = "Jan–Mar" | "Shoulder (Apr/May/Sep)" | "Summer (Jun–Aug)" | "Autumn (Oct/Nov)" | "December";
 
@@ -76,7 +76,7 @@ export function usePricingStrategy(locationGroup: string | null) {
         const month = new Date(r.check_in).getMonth() + 1;
         const season = getSeason(month);
         const nights = Math.max(1, differenceInDays(new Date(r.check_out), new Date(r.check_in)));
-        buckets[season].revenue += getNetRevenue(r);
+        buckets[season].revenue += getGrossRevenue(r);
         buckets[season].nights += nights;
       }
 
