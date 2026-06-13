@@ -166,7 +166,15 @@ export function useOwnerPortalData(
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
 
-  const { from: periodStart, to: periodEnd } = getPeriodRange(periodType, periodRef);
+  const { from: periodStart, to: rawPeriodEnd } = getPeriodRange(periodType, periodRef);
+  // For an IN-PROGRESS period (today falls inside it), clamp the end to today so the
+  // headline is genuinely "to date" — and the prior-year comparison is clamped to the
+  // SAME as-of date. Otherwise a half-finished 2026 is compared to a complete 2025 and
+  // every figure (revenue, occupancy, YoY) reads misleadingly low. Past/future periods
+  // are left untouched.
+  const _todayMid = new Date(); _todayMid.setHours(0, 0, 0, 0);
+  const inProgress = periodStart.getTime() <= _todayMid.getTime() && rawPeriodEnd.getTime() > _todayMid.getTime();
+  const periodEnd = inProgress ? _todayMid : rawPeriodEnd;
   const periodDays = Math.max(1, Math.floor((periodEnd.getTime() - periodStart.getTime()) / DAY_MS) + 1);
 
   const prevPeriodStart = subYears(periodStart, 1);
