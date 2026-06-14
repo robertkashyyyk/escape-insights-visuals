@@ -4,11 +4,42 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 const HOSTAWAY_API = "https://api.hostaway.com/v1";
 const LIMIT = 100;
 const BATCH_SIZE = 50;
+// Stop paginating before the ~150s edge-function gateway timeout so we always
+// finish cleanly (mark partial) instead of being killed mid-run with the
+// sync_logs row stuck on "running".
+const TIME_BUDGET_MS = 120_000;
+
+// Hostaway's reservations endpoint intermittently returns 500 "Internal error.
+// Please contact support@hostaway.com" on heavy includeResources pages. These
+// are transient — retry a couple of times with backoff before giving up.
+async function fetchHostawayJson(url: string, headers: Record<string, string>, label: string) {
+  let lastErr: unknown = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, { headers });
+      const body = await res.json();
+      if (res.ok) return body;
+      lastErr = new Error(`${label} failed: ${JSON.stringify(body)}`);
+    } catch (e) {
+      lastErr = e;
+    }
+    if (attempt < 3) await new Promise((r) => setTimeout(r, 600 * attempt));
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+// Parse Hostaway's "YYYY-MM-DD HH:MM:SS" UTC timestamps to epoch ms.
+function parseHostawayTs(v: unknown): number | null {
+  if (!v || typeof v !== "string") return null;
+  const ms = Date.parse(v.replace(" ", "T") + "Z");
+  return Number.isNaN(ms) ? null : ms;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  const START_MS = Date.now();
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -87,9 +118,7 @@ Deno.serve(async (req) => {
     let listingOffset = 0;
     while (true) {
       const url = `${HOSTAWAY_API}/listings?limit=${LIMIT}&offset=${listingOffset}`;
-      const res = await fetch(url, { headers: authHeaders });
-      const body = await res.json();
-      if (!res.ok) throw new Error(`Listings fetch failed: ${JSON.stringify(body)}`);
+      const body = await fetchHostawayJson(url, authHeaders, "Listings fetch");
 
       const listings = body.result || [];
       if (listings.length === 0) break;
@@ -171,16 +200,19 @@ Deno.serve(async (req) => {
     }
 
     // 5. Sync reservations
-    // For incremental: only fetch reservations modified in the last N days
     // includeResources=1 is REQUIRED for customFieldValues / hostNote / guestNote to be
     // returned (they come back empty otherwise — Hostaway's #1 silent gotcha).
-    let reservationUrlBase = `${HOSTAWAY_API}/reservations?limit=${LIMIT}&sortOrder=arrivalDate&includeResources=1`;
+    //
+    // Incremental: Hostaway has NO server-side "modified since" filter on /reservations
+    // (modifiedDateFrom is silently ignored → it would return ALL 10k rows and time out).
+    // Instead we lean on the endpoint's DEFAULT ordering, which is DESCENDING by updatedOn
+    // (most-recently-modified first). We page from the top and stop the moment we reach a
+    // reservation last modified before the cutoff — so a 2-day window is just page 1.
+    const reservationUrlBase = `${HOSTAWAY_API}/reservations?limit=${LIMIT}&includeResources=1`;
+    let cutoffMs = 0;
     if (syncMode === "incremental" && lookbackDays > 0) {
-      const sinceDate = new Date();
-      sinceDate.setDate(sinceDate.getDate() - lookbackDays);
-      const sinceStr = sinceDate.toISOString().split("T")[0];
-      reservationUrlBase += `&modifiedDateFrom=${sinceStr}`;
-      console.log(`Incremental sync: fetching reservations modified since ${sinceStr}`);
+      cutoffMs = START_MS - lookbackDays * 86400000;
+      console.log(`Incremental sync: fetching reservations modified in the last ${lookbackDays} day(s)`);
     } else {
       console.log("Full sync: fetching all reservations");
     }
@@ -200,17 +232,30 @@ Deno.serve(async (req) => {
     }
 
     let resOffset = 0;
+    let reachedCutoff = false;
     while (true) {
+      // Wall-clock guard: never let the function be killed mid-page. Finish cleanly
+      // and mark the run partial so the next cron pass picks up where we left off.
+      if (Date.now() - START_MS > TIME_BUDGET_MS) {
+        errors.push(`Stopped early after ${Math.round((Date.now() - START_MS) / 1000)}s time budget (offset=${resOffset})`);
+        break;
+      }
+
       const url = `${reservationUrlBase}&offset=${resOffset}`;
-      const res = await fetch(url, { headers: authHeaders });
-      const body = await res.json();
-      if (!res.ok) throw new Error(`Reservations fetch failed: ${JSON.stringify(body)}`);
+      const body = await fetchHostawayJson(url, authHeaders, `Reservations fetch (offset=${resOffset})`);
 
       const reservations = body.result || [];
       if (reservations.length === 0) break;
 
       const rows: Record<string, unknown>[] = [];
       for (const r of reservations) {
+        // Incremental early-stop: results are descending by updatedOn, so once we hit a
+        // reservation modified before the cutoff, everything after it is older too.
+        if (cutoffMs > 0) {
+          const um = parseHostawayTs(r.updatedOn ?? r.latestActivityOn ?? r.insertedOn);
+          if (um !== null && um < cutoffMs) { reachedCutoff = true; break; }
+        }
+
         const hostawayListingId = r.listingMapId || r.listingId;
         const listingUuid = listingMap.get(hostawayListingId);
         if (!listingUuid) {
@@ -359,9 +404,9 @@ Deno.serve(async (req) => {
       }
 
       totalReservations += rows.length;
-      skippedReservations += reservations.length - rows.length;
       resOffset += LIMIT;
       console.log(`Processed ${totalReservations} reservations so far (offset=${resOffset})`);
+      if (reachedCutoff) break;          // incremental: passed the modified-since cutoff
       if (reservations.length < LIMIT) break;
     }
 

@@ -102,9 +102,6 @@ export function OwnerSettingsDialog({ ownerId, open, onOpenChange, canChangePass
             </div>
           )}
 
-          <p className="text-[10px] text-muted-foreground border-t border-border/30 pt-3">
-            Emails come from Escape Grids and never include exact £ revenue figures.
-          </p>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
