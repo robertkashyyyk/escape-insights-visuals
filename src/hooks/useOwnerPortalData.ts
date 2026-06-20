@@ -47,14 +47,20 @@ export interface OwnerProperty {
 }
 
 export interface OwnerKpis {
+  // Headline values = FULL selected period ("what's on the cards").
   totalRevenue: number;
-  prevYearRevenue: number;
   occupancy: number;
-  prevYearOccupancy: number;
   adr: number;
-  prevYearAdr: number;
   totalBookings: number;
   totalNights: number;
+  // To-date pairs, used ONLY for the "vs last year" badges so the comparison stays
+  // like-for-like (period-to-date this year vs same-as-of-date last year).
+  revenueToDate: number;
+  prevRevenueToDate: number;
+  occupancyToDate: number;
+  prevOccupancyToDate: number;
+  adrToDate: number;
+  prevAdrToDate: number;
 }
 
 export function getPeriodRange(periodType: OwnerPeriodType, ref: Date) {
@@ -86,7 +92,7 @@ export function getPeriodLabel(periodType: OwnerPeriodType, ref: Date, now: Date
       const q = Math.ceil((from.getMonth() + 1) / 3);
       return `Q${q} ${format(from, "yyyy")}${isCurrentPeriod ? " (This quarter)" : ""}`;
     }
-    case "Year":    return `${format(from, "yyyy")}${isCurrentPeriod ? " YTD" : ""}`;
+    case "Year":    return `${format(from, "yyyy")}${isCurrentPeriod ? " (This year)" : ""}`;
   }
 }
 
@@ -167,16 +173,18 @@ export function useOwnerPortalData(
   const today = now.toISOString().slice(0, 10);
 
   const { from: periodStart, to: rawPeriodEnd } = getPeriodRange(periodType, periodRef);
-  // For an IN-PROGRESS period (today falls inside it), clamp the end to today so the
-  // headline is genuinely "to date" — and the prior-year comparison is clamped to the
-  // SAME as-of date. Otherwise a half-finished 2026 is compared to a complete 2025 and
-  // every figure (revenue, occupancy, YoY) reads misleadingly low. Past/future periods
-  // are left untouched.
+
+  // Headline cards + property cards show the FULL selected period — "what's on the cards"
+  // regardless of whether check-ins fall before or after today. (The earned-to-date vs
+  // pipeline split lives in My Graphs.) The "vs last year" badge, however, is computed over
+  // a SEPARATE to-date window below, so an in-progress (half-booked) period isn't pitted
+  // against a complete prior period.
   const _todayMid = new Date(); _todayMid.setHours(0, 0, 0, 0);
   const inProgress = periodStart.getTime() <= _todayMid.getTime() && rawPeriodEnd.getTime() > _todayMid.getTime();
-  const periodEnd = inProgress ? _todayMid : rawPeriodEnd;
-  const periodDays = Math.max(1, Math.floor((periodEnd.getTime() - periodStart.getTime()) / DAY_MS) + 1);
 
+  // Display window = full period.
+  const periodEnd = rawPeriodEnd;
+  const periodDays = Math.max(1, Math.floor((periodEnd.getTime() - periodStart.getTime()) / DAY_MS) + 1);
   const prevPeriodStart = subYears(periodStart, 1);
   const prevPeriodEnd = subYears(periodEnd, 1);
   const prevPeriodDays = Math.max(1, Math.floor((prevPeriodEnd.getTime() - prevPeriodStart.getTime()) / DAY_MS) + 1);
@@ -185,6 +193,18 @@ export function useOwnerPortalData(
   const periodEndStr   = periodEnd.toISOString().slice(0, 10);
   const prevStartStr   = prevPeriodStart.toISOString().slice(0, 10);
   const prevEndStr     = prevPeriodEnd.toISOString().slice(0, 10);
+
+  // Comparison window = to-date (clamped to today for an in-progress period) + the same
+  // as-of date a year earlier. Used only for the YoY badges.
+  const cmpEnd = inProgress ? _todayMid : rawPeriodEnd;
+  const cmpDays = Math.max(1, Math.floor((cmpEnd.getTime() - periodStart.getTime()) / DAY_MS) + 1);
+  const prevCmpStart = subYears(periodStart, 1);
+  const prevCmpEnd   = subYears(cmpEnd, 1);
+  const prevCmpDays  = Math.max(1, Math.floor((prevCmpEnd.getTime() - prevCmpStart.getTime()) / DAY_MS) + 1);
+  const cmpStartStr     = periodStartStr;
+  const cmpEndStr       = cmpEnd.toISOString().slice(0, 10);
+  const prevCmpStartStr = prevCmpStart.toISOString().slice(0, 10);
+  const prevCmpEndStr   = prevCmpEnd.toISOString().slice(0, 10);
   const useCreatedDate = dateMode === "created";
 
   return useQuery({
@@ -340,7 +360,6 @@ export function useOwnerPortalData(
 
       /* ── 7. Aggregate KPIs — derive from properties so totals ALWAYS tie ── */
       const totalRevenue   = properties.reduce((s, p) => s + p.revenueThisYear,  0);
-      const prevYearRevenue= properties.reduce((s, p) => s + p.revenuePrevYear,  0);
       const totalNightsAll = properties.reduce((s, p) => s + p.totalNights,      0);
       const totalBookings  = properties.reduce((s, p) => s + p.totalBookings,    0);
 
@@ -349,30 +368,40 @@ export function useOwnerPortalData(
         : 0;
       const adr = totalNightsAll > 0 ? totalRevenue / totalNightsAll : 0;
 
-      // Prev-year occupancy & ADR — same approach over the prev expanded slice
-      let prevNightsAll = 0;
-      let prevRevenueAll = 0;
+      // To-date comparison aggregates — drive the "vs last year" badges only. Current
+      // to-date (period start → today) vs the same as-of window a year earlier, so the %
+      // is like-for-like even though the headline above shows the full period.
+      let curCmpNights = 0,  curCmpRevenue = 0;
+      let prevCmpNights = 0, prevCmpRevenue = 0;
       componentListings.forEach((l: any) => {
-        const propRes = expanded.filter((r) => r._listing_id === l.id && inPeriod(r, prevStartStr, prevEndStr));
-        propRes.forEach((r) => {
-          prevNightsAll += nightsInPeriod(r.check_in, r.check_out, prevStartStr, prevEndStr);
-          prevRevenueAll += periodRevenue(r, prevStartStr, prevEndStr) * r._revenue_factor;
+        expanded.filter((r) => r._listing_id === l.id && inPeriod(r, cmpStartStr, cmpEndStr)).forEach((r) => {
+          curCmpNights  += nightsInPeriod(r.check_in, r.check_out, cmpStartStr, cmpEndStr);
+          curCmpRevenue += periodRevenue(r, cmpStartStr, cmpEndStr) * r._revenue_factor;
+        });
+        expanded.filter((r) => r._listing_id === l.id && inPeriod(r, prevCmpStartStr, prevCmpEndStr)).forEach((r) => {
+          prevCmpNights  += nightsInPeriod(r.check_in, r.check_out, prevCmpStartStr, prevCmpEndStr);
+          prevCmpRevenue += periodRevenue(r, prevCmpStartStr, prevCmpEndStr) * r._revenue_factor;
         });
       });
-      const prevYearOccupancy = nonBundleCount > 0
-        ? Math.min(100, (prevNightsAll / (prevPeriodDays * nonBundleCount)) * 100)
-        : 0;
-      const prevYearAdr = prevNightsAll > 0 ? prevRevenueAll / prevNightsAll : 0;
+      const occupancyToDate = nonBundleCount > 0
+        ? Math.min(100, (curCmpNights / (cmpDays * nonBundleCount)) * 100) : 0;
+      const prevOccupancyToDate = nonBundleCount > 0
+        ? Math.min(100, (prevCmpNights / (prevCmpDays * nonBundleCount)) * 100) : 0;
+      const adrToDate     = curCmpNights  > 0 ? curCmpRevenue  / curCmpNights  : 0;
+      const prevAdrToDate = prevCmpNights > 0 ? prevCmpRevenue / prevCmpNights : 0;
 
       const kpis: OwnerKpis = {
         totalRevenue,
-        prevYearRevenue,
         occupancy,
-        prevYearOccupancy,
         adr,
-        prevYearAdr,
         totalBookings,
         totalNights: totalNightsAll,
+        revenueToDate: curCmpRevenue,
+        prevRevenueToDate: prevCmpRevenue,
+        occupancyToDate,
+        prevOccupancyToDate,
+        adrToDate,
+        prevAdrToDate,
       };
 
       const duplicatesDroppedCount = properties.reduce((s, p) => s + p.duplicatesDropped.length, 0);

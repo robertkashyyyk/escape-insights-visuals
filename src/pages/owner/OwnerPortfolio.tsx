@@ -89,12 +89,14 @@ export default function OwnerPortfolio() {
   const firstName = owner?.name?.split(" ")[0] || "there";
   const todayStr = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
+  // Headline `value` shows the full selected period; the trend badge compares the
+  // to-date window (`current` vs `prev`) so the "vs last year" % stays like-for-like.
   const kpiCards = kpis ? [
-    { label: "Total Revenue", value: fmt(kpis.totalRevenue), icon: PoundSterling, prev: kpis.prevYearRevenue },
-    { label: "Bookings", value: kpis.totalBookings.toLocaleString(), icon: BookOpen, prev: null },
-    { label: "Nights Sold", value: kpis.totalNights.toLocaleString(), icon: Moon, prev: null },
-    { label: "Occupancy Rate", value: `${kpis.occupancy.toFixed(0)}%`, icon: Percent, prev: kpis.prevYearOccupancy },
-    { label: "Average Daily Rate", value: fmt(kpis.adr), icon: BedDouble, prev: kpis.prevYearAdr },
+    { label: "Total Revenue", value: fmt(kpis.totalRevenue), icon: PoundSterling, current: kpis.revenueToDate, prev: kpis.prevRevenueToDate },
+    { label: "Bookings", value: kpis.totalBookings.toLocaleString(), icon: BookOpen, current: null, prev: null },
+    { label: "Nights Sold", value: kpis.totalNights.toLocaleString(), icon: Moon, current: null, prev: null },
+    { label: "Occupancy Rate", value: `${kpis.occupancy.toFixed(0)}%`, icon: Percent, current: kpis.occupancyToDate, prev: kpis.prevOccupancyToDate },
+    { label: "Average Daily Rate", value: fmt(kpis.adr), icon: BedDouble, current: kpis.adrToDate, prev: kpis.prevAdrToDate },
   ] : [];
 
   return (
@@ -223,8 +225,8 @@ export default function OwnerPortfolio() {
                   <span className="text-[10px] font-medium uppercase tracking-wider">{kpi.label}</span>
                 </div>
                 <p className="text-xl md:text-2xl font-display font-bold text-foreground">{kpi.value}</p>
-                {kpi.prev != null && (
-                  <TrendBadge current={parseFloat(kpi.value.replace(/[£%,]/g, "")) || 0} previous={kpi.prev} />
+                {kpi.prev != null && kpi.current != null && (
+                  <TrendBadge current={kpi.current} previous={kpi.prev} />
                 )}
               </CardContent>
             </Card>
