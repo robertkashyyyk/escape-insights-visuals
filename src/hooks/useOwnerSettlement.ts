@@ -179,6 +179,25 @@ export function useOwnerSettlement(ownerId: string | null, periodStart: Date, pe
         });
       }
 
+      // Bills paid on behalf — fold each per-listing allocation into the matching
+      // cost-line code so they appear on the statement alongside manual/engine costs.
+      // Two-step (bills in period → their allocations) to avoid embedded-filter quirks.
+      if (listingIds.length) {
+        const { data: periodBills } = await db.from("bills_on_behalf")
+          .select("id, cost_line_types(code)").gte("bill_date", startStr).lte("bill_date", endStr);
+        const codeByBill = new Map<string, string>();
+        (periodBills ?? []).forEach((b: any) => { if (b.cost_line_types?.code) codeByBill.set(b.id, b.cost_line_types.code); });
+        if (codeByBill.size) {
+          const { data: allocs } = await db.from("bill_allocations")
+            .select("amount, listing_id, bill_id")
+            .in("listing_id", listingIds).in("bill_id", Array.from(codeByBill.keys()));
+          (allocs ?? []).forEach((a: any) => {
+            const code = codeByBill.get(a.bill_id);
+            if (code) manualByCode[code] = (manualByCode[code] ?? 0) + Number(a.amount ?? 0);
+          });
+        }
+      }
+
       const weeksDrawn = Math.round(daysInPeriod / 7);
       const weeklyRrAmount = Number(owner.weekly_rr_amount ?? 0);
       const weeklyRrTotal = owner.settlement_method === "weekly_draw" ? weeklyRrAmount * weeksDrawn : 0;

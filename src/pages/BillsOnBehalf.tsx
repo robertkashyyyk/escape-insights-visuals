@@ -24,7 +24,8 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 type TargetType = "property" | "communal" | "region";
 
-interface Listing { id: string; name: string; owner_id: string | null; location_group: string | null; communal_group_id: string | null; is_communal: boolean | null; communal_ratio_pct: number | null }
+interface Listing { id: string; name: string; owner_id: string | null; location_group: string | null; communal_group_id: string | null; is_communal: boolean | null; communal_ratio_pct: number | null; bedrooms: number | null }
+type RegionMethod = "equal" | "bedrooms";
 interface Owner { id: string; name: string; company: string | null }
 interface CostType { id: string; code: string; display_name: string; source_category: string }
 interface Group { id: string; name: string }
@@ -43,7 +44,7 @@ export default function BillsOnBehalf() {
   }});
   const { data: listings = [] } = useQuery({ queryKey: ["bills_listings"], queryFn: async () => {
     const { data } = await db.from("listings")
-      .select("id, name, owner_id, location_group, communal_group_id, is_communal, communal_ratio_pct")
+      .select("id, name, owner_id, location_group, communal_group_id, is_communal, communal_ratio_pct, bedrooms")
       .eq("is_bundle", false); return (data ?? []) as Listing[];
   }});
   const { data: costTypes = [] } = useQuery({ queryKey: ["bills_cost_types"], queryFn: async () => {
@@ -238,12 +239,13 @@ function ReviewRow({ txn, rule, listings, owners, costTypes, groups, regions, us
   const [listingId, setListingId] = useState<string>(rule?.target_listing_id ?? "");
   const [groupId, setGroupId] = useState<string>(rule?.target_communal_group_id ?? "");
   const [region, setRegion] = useState<string>(rule?.target_region ?? "");
+  const [regionMethod, setRegionMethod] = useState<RegionMethod>("equal");
   const [desc, setDesc] = useState<string>(rule?.default_description || txn.reference || txn.description || "");
   const [saving, setSaving] = useState(false);
   const amount = Math.abs(Number(txn.amount));
 
   // Preview the per-listing split so the user sees exactly what each owner gets charged.
-  const allocations = useMemo(() => buildAllocations(targetType, amount, { listingId, groupId, region, listings }), [targetType, amount, listingId, groupId, region, listings]);
+  const allocations = useMemo(() => buildAllocations(targetType, amount, { listingId, groupId, region, regionMethod, listings }), [targetType, amount, listingId, groupId, region, regionMethod, listings]);
 
   const ignore = async () => {
     setSaving(true);
@@ -343,10 +345,20 @@ function ReviewRow({ txn, rule, listings, owners, costTypes, groups, regions, us
               </Select>
             )}
             {targetType === "region" && (
-              <Select value={region} onValueChange={setRegion}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="Which region…" /></SelectTrigger>
-                <SelectContent>{regions.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-              </Select>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select value={region} onValueChange={setRegion}>
+                  <SelectTrigger className="h-9 w-56"><SelectValue placeholder="Which region…" /></SelectTrigger>
+                  <SelectContent>{regions.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                </Select>
+                <div className="flex gap-1 p-1 rounded-lg bg-background border border-border/40">
+                  {(["equal", "bedrooms"] as const).map((m) => (
+                    <button key={m} onClick={() => setRegionMethod(m)}
+                      className={`px-2.5 py-1 text-[11px] font-medium rounded-md ${regionMethod === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}>
+                      {m === "equal" ? "Equal split" : "By bedrooms"}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 
@@ -375,7 +387,7 @@ function ReviewRow({ txn, rule, listings, owners, costTypes, groups, regions, us
 /* ── apportionment ── */
 function buildAllocations(
   targetType: TargetType, amount: number,
-  ctx: { listingId: string; groupId: string; region: string; listings: Listing[] },
+  ctx: { listingId: string; groupId: string; region: string; regionMethod: RegionMethod; listings: Listing[] },
 ): { listing_id: string; ratio_pct: number | null; amount: number }[] {
   let members: { listing_id: string; ratio_pct: number | null }[] = [];
   if (targetType === "property") {
@@ -389,8 +401,13 @@ function buildAllocations(
   } else {
     if (!ctx.region) return [];
     const ms = ctx.listings.filter((l) => l.location_group === ctx.region);
-    const each = ms.length ? round2(100 / ms.length) : 0; // region: equal split across its properties
-    members = ms.map((l) => ({ listing_id: l.id, ratio_pct: each }));
+    if (ctx.regionMethod === "bedrooms" && ms.some((l) => Number(l.bedrooms ?? 0) > 0)) {
+      const totalBeds = ms.reduce((s, l) => s + Math.max(0, Number(l.bedrooms ?? 0)), 0) || 1;
+      members = ms.map((l) => ({ listing_id: l.id, ratio_pct: round2((Math.max(0, Number(l.bedrooms ?? 0)) / totalBeds) * 100) }));
+    } else {
+      const each = ms.length ? round2(100 / ms.length) : 0; // equal split across the region's properties
+      members = ms.map((l) => ({ listing_id: l.id, ratio_pct: each }));
+    }
   }
   // Apply amounts; last member absorbs any rounding remainder so the split ties to the total.
   let allocated = 0;
