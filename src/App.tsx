@@ -45,6 +45,7 @@ import CleanReset from "./pages/CleanReset";
 import MaintenanceQueue from "./pages/MaintenanceQueue";
 import OtaImports from "./pages/OtaImports";
 import ExpensesPage from "./pages/ExpensesPage";
+import BillsOnBehalf from "./pages/BillsOnBehalf";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -98,6 +99,7 @@ const App = () => (
             <Route path="/operations/maintenance" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><MaintenanceQueue /></ProtectedRoute>} />
             <Route path="/operations/imports" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><OtaImports /></ProtectedRoute>} />
             <Route path="/finance/expenses" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ExpensesPage /></ProtectedRoute>} />
+            <Route path="/finance/bills-on-behalf" element={<ProtectedRoute requiredRoles={["super", "senior"]}><BillsOnBehalf /></ProtectedRoute>} />
             <Route path="/operations/numbers" element={<ProtectedRoute requiredRoles={["super", "senior"]}><CleaningNumbers /></ProtectedRoute>} />
             <Route path="/property-knowledge" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PropertyKnowledge /></ProtectedRoute>} />
             <Route path="/property-knowledge/:listingId" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PropertyKnowledgeDetail /></ProtectedRoute>} />

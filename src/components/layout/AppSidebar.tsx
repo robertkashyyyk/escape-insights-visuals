@@ -3,7 +3,7 @@ import {
   Building2, Users, Briefcase, Settings, LogOut, Telescope,
   Gauge, Target, Sparkles, Home, ChevronRight, Brush, BookOpen,
   FileText, Link, UserSearch, Mail, Send, Megaphone, ClipboardList,
-  Eye, Sun, Moon, MapPin, Wrench, Receipt, UploadCloud,
+  Eye, Sun, Moon, MapPin, Wrench, Receipt, UploadCloud, Banknote,
   LucideIcon,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
@@ -94,6 +94,7 @@ const sections: NavSection[] = [
     items: [
       { title: "Management Revenue", url: "/management", icon: Briefcase, roles: managementRoles },
       { title: "Expenses", url: "/finance/expenses", icon: Receipt, roles: managementRoles },
+      { title: "Bills on Behalf", url: "/finance/bills-on-behalf", icon: Banknote, roles: managementRoles },
       {
       title: "Owner Reports", url: "/owner-reports", icon: FileText, roles: managementRoles,
         children: [
