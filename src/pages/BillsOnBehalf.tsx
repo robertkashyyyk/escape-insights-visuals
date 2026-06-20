@@ -22,6 +22,16 @@ const db = supabase as any;
 const fmtGbp = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(n || 0);
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+// Optional: attach the actual bill document. Reuses the existing receipts bucket.
+async function uploadBillDoc(file: File | null, userId: string | null): Promise<string | null> {
+  if (!file || !userId) return null;
+  const ext = file.name.split(".").pop() ?? "pdf";
+  const path = `bills/${userId}/${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from("expense-receipts").upload(path, file);
+  if (error) { toast.error("Attachment upload failed", { description: error.message }); return null; }
+  return path;
+}
+
 type TargetType = "property" | "communal" | "region";
 
 interface Listing { id: string; name: string; owner_id: string | null; location_group: string | null; communal_group_id: string | null; is_communal: boolean | null; communal_ratio_pct: number | null; bedrooms: number | null }
@@ -241,6 +251,7 @@ function ReviewRow({ txn, rule, listings, owners, costTypes, groups, regions, us
   const [region, setRegion] = useState<string>(rule?.target_region ?? "");
   const [regionMethod, setRegionMethod] = useState<RegionMethod>("equal");
   const [desc, setDesc] = useState<string>(rule?.default_description || txn.reference || txn.description || "");
+  const [doc, setDoc] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const amount = Math.abs(Number(txn.amount));
 
@@ -260,11 +271,12 @@ function ReviewRow({ txn, rule, listings, owners, costTypes, groups, regions, us
     if (!allocations.length) { toast.error("Pick what this bill applies to"); return; }
     setSaving(true);
     try {
+      const receiptPath = await uploadBillDoc(doc, userId); // optional
       const { data: bill, error } = await db.from("bills_on_behalf").insert({
         txn_id: txn.id, payee_name: txn.payee_name, bill_date: txn.txn_date ?? format(new Date(), "yyyy-MM-dd"),
         amount, cost_line_type_id: costTypeId, description: desc, target_type: targetType,
         target_communal_group_id: targetType === "communal" ? groupId : null,
-        target_region: targetType === "region" ? region : null, created_by: userId,
+        target_region: targetType === "region" ? region : null, receipt_url: receiptPath, created_by: userId,
       }).select("id").single();
       if (error) throw error;
       await db.from("bill_allocations").insert(allocations.map((a) => ({ bill_id: bill.id, listing_id: a.listing_id, ratio_pct: a.ratio_pct, amount: a.amount })));
@@ -375,7 +387,14 @@ function ReviewRow({ txn, rule, listings, owners, costTypes, groups, regions, us
             </div>
           )}
 
-          <div className="md:col-span-2 flex justify-end">
+          <div className="md:col-span-2 flex items-center justify-between gap-3 pt-1">
+            <label className="text-xs text-muted-foreground flex items-center gap-2 cursor-pointer">
+              <span className="px-2.5 py-1.5 rounded-md border border-border/40 bg-background hover:bg-secondary/50">
+                {doc ? "Change document" : "Attach bill (optional)"}
+              </span>
+              {doc && <span className="truncate max-w-[180px]">{doc.name}</span>}
+              <input type="file" accept=".pdf,image/*" className="hidden" onChange={(e) => setDoc(e.target.files?.[0] ?? null)} />
+            </label>
             <Button size="sm" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save bill"}</Button>
           </div>
         </div>
