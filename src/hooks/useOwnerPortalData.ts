@@ -297,6 +297,10 @@ export function useOwnerPortalData(
         (useCreatedDate ? getGrossRevenue(r) : periodRevenue(r, s, e)) * r._revenue_factor;
       const nightsOf = (r: any, s: string, e: string) =>
         useCreatedDate ? nightsBetween(r.check_in, r.check_out) : nightsInPeriod(r.check_in, r.check_out, s, e);
+      // Check-in occupancy can't exceed 100% (you can't occupy more than the room-nights
+      // available). Booking-Date "occupancy" CAN exceed 100% — it's nights booked in the
+      // period vs the period's capacity, and a strong week can book more than a week's worth.
+      const capOcc = (v: number) => (useCreatedDate ? v : Math.min(100, v));
 
       /* ── 6. Build per-property aggregates (single source of truth) ── */
       const properties: OwnerProperty[] = componentListings.map((l: any) => {
@@ -318,7 +322,7 @@ export function useOwnerPortalData(
 
         const totalNights = thisPeriodRes.reduce((s, r) => s + nightsOf(r, periodStartStr, periodEndStr), 0);
 
-        const occupancyPct = Math.min(100, (totalNights / periodDays) * 100);
+        const occupancyPct = capOcc((totalNights / periodDays) * 100);
         const adr = totalNights > 0 ? revenueThisYear / totalNights : 0;
         const totalBookings = thisPeriodRes.length;
         const upcomingCount = propRes.filter((r) => r.check_in >= today).length;
@@ -368,7 +372,7 @@ export function useOwnerPortalData(
       const totalBookings  = properties.reduce((s, p) => s + p.totalBookings,    0);
 
       const occupancy = nonBundleCount > 0
-        ? Math.min(100, (totalNightsAll / (periodDays * nonBundleCount)) * 100)
+        ? capOcc((totalNightsAll / (periodDays * nonBundleCount)) * 100)
         : 0;
       const adr = totalNightsAll > 0 ? totalRevenue / totalNightsAll : 0;
 
@@ -388,9 +392,9 @@ export function useOwnerPortalData(
         });
       });
       const occupancyToDate = nonBundleCount > 0
-        ? Math.min(100, (curCmpNights / (cmpDays * nonBundleCount)) * 100) : 0;
+        ? capOcc((curCmpNights / (cmpDays * nonBundleCount)) * 100) : 0;
       const prevOccupancyToDate = nonBundleCount > 0
-        ? Math.min(100, (prevCmpNights / (prevCmpDays * nonBundleCount)) * 100) : 0;
+        ? capOcc((prevCmpNights / (prevCmpDays * nonBundleCount)) * 100) : 0;
       const adrToDate     = curCmpNights  > 0 ? curCmpRevenue  / curCmpNights  : 0;
       const prevAdrToDate = prevCmpNights > 0 ? prevCmpRevenue / prevCmpNights : 0;
 

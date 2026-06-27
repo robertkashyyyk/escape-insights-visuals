@@ -10,7 +10,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { isFuture } from "date-fns";
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from "recharts";
@@ -77,7 +76,10 @@ export default function OwnerGraphs() {
   const canGoForward = (() => {
     const next = shiftPeriod(periodRef, periodType, 1);
     const { from: nf } = getPeriodRange(periodType, next);
-    return !isFuture(nf);
+    // Allow browsing forward into future periods (future bookings exist) up to a 2-year
+    // horizon, rather than locking at the current period.
+    const horizon = new Date(); horizon.setFullYear(horizon.getFullYear() + 2);
+    return nf <= horizon;
   })();
 
   const toggleMetric = (m: GraphMetric) => {

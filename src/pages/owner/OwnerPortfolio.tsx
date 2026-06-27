@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PoundSterling, Percent, BedDouble, TrendingUp, TrendingDown, CalendarDays, ChevronLeft, ChevronRight, BookOpen, Moon, CalendarCheck, MapPin, ListTree, AlertTriangle, RefreshCw } from "lucide-react";
-import { isFuture, formatDistanceToNow, parseISO } from "date-fns";
+import { formatDistanceToNow, parseISO } from "date-fns";
 import { OwnerLocalAreaTab } from "@/components/amenities/OwnerLocalAreaTab";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { OwnerReservationsDrawer } from "@/components/owners/OwnerReservationsDrawer";
@@ -59,7 +59,10 @@ export default function OwnerPortfolio() {
   const canGoForward = (() => {
     const next = shiftPeriod(periodRef, periodType, 1);
     const { from } = getPeriodRange(periodType, next);
-    return !isFuture(from);
+    // Allow browsing forward into future periods (there are bookings ahead) up to a
+    // 2-year horizon, rather than locking at the current period.
+    const horizon = new Date(); horizon.setFullYear(horizon.getFullYear() + 2);
+    return from <= horizon;
   })();
 
   const handlePeriodChange = (p: OwnerPeriodType) => {
@@ -91,15 +94,13 @@ export default function OwnerPortfolio() {
 
   // Headline `value` shows the full selected period; the trend badge compares the
   // to-date window (`current` vs `prev`) so the "vs last year" % stays like-for-like.
-  // Occupancy is a stays/check-in concept — on a Booking-Date basis the "nights" are
-  // future stays booked in the period (you can book more night-stays than the period has
-  // room-nights), so a % is meaningless. Show "—" there.
-  const isBookingDate = dateMode === "created";
+  // On a Booking-Date basis occupancy can exceed 100% (nights booked vs the period's
+  // capacity — a strong week books more than a week's worth); the hook leaves it uncapped.
   const kpiCards = kpis ? [
     { label: "Total Revenue", value: fmt(kpis.totalRevenue), icon: PoundSterling, current: kpis.revenueToDate, prev: kpis.prevRevenueToDate },
     { label: "Bookings", value: kpis.totalBookings.toLocaleString(), icon: BookOpen, current: null, prev: null },
     { label: "Nights Sold", value: kpis.totalNights.toLocaleString(), icon: Moon, current: null, prev: null },
-    { label: "Occupancy Rate", value: isBookingDate ? "—" : `${kpis.occupancy.toFixed(0)}%`, icon: Percent, current: isBookingDate ? null : kpis.occupancyToDate, prev: isBookingDate ? null : kpis.prevOccupancyToDate },
+    { label: "Occupancy Rate", value: `${kpis.occupancy.toFixed(0)}%`, icon: Percent, current: kpis.occupancyToDate, prev: kpis.prevOccupancyToDate },
     { label: "Average Daily Rate", value: fmt(kpis.adr), icon: BedDouble, current: kpis.adrToDate, prev: kpis.prevAdrToDate },
   ] : [];
 
@@ -281,7 +282,7 @@ export default function OwnerPortfolio() {
                       </div>
                       <div>
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Occupancy</p>
-                        <p className="text-sm font-display font-bold text-foreground">{isBookingDate ? "—" : `${p.occupancyPct.toFixed(0)}%`}</p>
+                        <p className="text-sm font-display font-bold text-foreground">{p.occupancyPct.toFixed(0)}%</p>
                       </div>
                       <div>
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider">ADR</p>
