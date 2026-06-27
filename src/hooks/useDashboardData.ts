@@ -84,16 +84,25 @@ export function useDashboardData(dateRange: DateRange, periodType: PeriodType) {
       const fromStr = format(dateRange.from, "yyyy-MM-dd");
       const toStr = format(dateRange.to, "yyyy-MM-dd");
 
-      // Fetch reservations overlapping the date range
-      const { data: reservations, error } = await supabase
-        .from("reservations")
-        .select("*, listings(name, city, location_group, bedrooms, bathrooms, max_guests, owner_id)")
-        .or(`check_in.lte.${toStr},check_out.gte.${fromStr}`)
-        .gte("check_in", fromStr)
-        .lte("check_in", toStr)
-        .eq("status", "confirmed");
-
-      if (error) throw error;
+      // Fetch reservations overlapping the date range. Paginate — a single query is
+      // capped at PostgREST's default 1000 rows, which silently truncated portfolio-wide
+      // ranges (e.g. a full year has ~2k bookings) and roughly halved every metric.
+      const PAGE = 1000;
+      const reservations: any[] = [];
+      for (let offset = 0; ; offset += PAGE) {
+        const { data, error } = await supabase
+          .from("reservations")
+          .select("*, listings(name, city, location_group, bedrooms, bathrooms, max_guests, owner_id)")
+          .or(`check_in.lte.${toStr},check_out.gte.${fromStr}`)
+          .gte("check_in", fromStr)
+          .lte("check_in", toStr)
+          .eq("status", "confirmed")
+          .order("id", { ascending: true })
+          .range(offset, offset + PAGE - 1);
+        if (error) throw error;
+        reservations.push(...(data ?? []));
+        if (!data || data.length < PAGE) break;
+      }
 
       // Fetch total guest-bookable listings count for occupancy calc.
       // Exclude bundles (is_bundle=true) — they're virtual aggregates of other
