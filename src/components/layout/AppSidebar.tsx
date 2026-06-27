@@ -10,6 +10,7 @@ import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth, useRole } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
+import { ThemePicker } from "@/components/ThemePicker";
 import { Badge } from "@/components/ui/badge";
 import { useState, useCallback } from "react";
 
@@ -429,14 +430,7 @@ export function AppSidebar() {
                   </Badge>
                 )}
               </div>
-              <button
-                onClick={toggleTheme}
-                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
-                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-                aria-label="Toggle theme"
-              >
-                {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-              </button>
+              <ThemePicker />
               <button
                 onClick={signOut}
                 className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"

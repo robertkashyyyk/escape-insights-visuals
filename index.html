@@ -3,6 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Set the theme before first paint to avoid a flash of the wrong theme.
+      (function () {
+        try {
+          var t = localStorage.getItem("eg-theme");
+          if (t !== "light" && t !== "dark" && t !== "brand") t = "dark";
+          var r = document.documentElement;
+          r.setAttribute("data-theme", t);
+          r.classList.add(t === "light" ? "light" : "dark");
+          r.style.colorScheme = t === "light" ? "light" : "dark";
+        } catch (e) {}
+      })();
+    </script>
     <!-- TODO: Set the document title to the name of your application -->
     <title>Escape Grids</title>
     <meta name="description" content="Escape Grids by Escape Ordinary">

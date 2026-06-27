@@ -2,6 +2,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useOwnerPreview } from "@/contexts/OwnerPreviewContext";
 import { OwnerProfileMenu } from "@/components/owner/OwnerProfileMenu";
 import { useTheme } from "@/contexts/ThemeContext";
+import { ThemePicker } from "@/components/ThemePicker";
 import { NavLink, useNavigate } from "react-router-dom";
 import { LogOut, Home, CalendarDays, FileText, Eye, BarChart3, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -94,16 +95,7 @@ export function OwnerLayout({ children }: { children: React.ReactNode }) {
 
             {/* Right — theme toggle + profile menu */}
             <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleTheme}
-                className="text-muted-foreground hover:text-foreground h-8 w-8 p-0"
-                aria-label="Toggle theme"
-                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              >
-                {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-              </Button>
+              <ThemePicker />
               <OwnerProfileMenu />
             </div>
           </div>
