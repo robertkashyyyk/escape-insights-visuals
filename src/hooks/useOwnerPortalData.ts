@@ -9,7 +9,7 @@ import {
   format,
 } from "date-fns";
 import { REVENUE_FIELDS } from "@/lib/revenue";
-import { periodRevenue, overlapsPeriod } from "@/lib/metrics";
+import { periodRevenue, overlapsPeriod, getGrossRevenue } from "@/lib/metrics";
 
 export type OwnerPeriodType = "Week" | "Month" | "Quarter" | "Year";
 export type OwnerDateMode = "check_in" | "created";
@@ -290,6 +290,14 @@ export function useOwnerPortalData(
 
       const currentYear = now.getFullYear();
 
+      // In Booking-Date mode the metrics reflect the FULL value/length of bookings MADE in
+      // the period (their stays are usually in the future), matching My Graphs. In Check-in
+      // mode they're clipped to the nights that fall inside the period.
+      const revOf = (r: any, s: string, e: string) =>
+        (useCreatedDate ? getGrossRevenue(r) : periodRevenue(r, s, e)) * r._revenue_factor;
+      const nightsOf = (r: any, s: string, e: string) =>
+        useCreatedDate ? nightsBetween(r.check_in, r.check_out) : nightsInPeriod(r.check_in, r.check_out, s, e);
+
       /* ── 6. Build per-property aggregates (single source of truth) ── */
       const properties: OwnerProperty[] = componentListings.map((l: any) => {
         const propRes = expanded.filter((r) => r._listing_id === l.id);
@@ -297,8 +305,8 @@ export function useOwnerPortalData(
         const thisPeriodRes = propRes.filter((r) => inPeriod(r, periodStartStr, periodEndStr));
         const prevPeriodRes = propRes.filter((r) => inPeriod(r, prevStartStr, prevEndStr));
 
-        const revenueThisYear = thisPeriodRes.reduce((s, r) => s + periodRevenue(r, periodStartStr, periodEndStr) * r._revenue_factor, 0);
-        const revenuePrevYear = prevPeriodRes.reduce((s, r) => s + periodRevenue(r, prevStartStr, prevEndStr) * r._revenue_factor, 0);
+        const revenueThisYear = thisPeriodRes.reduce((s, r) => s + revOf(r, periodStartStr, periodEndStr), 0);
+        const revenuePrevYear = prevPeriodRes.reduce((s, r) => s + revOf(r, prevStartStr, prevEndStr), 0);
 
         const monthlyRevenue = Array.from({ length: 12 }, (_, m) => {
           const ms = `${currentYear}-${String(m + 1).padStart(2, "0")}-01`;
@@ -308,11 +316,7 @@ export function useOwnerPortalData(
             .reduce((s, r) => s + periodRevenue(r, ms, me) * r._revenue_factor, 0);
         });
 
-        // Clip nights to period — prevents cross-month bleed and overlap > calendar
-        const totalNights = thisPeriodRes.reduce(
-          (s, r) => s + nightsInPeriod(r.check_in, r.check_out, periodStartStr, periodEndStr),
-          0
-        );
+        const totalNights = thisPeriodRes.reduce((s, r) => s + nightsOf(r, periodStartStr, periodEndStr), 0);
 
         const occupancyPct = Math.min(100, (totalNights / periodDays) * 100);
         const adr = totalNights > 0 ? revenueThisYear / totalNights : 0;
@@ -326,8 +330,8 @@ export function useOwnerPortalData(
             check_in: r.check_in,
             check_out: r.check_out,
             nights_total: nightsBetween(r.check_in, r.check_out),
-            nights_in_period: nightsInPeriod(r.check_in, r.check_out, periodStartStr, periodEndStr),
-            revenue: periodRevenue(r, periodStartStr, periodEndStr) * r._revenue_factor,
+            nights_in_period: nightsOf(r, periodStartStr, periodEndStr),
+            revenue: revOf(r, periodStartStr, periodEndStr),
             revenue_factor: r._revenue_factor,
             platform: r.platform ?? null,
             is_bundle_expansion: r._is_bundle_expansion,
@@ -375,12 +379,12 @@ export function useOwnerPortalData(
       let prevCmpNights = 0, prevCmpRevenue = 0;
       componentListings.forEach((l: any) => {
         expanded.filter((r) => r._listing_id === l.id && inPeriod(r, cmpStartStr, cmpEndStr)).forEach((r) => {
-          curCmpNights  += nightsInPeriod(r.check_in, r.check_out, cmpStartStr, cmpEndStr);
-          curCmpRevenue += periodRevenue(r, cmpStartStr, cmpEndStr) * r._revenue_factor;
+          curCmpNights  += nightsOf(r, cmpStartStr, cmpEndStr);
+          curCmpRevenue += revOf(r, cmpStartStr, cmpEndStr);
         });
         expanded.filter((r) => r._listing_id === l.id && inPeriod(r, prevCmpStartStr, prevCmpEndStr)).forEach((r) => {
-          prevCmpNights  += nightsInPeriod(r.check_in, r.check_out, prevCmpStartStr, prevCmpEndStr);
-          prevCmpRevenue += periodRevenue(r, prevCmpStartStr, prevCmpEndStr) * r._revenue_factor;
+          prevCmpNights  += nightsOf(r, prevCmpStartStr, prevCmpEndStr);
+          prevCmpRevenue += revOf(r, prevCmpStartStr, prevCmpEndStr);
         });
       });
       const occupancyToDate = nonBundleCount > 0

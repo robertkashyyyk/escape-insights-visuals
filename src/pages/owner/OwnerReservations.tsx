@@ -9,7 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarDays, Home, User, PoundSterling } from "lucide-react";
-import { format, differenceInDays } from "date-fns";
+import {
+  format, differenceInDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
+  startOfQuarter, endOfQuarter, startOfYear, endOfYear,
+} from "date-fns";
 
 const fmt = (n: number) => `£${n.toLocaleString("en-GB", { maximumFractionDigits: 0 })}`;
 
@@ -20,12 +23,25 @@ const platformColors: Record<string, string> = {
   "vrbo": "bg-[#3C6EEF]/15 text-[#3C6EEF] border-[#3C6EEF]/30",
 };
 
+// Preset period → [startStr, endStr] for the date filter (by check-in date).
+function periodRange(key: string): [string, string] | null {
+  const now = new Date();
+  const fmt = (d: Date) => format(d, "yyyy-MM-dd");
+  switch (key) {
+    case "this_week":    return [fmt(startOfWeek(now, { weekStartsOn: 1 })), fmt(endOfWeek(now, { weekStartsOn: 1 }))];
+    case "this_month":   return [fmt(startOfMonth(now)), fmt(endOfMonth(now))];
+    case "this_quarter": return [fmt(startOfQuarter(now)), fmt(endOfQuarter(now))];
+    case "this_year":    return [fmt(startOfYear(now)), fmt(endOfYear(now))];
+    default: return null;
+  }
+}
+
 export default function OwnerReservations() {
   const { user } = useAuth();
   const { isPreviewMode, selectedOwnerId, selectedOwnerName } = useOwnerPreview();
   const [propertyFilter, setPropertyFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("upcoming");
-  const [sortBy, setSortBy] = useState<string>("check_in_desc");
+  const [sortBy, setSortBy] = useState<string>("check_in_asc");
 
   const { data, isLoading } = useQuery({
     queryKey: ["owner_reservations", isPreviewMode ? selectedOwnerId : user?.id],
@@ -76,6 +92,9 @@ export default function OwnerReservations() {
       list = list.filter((r: any) => r.check_in >= today);
     } else if (dateFilter === "past") {
       list = list.filter((r: any) => r.check_out < today);
+    } else if (dateFilter !== "all") {
+      const range = periodRange(dateFilter); // this_week / this_month / this_quarter / this_year
+      if (range) list = list.filter((r: any) => r.check_in >= range[0] && r.check_in <= range[1]);
     }
 
     const [field, dir] = sortBy.split("_").length === 3
@@ -135,17 +154,21 @@ export default function OwnerReservations() {
               <SelectItem value="upcoming">Upcoming</SelectItem>
               <SelectItem value="past">Past</SelectItem>
               <SelectItem value="all">All dates</SelectItem>
+              <SelectItem value="this_week">This week</SelectItem>
+              <SelectItem value="this_month">This month</SelectItem>
+              <SelectItem value="this_quarter">This quarter</SelectItem>
+              <SelectItem value="this_year">This year</SelectItem>
             </SelectContent>
           </Select>
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[180px] h-9 text-xs">
+            <SelectTrigger className="w-[190px] h-9 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="check_in_desc">Check-in (newest)</SelectItem>
-              <SelectItem value="check_in_asc">Check-in (oldest)</SelectItem>
-              <SelectItem value="check_out_desc">Check-out (newest)</SelectItem>
-              <SelectItem value="check_out_asc">Check-out (oldest)</SelectItem>
+              <SelectItem value="check_in_asc">Check-in (earliest first)</SelectItem>
+              <SelectItem value="check_in_desc">Check-in (latest first)</SelectItem>
+              <SelectItem value="check_out_asc">Check-out (earliest first)</SelectItem>
+              <SelectItem value="check_out_desc">Check-out (latest first)</SelectItem>
             </SelectContent>
           </Select>
         </div>
