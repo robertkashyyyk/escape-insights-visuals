@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import {
   format, addDays, addWeeks, subWeeks, addMonths, subMonths,
   startOfWeek, endOfWeek, startOfMonth, endOfMonth, isBefore, isAfter, isSameMonth, startOfDay,
@@ -97,13 +98,13 @@ export default function CleaningNumbers() {
   const { data: checkoutReservations = [] } = useQuery({
     queryKey: ["reservations-numbers-checkouts", rangeStartStr, rangeEndStr],
     queryFn: async () => {
-      const { data } = await supabase
+      const data = await fetchAllRows<{ id: string; listing_id: string; check_out: string; status: string }>(() => supabase
         .from("reservations")
         .select("id, listing_id, check_out, status")
         .gte("check_out", rangeStartStr)
         .lte("check_out", rangeEndStr)
-        .eq("status", "confirmed");
-      return (data || []) as { id: string; listing_id: string; check_out: string; status: string }[];
+        .eq("status", "confirmed"));
+      return data;
     },
   });
 
@@ -112,13 +113,13 @@ export default function CleaningNumbers() {
     queryKey: ["reservations-numbers-prev-checkouts", prevStartStr, prevEndStr],
     enabled: period === "month",
     queryFn: async () => {
-      const { data } = await supabase
+      const data = await fetchAllRows<{ id: string; listing_id: string; check_out: string; status: string }>(() => supabase
         .from("reservations")
         .select("id, listing_id, check_out, status")
         .gte("check_out", prevStartStr)
         .lte("check_out", prevEndStr)
-        .eq("status", "confirmed");
-      return (data || []) as { id: string; listing_id: string; check_out: string; status: string }[];
+        .eq("status", "confirmed"));
+      return data;
     },
   });
 

@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { format, addDays, startOfWeek, endOfWeek, isSameDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -181,28 +182,28 @@ export function useCleaningSchedule() {
   const { data: checkoutReservations = [] } = useQuery({
     queryKey: ["reservations-checkouts", rangeStartStr, rangeEndStr],
     queryFn: async () => {
-      const { data } = await supabase
+      const data = await fetchAllRows<Reservation>(() => supabase
         .from("reservations")
         .select("id, listing_id, check_in, check_out, status, guest_name, check_in_time, check_out_time")
         .gte("check_out", rangeStartStr)
         .lte("check_out", rangeEndStr)
         .eq("status", "confirmed")
-        .order("check_out");
-      return (data || []) as Reservation[];
+        .order("check_out"));
+      return data;
     },
   });
 
   const { data: checkinReservations = [] } = useQuery({
     queryKey: ["reservations-checkins", rangeStartStr, lookAheadStr],
     queryFn: async () => {
-      const { data } = await supabase
+      const data = await fetchAllRows<Reservation>(() => supabase
         .from("reservations")
         .select("id, listing_id, check_in, check_out, status, guest_name, check_in_time, check_out_time")
         .gte("check_in", rangeStartStr)
         .lte("check_in", lookAheadStr)
         .eq("status", "confirmed")
-        .order("check_in");
-      return (data || []) as Reservation[];
+        .order("check_in"));
+      return data;
     },
   });
 

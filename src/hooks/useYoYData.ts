@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import {
   startOfWeek,
   endOfWeek,
@@ -67,24 +68,24 @@ export function useYoYData(periodType: PeriodType, periodValue: number, year: nu
       const fmt = (d: Date) => format(d, "yyyy-MM-dd");
 
       // Fetch both periods + listings in parallel
-      const [{ data: curRes, error: e1 }, { data: prevRes, error: e2 }, { data: listings, error: e3 }] =
-        await Promise.all([
-          supabase
-            .from("reservations")
-            .select(`listing_id, check_in, check_out, ${REVENUE_FIELDS}`)
-            .gte("check_in", fmt(current.start))
-            .lte("check_in", fmt(current.end))
-            .eq("status", "confirmed"),
-          supabase
-            .from("reservations")
-            .select(`listing_id, check_in, check_out, ${REVENUE_FIELDS}`)
-            .gte("check_in", fmt(previous.start))
-            .lte("check_in", fmt(previous.end))
-            .eq("status", "confirmed"),
-          supabase.from("listings").select("id, name, city"),
-        ]);
+      const [curRes, prevRes, listingsRes] = await Promise.all([
+        fetchAllRows<any>(() => supabase
+          .from("reservations")
+          .select(`listing_id, check_in, check_out, ${REVENUE_FIELDS}`)
+          .gte("check_in", fmt(current.start))
+          .lte("check_in", fmt(current.end))
+          .eq("status", "confirmed")),
+        fetchAllRows<any>(() => supabase
+          .from("reservations")
+          .select(`listing_id, check_in, check_out, ${REVENUE_FIELDS}`)
+          .gte("check_in", fmt(previous.start))
+          .lte("check_in", fmt(previous.end))
+          .eq("status", "confirmed")),
+        supabase.from("listings").select("id, name, city"),
+      ]);
 
-      if (e1 || e2 || e3) throw e1 || e2 || e3;
+      if (listingsRes.error) throw listingsRes.error;
+      const listings = listingsRes.data;
 
       const listingMap = new Map((listings || []).map((l) => [l.id, l]));
 

@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { Receipt, ChevronDown, Plus, Upload, Trash2 } from "lucide-react";
@@ -396,12 +397,12 @@ function LaundryTab() {
     if (bErr || !bill) { setSubmitting(false); toast.error(bErr?.message ?? "Failed to create bill"); return; }
 
     // Find bookings overlapping period
-    const { data: resv } = await supabase
+    const resv = await fetchAllRows<any>(() => supabase
       .from("reservations")
       .select("listing_id, listings:listing_id (name, bedrooms)")
       .lt("check_in", periodEnd)
       .gt("check_out", periodStart)
-      .not("status", "in", "(cancelled,canceled,declined,expired,inquiry)");
+      .not("status", "in", "(cancelled,canceled,declined,expired,inquiry)"));
 
     const byListing = new Map<string, { name: string; bedrooms: number; bookings: number }>();
     (resv ?? []).forEach((r: any) => {

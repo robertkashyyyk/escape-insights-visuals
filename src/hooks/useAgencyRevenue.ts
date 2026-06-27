@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
 interface MonthlyData {
@@ -35,17 +36,16 @@ export function useAgencyRevenue() {
       const startOfYear = `${currentYear}-01-01`;
       const endOfYear = `${currentYear}-12-31`;
 
-      const [{ data: reservations, error: rErr }, { data: owners, error: oErr }] = await Promise.all([
-        supabase
+      const [reservations, { data: owners, error: oErr }] = await Promise.all([
+        fetchAllRows<any>(() => supabase
           .from("reservations")
           .select(`check_in, listing_id, listings(name, city, location_group, owner_id), ${REVENUE_FIELDS}`)
           .gte("check_in", startOfYear)
           .lte("check_in", endOfYear)
-          .eq("status", "confirmed"),
+          .eq("status", "confirmed")),
         supabase.from("property_owners").select("id, name, company, management_rate_pct, vat_inclusive" as any),
       ]);
 
-      if (rErr) throw rErr;
       if (oErr) throw oErr;
 
       // Build owner map with effective rate

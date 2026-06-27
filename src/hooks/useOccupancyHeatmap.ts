@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import {
   differenceInDays,
   getDaysInMonth,
@@ -37,14 +38,14 @@ export function useOccupancyHeatmap(year: number) {
       const yearStart = `${year}-01-01`;
       const yearEnd = `${year}-12-31`;
 
-      const [{ data: listings }, { data: reservations }] = await Promise.all([
+      const [{ data: listings }, reservations] = await Promise.all([
         supabase.from("listings").select("id, name, location_group, min_stay_nights").eq("status", "active").order("name"),
-        supabase
+        fetchAllRows<any>(() => supabase
           .from("reservations")
           .select("listing_id, check_in, check_out, total_amount, status")
           .gte("check_out", yearStart)
           .lte("check_in", yearEnd)
-          .eq("status", "confirmed"),
+          .eq("status", "confirmed")),
       ]);
 
       if (!listings) return { listings: [] as ListingOccupancy[], locationGroups: [] as string[] };

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { differenceInDays } from "date-fns";
 import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 
@@ -59,13 +60,12 @@ export function usePricingStrategy(locationGroup: string | null) {
       let allReservations: any[] = [];
       for (let i = 0; i < listingIds.length; i += 50) {
         const batch = listingIds.slice(i, i + 50);
-        const { data: res, error: re } = await supabase
+        const res = await fetchAllRows<any>(() => supabase
           .from("reservations")
           .select(`check_in, check_out, listing_id, ${REVENUE_FIELDS}`)
           .in("listing_id", batch)
-          .eq("status", "confirmed");
-        if (re) throw re;
-        if (res) allReservations = allReservations.concat(res);
+          .eq("status", "confirmed"));
+        allReservations = allReservations.concat(res);
       }
 
       // Aggregate per season

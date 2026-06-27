@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { format, differenceInDays, addMonths, addDays, startOfMonth, endOfMonth, parseISO, startOfISOWeek } from "date-fns";
 import { getGrossRevenue } from "@/lib/revenue";
 
@@ -110,14 +111,12 @@ export function useOTBData(window: PeriodWindow = 180) {
       const today = format(new Date(), "yyyy-MM-dd");
       const windowEnd = format(addDays(new Date(), window), "yyyy-MM-dd");
 
-      const { data: reservations, error } = await supabase
+      const reservations = await fetchAllRows<any>(() => supabase
         .from("reservations")
         .select("*, listings(id, name, location_group)")
         .gte("check_in", today)
         .lte("check_in", windowEnd)
-        .eq("status", "confirmed");
-
-      if (error) throw error;
+        .eq("status", "confirmed"));
 
       const rows = reservations ?? [];
       if (rows.length === 0) {

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllRows } from "@/lib/fetchAllRows";
 import { differenceInDays, parseISO } from "date-fns";
 import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 import { periodRevenue } from "@/lib/metrics";
@@ -37,20 +38,19 @@ export function useOwnerPerformance(year: number, dateMode: DateMode = "check_in
 
       const dateCol = dateMode === "created" ? "reservation_date" : "check_in";
 
-      const [ownersRes, listingsRes, reservationsRes] = await Promise.all([
+      const [ownersRes, listingsRes, reservations] = await Promise.all([
         supabase.from("property_owners").select("*").order("name"),
         supabase.from("listings").select("id, owner_id, status, location_group"),
-        supabase
+        fetchAllRows<any>(() => supabase
           .from("reservations")
           .select(`listing_id, check_in, check_out, status, reservation_date, ${REVENUE_FIELDS}`)
           .gte(dateCol, yearStart)
           .lte(dateCol, yearEnd)
-          .eq("status", "confirmed"),
+          .eq("status", "confirmed")),
       ]);
 
       const owners = ownersRes.data ?? [];
       const listings = listingsRes.data ?? [];
-      const reservations = reservationsRes.data ?? [];
 
       const listingsByOwner: Record<string, typeof listings> = {};
       const listingToOwner: Record<string, string> = {};
