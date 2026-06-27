@@ -170,7 +170,7 @@ export function useOwnerPortalData(
   const { user } = useAuth();
   const { isPreviewMode, selectedOwnerId } = useOwnerPreview();
   const now = new Date();
-  const today = now.toISOString().slice(0, 10);
+  const today = format(now, "yyyy-MM-dd");
 
   const { from: periodStart, to: rawPeriodEnd } = getPeriodRange(periodType, periodRef);
 
@@ -189,10 +189,13 @@ export function useOwnerPortalData(
   const prevPeriodEnd = subYears(periodEnd, 1);
   const prevPeriodDays = Math.max(1, Math.floor((prevPeriodEnd.getTime() - prevPeriodStart.getTime()) / DAY_MS) + 1);
 
-  const periodStartStr = periodStart.toISOString().slice(0, 10);
-  const periodEndStr   = periodEnd.toISOString().slice(0, 10);
-  const prevStartStr   = prevPeriodStart.toISOString().slice(0, 10);
-  const prevEndStr     = prevPeriodEnd.toISOString().slice(0, 10);
+  // Format in LOCAL time, not UTC. `toISOString().slice(0,10)` on a local-midnight Date
+  // shifts the date back a day in positive-offset zones (e.g. BST), so a week/month would
+  // wrongly pull in the previous boundary day's bookings.
+  const periodStartStr = format(periodStart, "yyyy-MM-dd");
+  const periodEndStr   = format(periodEnd, "yyyy-MM-dd");
+  const prevStartStr   = format(prevPeriodStart, "yyyy-MM-dd");
+  const prevEndStr     = format(prevPeriodEnd, "yyyy-MM-dd");
 
   // Comparison window = to-date (clamped to today for an in-progress period) + the same
   // as-of date a year earlier. Used only for the YoY badges.
@@ -202,9 +205,9 @@ export function useOwnerPortalData(
   const prevCmpEnd   = subYears(cmpEnd, 1);
   const prevCmpDays  = Math.max(1, Math.floor((prevCmpEnd.getTime() - prevCmpStart.getTime()) / DAY_MS) + 1);
   const cmpStartStr     = periodStartStr;
-  const cmpEndStr       = cmpEnd.toISOString().slice(0, 10);
-  const prevCmpStartStr = prevCmpStart.toISOString().slice(0, 10);
-  const prevCmpEndStr   = prevCmpEnd.toISOString().slice(0, 10);
+  const cmpEndStr       = format(cmpEnd, "yyyy-MM-dd");
+  const prevCmpStartStr = format(prevCmpStart, "yyyy-MM-dd");
+  const prevCmpEndStr   = format(prevCmpEnd, "yyyy-MM-dd");
   const useCreatedDate = dateMode === "created";
 
   return useQuery({
