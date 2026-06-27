@@ -91,11 +91,15 @@ export default function OwnerPortfolio() {
 
   // Headline `value` shows the full selected period; the trend badge compares the
   // to-date window (`current` vs `prev`) so the "vs last year" % stays like-for-like.
+  // Occupancy is a stays/check-in concept — on a Booking-Date basis the "nights" are
+  // future stays booked in the period (you can book more night-stays than the period has
+  // room-nights), so a % is meaningless. Show "—" there.
+  const isBookingDate = dateMode === "created";
   const kpiCards = kpis ? [
     { label: "Total Revenue", value: fmt(kpis.totalRevenue), icon: PoundSterling, current: kpis.revenueToDate, prev: kpis.prevRevenueToDate },
     { label: "Bookings", value: kpis.totalBookings.toLocaleString(), icon: BookOpen, current: null, prev: null },
     { label: "Nights Sold", value: kpis.totalNights.toLocaleString(), icon: Moon, current: null, prev: null },
-    { label: "Occupancy Rate", value: `${kpis.occupancy.toFixed(0)}%`, icon: Percent, current: kpis.occupancyToDate, prev: kpis.prevOccupancyToDate },
+    { label: "Occupancy Rate", value: isBookingDate ? "—" : `${kpis.occupancy.toFixed(0)}%`, icon: Percent, current: isBookingDate ? null : kpis.occupancyToDate, prev: isBookingDate ? null : kpis.prevOccupancyToDate },
     { label: "Average Daily Rate", value: fmt(kpis.adr), icon: BedDouble, current: kpis.adrToDate, prev: kpis.prevAdrToDate },
   ] : [];
 
@@ -277,7 +281,7 @@ export default function OwnerPortfolio() {
                       </div>
                       <div>
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Occupancy</p>
-                        <p className="text-sm font-display font-bold text-foreground">{p.occupancyPct.toFixed(0)}%</p>
+                        <p className="text-sm font-display font-bold text-foreground">{isBookingDate ? "—" : `${p.occupancyPct.toFixed(0)}%`}</p>
                       </div>
                       <div>
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wider">ADR</p>
