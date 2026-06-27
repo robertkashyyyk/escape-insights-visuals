@@ -8,8 +8,8 @@ import {
   subYears, addWeeks, addMonths, addQuarters, addYears,
   format,
 } from "date-fns";
-import { REVENUE_FIELDS } from "@/lib/revenue";
-import { periodRevenue, overlapsPeriod, getGrossRevenue } from "@/lib/metrics";
+import { REVENUE_FIELDS, getGrossRevenue } from "@/lib/revenue";
+import { periodRevenue, overlapsPeriod } from "@/lib/metrics";
 
 export type OwnerPeriodType = "Week" | "Month" | "Quarter" | "Year";
 export type OwnerDateMode = "check_in" | "created";
