@@ -110,6 +110,8 @@ export function useOwnerGraphData(
   return useQuery({
     queryKey: ["owner_graphs", isPreviewMode ? selectedOwnerId : user?.id, from.toISOString(), to.toISOString(), zoom, metrics, filterListingId],
     enabled: enabled && !!(isPreviewMode ? selectedOwnerId : user) && metrics.length > 0,
+    staleTime: 30_000,
+    refetchOnMount: true,
     queryFn: async () => {
       let listingsQuery = supabase.from("listings").select("id, is_bundle");
       if (isPreviewMode && selectedOwnerId) {

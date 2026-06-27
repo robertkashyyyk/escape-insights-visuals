@@ -210,6 +210,10 @@ export function useOwnerPortalData(
   return useQuery({
     queryKey: ["owner_portal_v2", isPreviewMode ? selectedOwnerId : user?.id, periodType, periodStartStr, dateMode],
     enabled: !!(isPreviewMode ? selectedOwnerId : user),
+    // Owners watch live booking numbers — override the global 1h/no-refetch defaults so a
+    // sync (every 2h) doesn't leave a stale period cached for up to an hour.
+    staleTime: 30_000,
+    refetchOnMount: true,
     queryFn: async () => {
       /* ── 1. Listings + owner ── */
       let listingsQuery = supabase.from("listings").select("id, name, location_group, bedrooms, owner_id, is_bundle, bundle_components");

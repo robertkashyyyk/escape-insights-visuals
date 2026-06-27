@@ -46,6 +46,8 @@ export default function OwnerReservations() {
   const { data, isLoading } = useQuery({
     queryKey: ["owner_reservations", isPreviewMode ? selectedOwnerId : user?.id],
     enabled: !!(isPreviewMode ? selectedOwnerId : user),
+    staleTime: 30_000,
+    refetchOnMount: true,
     queryFn: async () => {
       let listingsQuery = supabase.from("listings").select("id, name, owner_id");
       let ownerQuery = supabase.from("property_owners").select("name");
