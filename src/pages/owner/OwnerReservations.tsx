@@ -165,10 +165,10 @@ export default function OwnerReservations() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="check_in_asc">Check-in (earliest first)</SelectItem>
+              <SelectItem value="check_in_asc">Check-in (soonest first)</SelectItem>
               <SelectItem value="check_in_desc">Check-in (latest first)</SelectItem>
-              <SelectItem value="check_out_asc">Check-out (earliest first)</SelectItem>
-              <SelectItem value="check_out_desc">Check-out (latest first)</SelectItem>
+              <SelectItem value="reservation_date_desc">Booking date (newest first)</SelectItem>
+              <SelectItem value="reservation_date_asc">Booking date (oldest first)</SelectItem>
             </SelectContent>
           </Select>
         </div>
