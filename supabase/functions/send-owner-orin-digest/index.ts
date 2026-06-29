@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
       nights: cur.nights, prevNights: prevYear.nights,
       bookings: cur.bookings, prevBookings: prevYear.bookings,
       adrPctYoY: pct(adr(cur), adr(prevYear)),
-      topRevenueName: cur.topRevenueName, topNightsName: cur.topNightsName, topNights: cur.topNights,
+      topRevenueName: cur.topRevenueName, byProperty: cur.byProperty,
     });
 
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
@@ -99,15 +99,18 @@ function aggregate(rows: any[], s: string, e: string, props: any[]) {
     nightsByProp[r.listing_id] = (nightsByProp[r.listing_id] ?? 0) + inp;
     revByProp[r.listing_id] = (revByProp[r.listing_id] ?? 0) + rev;
   }
-  const topBy = (map: Record<string, number>) => {
-    let name = "—", max = -1;
-    for (const p of props) { const v = map[p.id] ?? 0; if (v > max) { max = v; name = p.name; } }
-    return { name, value: Math.max(0, max) };
-  };
-  const topRevenue = topBy(revByProp);
-  const topNights = topBy(nightsByProp);
-  return { revenue, nights, bookings, topRevenueName: topRevenue.name, topNightsName: topNights.name, topNights: topNights.value };
+  // Per-property breakdown (nights + revenue), sorted by nights desc.
+  const byProperty = props
+    .map((p: any) => ({ name: p.name, nights: nightsByProp[p.id] ?? 0, revenue: revByProp[p.id] ?? 0 }))
+    .sort((a, b) => b.nights - a.nights);
+  let topRevenueName = "—", maxRev = -1;
+  for (const p of byProperty) { if (p.revenue > maxRev) { maxRev = p.revenue; topRevenueName = p.name; } }
+  return { revenue, nights, bookings, topRevenueName, byProperty };
 }
+
+// Trim a listing's marketing name to its short identifier, e.g.
+// "Lily's Pad ~ Luxury ~ Lough Shore" / "Ernie's Den - Lakefront…" → "Lily's Pad" / "Ernie's Den".
+function shortName(n: string) { return n.split(/ ~ | - | by /)[0].trim(); }
 
 function ranges(period: string, now: Date) {
   if (period === "weekly") {
@@ -145,7 +148,7 @@ function orinEmail(
     occCur: number; occYoY: number; occPrior: number;
     nights: number; prevNights: number; bookings: number; prevBookings: number;
     adrPctYoY: number;
-    topRevenueName: string; topNightsName: string; topNights: number;
+    topRevenueName: string; byProperty: { name: string; nights: number; revenue: number }[];
   },
 ) {
   const pw = period === "weekly" ? "week" : "month";       // "this week" / "this month"
@@ -162,14 +165,15 @@ function orinEmail(
   if (d.adrPctYoY < 0 && d.revPctYoY > 0) insights.push(`Average nightly rate softened (${arrow(d.adrPctYoY)} on last year) but volume more than made up for it — net revenue still ${arrow(d.revPctYoY)}. A healthy trade.`);
   else if (d.adrPctYoY > 0) insights.push(`Average nightly rate firmed (${arrow(d.adrPctYoY)} on last year) — you held price and still sold the nights.`);
 
-  // Top performers — led by REVENUE (what actually drives the period), with the
-  // nights leader noted separately (most-nights ≠ most-valuable for cheaper units).
-  if (d.topRevenueName !== "—") {
-    insights.push(
-      d.topRevenueName === d.topNightsName
-        ? `<b>${d.topRevenueName}</b> led the ${pw} on both revenue and nights (${d.topNights} sold).`
-        : `<b>${d.topRevenueName}</b> drove the most revenue this ${pw}; <b>${d.topNightsName}</b> sold the most nights (${d.topNights}).`,
-    );
+  // Top performers — call out the REVENUE leader (the real driver; most-nights ≠
+  // most-valuable for cheaper units), then a per-property nights breakdown.
+  const withNights = d.byProperty.filter((p) => p.nights > 0);
+  if (withNights.length === 1) {
+    insights.push(`<b>${shortName(withNights[0].name)}</b> took all ${withNights[0].nights} nights this ${pw}.`);
+  } else if (withNights.length > 1) {
+    insights.push(`<b>${shortName(d.topRevenueName)}</b> drove the most revenue this ${pw}.`);
+    const breakdown = withNights.map((p) => `<b>${shortName(p.name)}</b> ${p.nights}`).join(", ");
+    insights.push(`Nights by property — ${breakdown}.`);
   }
 
   const lis = insights.map((t) => `<li style="margin:0 0 10px;color:#334155;font-size:14px;line-height:1.5">${t}</li>`).join("");
