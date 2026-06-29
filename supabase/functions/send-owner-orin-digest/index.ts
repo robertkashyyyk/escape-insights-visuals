@@ -28,9 +28,9 @@ Deno.serve(async (req) => {
     const ids = props.map((l: any) => l.id);
     if (ids.length === 0) return json({ skipped: "no properties" });
 
-    // Period ranges (previous full week/month) + same period last year.
+    // Current period + same period last year (YoY) + the immediately-preceding period (prior).
     const now = new Date();
-    const { curStart, curEnd, prevStart, prevEnd, label } = ranges(period, now);
+    const { curStart, curEnd, prevStart, prevEnd, ppStart, ppEnd, label } = ranges(period, now);
 
     const fetchRes = async (s: string, e: string) => {
       const { data } = await supabase.from("reservations")
@@ -38,20 +38,27 @@ Deno.serve(async (req) => {
         .in("listing_id", ids).eq("status", "confirmed").lte("check_in", e).gte("check_out", s);
       return data ?? [];
     };
-    const [curRes, prevRes] = await Promise.all([fetchRes(curStart, curEnd), fetchRes(prevStart, prevEnd)]);
+    const [curRes, prevRes, ppRes] = await Promise.all([
+      fetchRes(curStart, curEnd), fetchRes(prevStart, prevEnd), fetchRes(ppStart, ppEnd),
+    ]);
 
     const cur = aggregate(curRes, curStart, curEnd, props);
-    const prev = aggregate(prevRes, prevStart, prevEnd, props);
+    const prevYear = aggregate(prevRes, prevStart, prevEnd, props);
+    const prior = aggregate(ppRes, ppStart, ppEnd, props);
     const days = daysInclusive(curStart, curEnd);
-    const occCur = props.length ? Math.round((cur.nights / (props.length * days)) * 100) : 0;
-    const occPrev = props.length ? Math.round((prev.nights / (props.length * days)) * 100) : 0;
+    const occ = (a: { nights: number }) => (props.length ? Math.round((a.nights / (props.length * days)) * 100) : 0);
     const pct = (c: number, p: number) => (p > 0 ? Math.round(((c - p) / p) * 100) : (c > 0 ? 100 : 0));
-    const revPct = pct(cur.revenue, prev.revenue);
-    const adrCur = cur.nights ? cur.revenue / cur.nights : 0;
-    const adrPrev = prev.nights ? prev.revenue / prev.nights : 0;
-    const adrPct = pct(adrCur, adrPrev);
+    const adr = (a: { revenue: number; nights: number }) => (a.nights ? a.revenue / a.nights : 0);
 
-    const html = orinEmail(label, owner?.name ?? "there", { revPct, occCur, occPrev, nights: cur.nights, prevNights: prev.nights, bookings: cur.bookings, prevBookings: prev.bookings, adrPct, busiest: cur.busiest });
+    const html = orinEmail(label, period, owner?.name ?? "there", {
+      revPctYoY: pct(cur.revenue, prevYear.revenue),
+      revPctPrior: pct(cur.revenue, prior.revenue),
+      occCur: occ(cur), occYoY: occ(prevYear), occPrior: occ(prior),
+      nights: cur.nights, prevNights: prevYear.nights,
+      bookings: cur.bookings, prevBookings: prevYear.bookings,
+      adrPctYoY: pct(adr(cur), adr(prevYear)),
+      topRevenueName: cur.topRevenueName, topNightsName: cur.topNightsName, topNights: cur.topNights,
+    });
 
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
     if (!RESEND_API_KEY) return json({ skipped: "no resend key" }, 500);
@@ -81,18 +88,25 @@ function daysInclusive(s: string, e: string) { return Math.floor((toD(e).getTime
 
 function aggregate(rows: any[], s: string, e: string, props: any[]) {
   let revenue = 0, nights = 0, bookings = 0;
-  const byProp: Record<string, number> = {};
+  const nightsByProp: Record<string, number> = {};
+  const revByProp: Record<string, number> = {};
   for (const r of rows) {
     const inp = nightsInPeriod(r.check_in, r.check_out, s, e);
     if (inp <= 0) continue;
     const tn = nightsBetween(r.check_in, r.check_out);
-    revenue += gross(r) * (tn > 0 ? inp / tn : 1);
-    nights += inp; bookings += 1;
-    byProp[r.listing_id] = (byProp[r.listing_id] ?? 0) + inp;
+    const rev = gross(r) * (tn > 0 ? inp / tn : 1);
+    revenue += rev; nights += inp; bookings += 1;
+    nightsByProp[r.listing_id] = (nightsByProp[r.listing_id] ?? 0) + inp;
+    revByProp[r.listing_id] = (revByProp[r.listing_id] ?? 0) + rev;
   }
-  let busiest = "—", max = -1;
-  for (const p of props) { const n = byProp[p.id] ?? 0; if (n > max) { max = n; busiest = p.name; } }
-  return { revenue, nights, bookings, busiest };
+  const topBy = (map: Record<string, number>) => {
+    let name = "—", max = -1;
+    for (const p of props) { const v = map[p.id] ?? 0; if (v > max) { max = v; name = p.name; } }
+    return { name, value: Math.max(0, max) };
+  };
+  const topRevenue = topBy(revByProp);
+  const topNights = topBy(nightsByProp);
+  return { revenue, nights, bookings, topRevenueName: topRevenue.name, topNightsName: topNights.name, topNights: topNights.value };
 }
 
 function ranges(period: string, now: Date) {
@@ -103,15 +117,17 @@ function ranges(period: string, now: Date) {
     const curEndD = new Date(thisMon.getTime() - DAY);       // last Sun
     const curStartD = new Date(curEndD.getTime() - 6 * DAY); // last Mon
     const ps = new Date(curStartD.getTime() - 364 * DAY), pe = new Date(curEndD.getTime() - 364 * DAY);
+    const pps = new Date(curStartD.getTime() - 7 * DAY), ppe = new Date(curEndD.getTime() - 7 * DAY); // previous week
     const f = (x: Date) => x.toISOString().slice(0, 10);
-    return { curStart: f(curStartD), curEnd: f(curEndD), prevStart: f(ps), prevEnd: f(pe), label: `week of ${curStartD.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}` };
+    return { curStart: f(curStartD), curEnd: f(curEndD), prevStart: f(ps), prevEnd: f(pe), ppStart: f(pps), ppEnd: f(ppe), label: `week of ${curStartD.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}` };
   }
   // monthly: previous full month
   const y = now.getUTCFullYear(), m = now.getUTCMonth(); // 0-based, current month
   const cs = new Date(Date.UTC(y, m - 1, 1)), ce = new Date(Date.UTC(y, m, 0));
   const ps = new Date(Date.UTC(y - 1, m - 1, 1)), pe = new Date(Date.UTC(y - 1, m, 0));
+  const pcs = new Date(Date.UTC(y, m - 2, 1)), pce = new Date(Date.UTC(y, m - 1, 0)); // previous month
   const f = (x: Date) => x.toISOString().slice(0, 10);
-  return { curStart: f(cs), curEnd: f(ce), prevStart: f(ps), prevEnd: f(pe), label: cs.toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }) };
+  return { curStart: f(cs), curEnd: f(ce), prevStart: f(ps), prevEnd: f(pe), ppStart: f(pcs), ppEnd: f(pce), label: cs.toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }) };
 }
 
 function json(obj: unknown, status = 200) {
@@ -120,15 +136,41 @@ function json(obj: unknown, status = 200) {
 
 function arrow(p: number) { return p > 0 ? `up ${p}%` : p < 0 ? `down ${Math.abs(p)}%` : "flat"; }
 
-function orinEmail(label: string, name: string, d: { revPct: number; occCur: number; occPrev: number; nights: number; prevNights: number; bookings: number; prevBookings: number; adrPct: number; busiest: string }) {
-  const headline = d.revPct >= 0
-    ? `Solid ${label} — revenue ${arrow(d.revPct)} on last year.`
-    : `${label} came in softer — revenue ${arrow(d.revPct)} on last year.`;
+function orinEmail(
+  label: string,
+  period: string,
+  name: string,
+  d: {
+    revPctYoY: number; revPctPrior: number;
+    occCur: number; occYoY: number; occPrior: number;
+    nights: number; prevNights: number; bookings: number; prevBookings: number;
+    adrPctYoY: number;
+    topRevenueName: string; topNightsName: string; topNights: number;
+  },
+) {
+  const pw = period === "weekly" ? "week" : "month";       // "this week" / "this month"
+  const prior = period === "weekly" ? "the week before" : "the month before";
+  const headline = d.revPctYoY >= 0
+    ? `Solid ${label} — revenue ${arrow(d.revPctYoY)} on last year and ${arrow(d.revPctPrior)} on ${prior}.`
+    : `${label} came in softer — revenue ${arrow(d.revPctYoY)} on last year (${arrow(d.revPctPrior)} on ${prior}).`;
+
   const insights: string[] = [];
-  insights.push(`Occupancy ran at <b>${d.occCur}%</b> (vs ${d.occPrev}% a year ago) — ${d.nights} nights sold across ${d.bookings} bookings${d.prevNights ? `, ${d.nights - d.prevNights >= 0 ? "+" : ""}${d.nights - d.prevNights} nights and ${d.bookings - d.prevBookings >= 0 ? "+" : ""}${d.bookings - d.prevBookings} bookings year-on-year` : ""}.`);
-  if (d.adrPct < 0 && d.revPct > 0) insights.push(`Average nightly rate softened (${arrow(d.adrPct)}) but volume more than made up for it — net revenue still ${arrow(d.revPct)}. A healthy trade.`);
-  else if (d.adrPct > 0) insights.push(`Average nightly rate firmed (${arrow(d.adrPct)}) — you held price and still sold the nights.`);
-  insights.push(`<b>${d.busiest}</b> carried the month with the most nights sold.`);
+  const yoyDelta = d.prevNights
+    ? ` (${d.nights - d.prevNights >= 0 ? "+" : ""}${d.nights - d.prevNights} nights, ${d.bookings - d.prevBookings >= 0 ? "+" : ""}${d.bookings - d.prevBookings} bookings vs last year)`
+    : "";
+  insights.push(`Occupancy ran at <b>${d.occCur}%</b> — versus ${d.occYoY}% a year ago and ${d.occPrior}% ${prior}. ${d.nights} nights sold across ${d.bookings} bookings${yoyDelta}.`);
+  if (d.adrPctYoY < 0 && d.revPctYoY > 0) insights.push(`Average nightly rate softened (${arrow(d.adrPctYoY)} on last year) but volume more than made up for it — net revenue still ${arrow(d.revPctYoY)}. A healthy trade.`);
+  else if (d.adrPctYoY > 0) insights.push(`Average nightly rate firmed (${arrow(d.adrPctYoY)} on last year) — you held price and still sold the nights.`);
+
+  // Top performers — led by REVENUE (what actually drives the period), with the
+  // nights leader noted separately (most-nights ≠ most-valuable for cheaper units).
+  if (d.topRevenueName !== "—") {
+    insights.push(
+      d.topRevenueName === d.topNightsName
+        ? `<b>${d.topRevenueName}</b> led the ${pw} on both revenue and nights (${d.topNights} sold).`
+        : `<b>${d.topRevenueName}</b> drove the most revenue this ${pw}; <b>${d.topNightsName}</b> sold the most nights (${d.topNights}).`,
+    );
+  }
 
   const lis = insights.map((t) => `<li style="margin:0 0 10px;color:#334155;font-size:14px;line-height:1.5">${t}</li>`).join("");
   return `<!doctype html><html><body style="margin:0;background:#f1f5f9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
