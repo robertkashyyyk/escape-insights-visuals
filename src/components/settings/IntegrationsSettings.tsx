@@ -46,21 +46,26 @@ export function IntegrationsSettings() {
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [secretConfigured, setSecretConfigured] = useState(false);
   const [cronInterval, setCronInterval] = useState("off");
   const [savingCron, setSavingCron] = useState(false);
 
   useEffect(() => {
     (async () => {
+      // Write-only secret: we NEVER pull hostaway_client_secret into the browser.
+      // We only read the (non-secret) account id + sync interval, and a boolean
+      // flag that tells us whether a secret is already stored.
       const { data } = await supabase
         .from("app_settings")
         .select("key, value")
-        .in("key", ["hostaway_account_id", "hostaway_client_secret", "hostaway_sync_interval"]);
+        .in("key", ["hostaway_account_id", "hostaway_client_secret_set", "hostaway_sync_interval"]);
       if (data) {
         const map = Object.fromEntries(data.map((r) => [r.key, r.value]));
         if (map.hostaway_account_id) setAccountId(map.hostaway_account_id);
-        if (map.hostaway_client_secret) setClientSecret(map.hostaway_client_secret);
         if (map.hostaway_sync_interval) setCronInterval(map.hostaway_sync_interval);
-        if (map.hostaway_account_id && map.hostaway_client_secret) setConnected(true);
+        const secretSet = map.hostaway_client_secret_set === "true";
+        setSecretConfigured(secretSet);
+        if (map.hostaway_account_id && secretSet) setConnected(true);
       }
       setLoading(false);
     })();
@@ -69,15 +74,24 @@ export function IntegrationsSettings() {
   const handleSave = async () => {
     setSaving(true);
     const now = new Date().toISOString();
-    const { error } = await (supabase.from("app_settings") as any).upsert([
+    const rows: any[] = [
       { key: "hostaway_account_id", value: accountId, updated_by: user?.id, updated_at: now },
-      { key: "hostaway_client_secret", value: clientSecret, updated_by: user?.id, updated_at: now },
-    ], { onConflict: "key" });
+    ];
+    // Only write the secret when a new one has actually been entered — a blank
+    // field means "keep the existing secret", never overwrite it with "".
+    const enteredSecret = clientSecret.trim();
+    if (enteredSecret) {
+      rows.push({ key: "hostaway_client_secret", value: enteredSecret, updated_by: user?.id, updated_at: now });
+      rows.push({ key: "hostaway_client_secret_set", value: "true", updated_by: user?.id, updated_at: now });
+    }
+    const { error } = await (supabase.from("app_settings") as any).upsert(rows, { onConflict: "key" });
     setSaving(false);
     if (error) {
       toast({ title: "Error saving", description: error.message, variant: "destructive" });
     } else {
-      setConnected(true);
+      if (enteredSecret) setSecretConfigured(true);
+      setClientSecret(""); // never keep the secret in browser memory after save
+      if (accountId && (enteredSecret || secretConfigured)) setConnected(true);
       toast({ title: "Hostaway credentials saved" });
     }
   };
@@ -135,10 +149,12 @@ export function IntegrationsSettings() {
     setAccountId("");
     setClientSecret("");
     setConnected(false);
+    setSecretConfigured(false);
     const now = new Date().toISOString();
     await (supabase.from("app_settings") as any).upsert([
       { key: "hostaway_account_id", value: "", updated_by: user?.id, updated_at: now },
       { key: "hostaway_client_secret", value: "", updated_by: user?.id, updated_at: now },
+      { key: "hostaway_client_secret_set", value: "false", updated_by: user?.id, updated_at: now },
     ], { onConflict: "key" });
     toast({ title: "Credentials cleared", description: "Enter new credentials and save." });
   };
@@ -161,7 +177,18 @@ export function IntegrationsSettings() {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">Client Secret</Label>
-            <Input type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} placeholder={loading ? "Loading..." : "Enter Client Secret"} disabled={loading} className="bg-secondary/50 border-border/40" />
+            <Input
+              type="password"
+              value={clientSecret}
+              onChange={(e) => setClientSecret(e.target.value)}
+              placeholder={loading ? "Loading..." : secretConfigured ? "•••••••••• saved — leave blank to keep" : "Enter Client Secret"}
+              disabled={loading}
+              autoComplete="off"
+              className="bg-secondary/50 border-border/40"
+            />
+            <p className="text-[11px] text-muted-foreground/70">
+              Stored write-only. The saved secret is never sent back to the browser — enter a new value only to replace it.
+            </p>
           </div>
           <div className="flex gap-2 flex-wrap">
             <Button onClick={handleSave} disabled={saving || loading} size="sm">
