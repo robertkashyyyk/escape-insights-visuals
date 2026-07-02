@@ -48,6 +48,40 @@ const empty: CleanerForm = {
   color: null,
 };
 
+/** London-local today as yyyy-MM-dd (BST-safe: en-CA gives ISO date, no UTC shift). */
+function londonToday(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
+}
+
+/** Add n days to a yyyy-MM-dd string, anchored at noon UTC to avoid DST edge shifts. */
+function addDaysStr(iso: string, n: number): string {
+  const d = new Date(iso + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Whole-day span (inclusive) between two yyyy-MM-dd strings. */
+function daySpanInclusive(startIso: string, endIso: string): number {
+  const a = new Date(startIso + "T12:00:00Z").getTime();
+  const b = new Date(endIso + "T12:00:00Z").getTime();
+  return Math.round((b - a) / 86400000) + 1;
+}
+
+/** Did any field that changes clean allocation get edited? Order-insensitive for the arrays/maps. */
+function schedulingFieldsChanged(before: Cleaner, after: CleanerForm): boolean {
+  const arr = (x: string[] = []) => JSON.stringify([...x].sort());
+  const map = (x: Record<string, number> = {}) =>
+    JSON.stringify(Object.fromEntries(Object.entries(x).sort(([a], [b]) => a.localeCompare(b))));
+  return (
+    arr(before.location_groups) !== arr(after.location_groups) ||
+    arr(before.non_working_days) !== arr(after.non_working_days) ||
+    map(before.workload_share) !== map(after.workload_share) ||
+    (before.daily_working_hours ?? 8) !== (after.daily_working_hours ?? 8) ||
+    (before.home_latitude ?? null) !== (after.home_latitude ?? null) ||
+    (before.home_longitude ?? null) !== (after.home_longitude ?? null)
+  );
+}
+
 /** Get sum of workload_share for a group across all cleaners, excluding one cleaner by id */
 function getOthersTotal(cleaners: Cleaner[], group: string, excludeId: string | null): number {
   return cleaners.reduce((sum, c) => {
@@ -78,6 +112,10 @@ export function CleanersSettings() {
   const [enablingLogin, setEnablingLogin] = useState<string | null>(null);
   const [emailNotifEnabled, setEmailNotifEnabled] = useState<boolean>(false);
   const [emailNotifLoading, setEmailNotifLoading] = useState(false);
+  const [pendingRegen, setPendingRegen] = useState<
+    { cleanerId: string; cleanerName: string; ids: string[]; startStr: string; days: number } | null
+  >(null);
+  const [regenerating, setRegenerating] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -195,13 +233,73 @@ export function CleanersSettings() {
       color: form.color,
     };
     if (editing) {
+      const changed = schedulingFieldsChanged(editing, form);
       await (supabase.from("cleaners" as any) as any).update(payload).eq("id", editing.id);
       toast({ title: "Cleaner updated" });
-    } else {
-      await (supabase.from("cleaners" as any) as any).insert(payload);
-      toast({ title: "Cleaner added" });
+      setOpen(false);
+      fetchCleaners();
+      // If region/working-days/workload/home changed, this cleaner's already-assigned
+      // future cleans are now stale (she may be locked into cleans outside her new
+      // region). Offer to regenerate just her upcoming cleans so they redistribute.
+      if (changed) await maybeOfferRegen(editing.id, form.name, false);
+      return;
     }
+    await (supabase.from("cleaners" as any) as any).insert(payload);
+    toast({ title: "Cleaner added" });
     setOpen(false);
+    fetchCleaners();
+  };
+
+  // Look for this cleaner's future, non-completed, non-manual cleans from tomorrow
+  // onward. If any exist, stage a confirm prompt before touching the schedule.
+  const maybeOfferRegen = async (cleanerId: string, cleanerName: string, announceEmpty = true) => {
+    const startStr = addDaysStr(londonToday(), 1); // never disturb today's dispatched cleans
+    const { data } = await (supabase.from("clean_tasks" as any) as any)
+      .select("id, scheduled_date, override_assignment")
+      .eq("assigned_cleaner_id", cleanerId)
+      .gte("scheduled_date", startStr)
+      .not("status", "in", "(completed,cancelled,canceled)");
+    // Preserve manual overrides — a deliberately pinned cleaner should stay pinned.
+    const rows = (data || []).filter((r: any) => !r.override_assignment);
+    if (rows.length === 0) {
+      if (announceEmpty) toast({ title: "Nothing to regenerate", description: `${cleanerName} has no upcoming reassignable cleans.` });
+      return;
+    }
+    const maxDate = rows.reduce((m: string, r: any) => (r.scheduled_date > m ? r.scheduled_date : m), startStr);
+    setPendingRegen({
+      cleanerId,
+      cleanerName,
+      ids: rows.map((r: any) => r.id),
+      startStr,
+      days: daySpanInclusive(startStr, maxDate),
+    });
+  };
+
+  const handleConfirmRegen = async () => {
+    if (!pendingRegen) return;
+    setRegenerating(true);
+    const { ids, startStr, days, cleanerName } = pendingRegen;
+    // 1. Release this cleaner's future cleans back into the unassigned pool.
+    const { error: unErr } = await (supabase.from("clean_tasks" as any) as any)
+      .update({ assigned_cleaner_id: null, status: "unassigned" })
+      .in("id", ids);
+    if (unErr) {
+      toast({ title: "Regenerate failed", description: unErr.message, variant: "destructive" });
+      setRegenerating(false);
+      return;
+    }
+    // 2. Re-run the allocator over the affected window — cleans now fall to whoever
+    //    covers each region under the updated settings.
+    try {
+      await supabase.functions.invoke("generate-daily-cleaning-schedule", {
+        body: { date: startStr, days_ahead: days },
+      });
+      toast({ title: "Cleans regenerated", description: `${ids.length} upcoming clean${ids.length === 1 ? "" : "s"} reallocated after ${cleanerName}'s change.` });
+    } catch (e: any) {
+      toast({ title: "Released, but generator failed", description: e?.message, variant: "destructive" });
+    }
+    setRegenerating(false);
+    setPendingRegen(null);
     fetchCleaners();
   };
 
@@ -635,10 +733,51 @@ export function CleanersSettings() {
                 <UserCheck className="h-3.5 w-3.5 mr-1" /> Login enabled
               </Badge>
             )}
+            {editing && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                title="Release this cleaner's upcoming cleans and reallocate them under her current region/settings"
+                onClick={() => { const c = editing; setOpen(false); maybeOfferRegen(c.id, c.name); }}
+              >
+                <SprayCan className="h-3.5 w-3.5" /> Regenerate future cleans
+              </Button>
+            )}
             <div className="flex gap-2 ml-auto">
               <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
               <Button onClick={handleSave} disabled={!form.name.trim()}>{editing ? "Update" : "Add"}</Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Regenerate-future-cleans prompt after a scheduling-relevant change */}
+      <Dialog open={!!pendingRegen} onOpenChange={(o) => { if (!o && !regenerating) setPendingRegen(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Regenerate future cleans?</DialogTitle>
+          </DialogHeader>
+          {pendingRegen && (
+            <div className="space-y-3 text-sm">
+              <p>
+                {pendingRegen.cleanerName} has{" "}
+                <span className="font-semibold">{pendingRegen.ids.length}</span> upcoming clean
+                {pendingRegen.ids.length === 1 ? "" : "s"} already assigned from these settings.
+              </p>
+              <p className="text-muted-foreground">
+                Regenerate to reassign them under the new region/settings — cleans outside{" "}
+                {pendingRegen.cleanerName}'s regions move to whoever now covers them. Today's cleans,
+                completed cleans, and manually pinned cleans are left untouched.
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPendingRegen(null)} disabled={regenerating}>
+              Keep as-is
+            </Button>
+            <Button onClick={handleConfirmRegen} disabled={regenerating}>
+              {regenerating ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Regenerating…</> : "Regenerate cleans"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
