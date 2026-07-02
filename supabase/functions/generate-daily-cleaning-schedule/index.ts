@@ -414,6 +414,89 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     }
   }
 
+  // 3b. Reconcile the same-day-turnaround flag on cleans that ALREADY exist for
+  // this date. The SDC flag is otherwise stamped only at creation, so a booking
+  // that arrives (or cancels) AFTER the clean was generated would never update
+  // it — e.g. a late same-day arrival leaves the clean stuck on "standard".
+  // Re-derive it here from the live confirmed-arrivals picture and patch any
+  // mismatch. Only touches already-assigned cleans (unassigned ones are handled
+  // by the allocation pass below) and never P0 arrival-risk carryovers.
+  {
+    const { data: existingForSdc } = await supabase
+      .from("clean_tasks")
+      .select("id, listing_id, status, priority_level, is_same_day_turnaround, estimated_start_time, cleaning_duration_minutes")
+      .eq("scheduled_date", targetDate)
+      .not("status", "in", CANCELLED_TASK_STATUSES);
+
+    const reconcilable = (existingForSdc || []).filter(
+      (t: any) => t.priority_level !== 0 && t.status !== "unassigned",
+    );
+    const sdcListingIds = Array.from(new Set(reconcilable.map((t: any) => String(t.listing_id))));
+
+    if (sdcListingIds.length > 0) {
+      const { data: sdcArrivals } = await supabase
+        .from("reservations")
+        .select("listing_id, check_in_time")
+        .in("listing_id", sdcListingIds)
+        .eq("check_in", targetDate)
+        .eq("status", "confirmed");
+      const arrivalTimeByListing = new Map<string, string | null>();
+      for (const a of sdcArrivals || []) {
+        if (!arrivalTimeByListing.has(String(a.listing_id))) {
+          arrivalTimeByListing.set(String(a.listing_id), a.check_in_time);
+        }
+      }
+
+      for (const t of reconcilable) {
+        const lid = String(t.listing_id);
+        const shouldBeSdc = arrivalTimeByListing.has(lid);
+        if (shouldBeSdc === !!t.is_same_day_turnaround) continue; // already correct
+
+        if (shouldBeSdc) {
+          const listing = listingMap.get(lid);
+          const checkinTime = normaliseTime(
+            arrivalTimeByListing.get(lid),
+            normaliseTime(listing?.default_check_in_time, DEFAULT_CHECKIN),
+          );
+          // Flag a tight window if the already-planned finish runs past check-in.
+          let overloaded = false;
+          let warning: string | null = null;
+          if (t.estimated_start_time) {
+            const finish = addMinutesToTime(t.estimated_start_time, t.cleaning_duration_minutes || 90);
+            if (finish > checkinTime) {
+              overloaded = true;
+              warning = `Tight window — projected finish ${finish} is after guest check-in ${checkinTime}`;
+            }
+          }
+          await supabase
+            .from("clean_tasks")
+            .update({
+              priority: "same_day_turnaround",
+              priority_level: 1,
+              is_same_day_turnaround: true,
+              checkin_time: checkinTime,
+              overloaded,
+              warning_reason: warning,
+            })
+            .eq("id", t.id);
+        } else {
+          // The same-day arrival is gone (cancelled/modified) — revert to standard.
+          await supabase
+            .from("clean_tasks")
+            .update({
+              priority: "standard",
+              priority_level: 2,
+              is_same_day_turnaround: false,
+              checkin_time: null,
+              overloaded: false,
+              warning_reason: null,
+            })
+            .eq("id", t.id);
+        }
+      }
+    }
+  }
+
   // 4. Check existing tasks to avoid duplicates — dedupe by (listing_id, scheduled_date)
   // because Hostaway often returns multiple sibling reservations sharing the same checkout date
   // for the same listing (split stays, channel re-imports, modified bookings). One clean per
