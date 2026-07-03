@@ -225,8 +225,36 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     const haveToday = new Set((existingToday || []).map((r: any) => String(r.listing_id)));
     const promotedListings = new Set<string>();
 
+    // Re-occupancy guard: a prior clean is STALE if the property was re-let after
+    // that clean's source checkout (a later guest checked in and has since been
+    // turned over). Without this, an un-completed old clean gets dragged forward
+    // day after day as a phantom P0 (e.g. CHC 12: 26 Jun checkout still showing
+    // "today" weeks later). Cancel such cleans instead of promoting them.
+    const priorResIds = (priorOpen || []).map((t: any) => t.reservation_id).filter(Boolean);
+    const { data: priorResRows } = await supabase
+      .from("reservations")
+      .select("id, check_out")
+      .in("id", priorResIds.length ? priorResIds : ["00000000-0000-0000-0000-000000000000"]);
+    const checkoutByRes = new Map((priorResRows || []).map((r: any) => [String(r.id), r.check_out]));
+    const { data: reoccArrivals } = await supabase
+      .from("reservations")
+      .select("listing_id, check_in")
+      .in("listing_id", arrivalListingIds)
+      .eq("status", "confirmed")
+      .lte("check_in", targetDate);
+    const checkinsByListing: Record<string, string[]> = {};
+    for (const r of reoccArrivals || []) {
+      (checkinsByListing[String(r.listing_id)] ||= []).push(r.check_in);
+    }
+
     for (const t of priorOpen || []) {
       const lid = String(t.listing_id);
+      // Skip + retire cleans the property was already re-let (and turned over) for.
+      const srcCheckout = t.reservation_id ? checkoutByRes.get(String(t.reservation_id)) : t.scheduled_date;
+      if (srcCheckout && (checkinsByListing[lid] || []).some((ci) => ci > srcCheckout && ci <= targetDate)) {
+        await supabase.from("clean_tasks").update({ status: "cancelled" }).eq("id", t.id);
+        continue;
+      }
       if (haveToday.has(lid) || promotedListings.has(lid)) {
         // Already covered today (or sibling just promoted) — delete the
         // redundant prior task so no duplicate active cleans remain.
