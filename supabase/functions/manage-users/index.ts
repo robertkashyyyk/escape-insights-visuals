@@ -6,7 +6,14 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-type Action = "list" | "update_role" | "delete" | "reset_password";
+type Action =
+  | "list"
+  | "create"
+  | "update_role"
+  | "delete"
+  | "reset_password"
+  | "invite_email"
+  | "resend_invite";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -101,6 +108,90 @@ Deno.serve(async (req) => {
       return json({ success: true });
     }
 
+    if (action === "create") {
+      const { email, name, role, linkTable, linkId, credential_mode, password } = body;
+      if (!email || !role) return json({ error: "email and role are required" }, 400);
+      const valid = ["super", "senior", "admin", "client", "cleaner"];
+      if (!valid.includes(role)) return json({ error: "Invalid role" }, 400);
+      const validLinkTables = ["cleaners", "property_owners"];
+      if (linkTable && !validLinkTables.includes(linkTable)) {
+        return json({ error: "Invalid linkTable" }, 400);
+      }
+      const mode = credential_mode === "temp_password" ? "temp_password" : "invite";
+      if (mode === "temp_password" && (typeof password !== "string" || password.length < 8)) {
+        return json({ error: "A temporary password of at least 8 characters is required" }, 400);
+      }
+
+      // Idempotent: adopt an existing account for this email instead of erroring.
+      // This is what prevents half-finished-account orphans (create succeeds, a
+      // later step fails, retry hits "already registered").
+      let userId: string | undefined;
+      let adopted = false;
+      const existing = await findUserByEmail(admin, String(email));
+      if (existing) {
+        userId = existing.id;
+        adopted = true;
+        if (mode === "temp_password") {
+          const { error } = await admin.auth.admin.updateUserById(userId, {
+            password,
+            email_confirm: true,
+          });
+          if (error) return json({ error: `Set password failed: ${error.message}` }, 500);
+        }
+      } else if (mode === "temp_password") {
+        const { data, error } = await admin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { role, name },
+        });
+        if (error) return json({ error: `Create failed: ${error.message}` }, 400);
+        userId = data.user?.id;
+      } else {
+        const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
+          data: { role, name },
+        });
+        if (error) return json({ error: `Invite failed: ${error.message}` }, 400);
+        userId = data.user?.id;
+      }
+      if (!userId) return json({ error: "Could not resolve the user id" }, 500);
+
+      // Assign role (single-role model: clear then set). Errors are surfaced.
+      await admin.from("user_roles").delete().eq("user_id", userId);
+      const { error: roleErr } = await admin.from("user_roles").insert({ user_id: userId, role });
+      if (roleErr) return json({ error: `Role assignment failed: ${roleErr.message}` }, 500);
+
+      // Link the domain record (cleaner / owner). Errors are surfaced.
+      if (linkTable && linkId) {
+        const { error: linkErr } = await admin.from(linkTable).update({ user_id: userId }).eq("id", linkId);
+        if (linkErr) return json({ error: `Linking ${linkTable} failed: ${linkErr.message}` }, 500);
+      }
+
+      if (name) {
+        await admin.from("profiles").upsert({ id: userId, display_name: name }, { onConflict: "id" });
+      }
+
+      return json({ success: true, user_id: userId, adopted, mode });
+    }
+
+    if (action === "invite_email" || action === "resend_invite") {
+      let { email } = body;
+      const { user_id } = body;
+      if (!email && user_id) {
+        const { data } = await admin.auth.admin.getUserById(user_id);
+        email = data?.user?.email ?? undefined;
+      }
+      if (!email) return json({ error: "email or user_id required" }, 400);
+      const { error } = await admin.auth.admin.inviteUserByEmail(email);
+      if (error) {
+        return json(
+          { error: `Could not send invite: ${error.message}. If the account already exists, use a temporary password instead.` },
+          400,
+        );
+      }
+      return json({ success: true });
+    }
+
     if (action === "reset_password") {
       const { user_id, password } = body;
       if (!user_id || !password) return json({ error: "user_id and password required" }, 400);
@@ -133,6 +224,22 @@ Deno.serve(async (req) => {
     return json({ error: (err as Error).message }, 500);
   }
 });
+
+// Find an existing auth user by email (case-insensitive). GoTrue admin has no
+// server-side email filter in this version, so paginate. Admin action, infrequent.
+async function findUserByEmail(admin: any, email: string): Promise<any | null> {
+  const target = email.toLowerCase();
+  let page = 1;
+  const perPage = 1000;
+  while (true) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) throw new Error(error.message);
+    const hit = data.users.find((u: any) => (u.email ?? "").toLowerCase() === target);
+    if (hit) return hit;
+    if (data.users.length < perPage) return null;
+    page++;
+  }
+}
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
