@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag, Sunrise, Play, X } from "lucide-react";
+import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag, Sunrise, Play, X, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, addDays, startOfWeek, endOfWeek, parseISO } from "date-fns";
@@ -382,6 +382,31 @@ export default function CleanerPortal() {
       toast.error("Failed to start job. Please try again.");
     } else {
       toast.success(`Started — ${task.property_name}`);
+    }
+    setStartingId(null);
+  };
+
+  // Undo an accidental "Start Job" — revert an in-progress clean back to not-started.
+  const handleUndoStart = async (task: CleanTask) => {
+    if (isPreviewMode) {
+      toast.info("Preview mode — actions are disabled");
+      return;
+    }
+    const prevStartedAt = task.started_at;
+    setStartingId(task.id);
+    setTasks((prev) =>
+      prev.map((t) => (t.id === task.id ? { ...t, status: "scheduled", started_at: null } : t))
+    );
+    const { error } = await (supabase.from("clean_tasks") as any)
+      .update({ status: "scheduled", started_at: null })
+      .eq("id", task.id);
+    if (error) {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? { ...t, status: "in_progress", started_at: prevStartedAt } : t))
+      );
+      toast.error("Couldn't undo — please try again.");
+    } else {
+      toast.success("Set back to not started");
     }
     setStartingId(null);
   };
@@ -888,6 +913,23 @@ export default function CleanerPortal() {
                                       </motion.div>
                                     )}
                                   </div>
+                                )}
+
+                                {isInProgress && !isConfirming && (
+                                  <button
+                                    onClick={() => handleUndoStart(task)}
+                                    disabled={startingId === task.id || isPreviewMode}
+                                    className="w-full mt-2 min-h-[40px] rounded-lg text-xs font-medium text-muted-foreground flex items-center justify-center gap-1.5 hover:text-foreground transition-colors disabled:opacity-50"
+                                  >
+                                    {startingId === task.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <>
+                                        <Undo2 className="h-3.5 w-3.5" />
+                                        Started by mistake? Undo
+                                      </>
+                                    )}
+                                  </button>
                                 )}
 
                                 <button
