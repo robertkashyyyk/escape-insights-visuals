@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { CheckCircle2, Clock, Trash2, Save, Undo2 } from "lucide-react";
+import { CheckCircle2, Clock, Trash2, Save, Undo2, X, Loader2, Check } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { getCleanerColor } from "@/lib/cleanerColors";
 import type { MatrixCleaner, MatrixListing, MatrixReservation, MatrixTask, CleanerHolidayRow } from "@/hooks/useMatrixSchedule";
@@ -49,9 +49,15 @@ export function TaskDetailPanel({
   const [pendingUnavailReason, setPendingUnavailReason] = useState<string | null>(null);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+  const [confirmComplete, setConfirmComplete] = useState(false);
+
+  const flashSaved = () => { setSavedFlash(true); setTimeout(() => setSavedFlash(false), 2000); };
 
   useEffect(() => {
     setNotes(task?.notes ?? "");
+    setConfirmComplete(false);
+    setSavedFlash(false);
   }, [task?.id, task?.notes]);
 
   if (!task || !listing) return null;
@@ -102,6 +108,7 @@ export function TaskDetailPanel({
     setBusy(true);
     await onReassign(task.id, val === "unassigned" ? null : val);
     setBusy(false);
+    flashSaved();
   };
 
   const confirmReassign = async () => {
@@ -111,6 +118,7 @@ export function TaskDetailPanel({
     setBusy(false);
     setPendingCleanerId(null);
     setPendingUnavailReason(null);
+    flashSaved();
   };
 
   const handleComplete = async () => {
@@ -148,7 +156,38 @@ export function TaskDetailPanel({
           <SheetHeader className="space-y-3">
             <div className="flex items-start justify-between gap-3">
               <SheetTitle className="text-xl font-display text-foreground">{listing.name}</SheetTitle>
-              <Badge variant="outline" className={statusBadge.className}>{statusBadge.label}</Badge>
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                <Badge variant="outline" className={statusBadge.className}>{statusBadge.label}</Badge>
+                {task.status !== "completed" ? (
+                  !confirmComplete ? (
+                    <Button
+                      size="sm" variant="ghost" onClick={() => setConfirmComplete(true)} disabled={busy}
+                      className="h-6 px-2 text-[11px] text-muted-foreground hover:text-emerald-400"
+                    >
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> Mark complete
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm" onClick={handleComplete} disabled={busy}
+                        className="h-6 px-2 text-[11px] bg-emerald-600 hover:bg-emerald-600/90 text-white"
+                      >
+                        {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <><Check className="h-3 w-3 mr-1" /> Confirm</>}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setConfirmComplete(false)} disabled={busy} className="h-6 px-1.5">
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )
+                ) : (
+                  <Button
+                    size="sm" variant="ghost" onClick={handleUndoComplete} disabled={busy}
+                    className="h-6 px-2 text-[11px] text-muted-foreground"
+                  >
+                    <Undo2 className="h-3 w-3 mr-1" /> Undo complete
+                  </Button>
+                )}
+              </div>
             </div>
             <p className="text-sm text-muted-foreground">
               {format(parseISO(task.scheduled_date), "EEEE d MMMM yyyy")}
@@ -203,7 +242,14 @@ export function TaskDetailPanel({
 
             {/* Reassignment */}
             <div>
-              <Label className="text-xs">Assigned cleaner</Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Assigned cleaner</Label>
+                {savedFlash && (
+                  <span className="text-[11px] text-emerald-400 flex items-center gap-1">
+                    <Check className="h-3 w-3" /> Saved
+                  </span>
+                )}
+              </div>
               <div className="mt-1 flex items-center gap-2">
                 <span
                   className="h-3 w-3 rounded-full shrink-0"
@@ -248,17 +294,9 @@ export function TaskDetailPanel({
               </Button>
             </div>
 
-            {/* Actions */}
+            {/* Actions — completion lives up in the header (small, deliberate) so it
+                can't be hit by accident when reassigning. This is just removal. */}
             <div className="flex flex-col gap-2 pt-2 border-t border-border/30">
-              {task.status !== "completed" ? (
-                <Button onClick={handleComplete} disabled={busy} className="w-full">
-                  <CheckCircle2 className="h-4 w-4 mr-1.5" /> Mark complete
-                </Button>
-              ) : (
-                <Button onClick={handleUndoComplete} disabled={busy} variant="secondary" className="w-full">
-                  <Undo2 className="h-4 w-4 mr-1.5" /> Undo complete
-                </Button>
-              )}
               <Button
                 variant="outline"
                 onClick={() => setShowRemoveConfirm(true)}

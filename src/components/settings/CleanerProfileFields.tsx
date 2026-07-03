@@ -13,7 +13,6 @@ export interface CleanerProfileValue {
   workload_share: Record<string, number>;
   non_working_days: string[];
   daily_working_hours: number;
-  rate_per_clean: number;
   home_postcode: string | null;
   home_latitude: number | null;
   home_longitude: number | null;
@@ -94,17 +93,10 @@ export function CleanerProfileFields({ value, onChange }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Daily hours</Label>
-          <Input type="number" min={1} max={16} value={value.daily_working_hours}
-            onChange={(e) => onChange({ daily_working_hours: Number(e.target.value) })} className="bg-secondary/50 border-border/40" />
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Rate per clean (£)</Label>
-          <Input type="number" min={0} value={value.rate_per_clean}
-            onChange={(e) => onChange({ rate_per_clean: Number(e.target.value) })} className="bg-secondary/50 border-border/40" />
-        </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">Daily hours</Label>
+        <Input type="number" min={1} max={16} value={value.daily_working_hours}
+          onChange={(e) => onChange({ daily_working_hours: Number(e.target.value) })} className="bg-secondary/50 border-border/40" />
       </div>
 
       <div className="space-y-1.5">

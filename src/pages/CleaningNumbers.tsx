@@ -16,7 +16,6 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 interface CleanerInfo {
   id: string;
   name: string;
-  rate_per_clean: number;
   active: boolean;
   location_groups: string[];
   workload_share: Record<string, number>;
@@ -29,6 +28,7 @@ interface UnifiedTask {
   scheduled_date: string;
   status: string;
   cleaning_duration_minutes: number;
+  listing_id: string | null;
   source: "db" | "reservation";
 }
 
@@ -60,7 +60,7 @@ export default function CleaningNumbers() {
     queryFn: async () => {
       const { data } = await supabase.from("cleaners" as any).select("*").eq("active", true).order("name");
       return ((data || []) as any[]).map((c: any): CleanerInfo => ({
-        id: c.id, name: c.name, rate_per_clean: c.rate_per_clean ?? 0, active: c.active,
+        id: c.id, name: c.name, active: c.active,
         location_groups: c.location_groups || [], workload_share: c.workload_share || {},
         non_working_days: c.non_working_days || [],
       }));
@@ -70,13 +70,13 @@ export default function CleaningNumbers() {
   const { data: listings = [] } = useQuery({
     queryKey: ["listings-numbers"],
     queryFn: async () => {
-      const { data } = await supabase.from("listings").select("id, location_group, cleaning_duration_minutes").eq("status", "active");
-      return (data || []) as { id: string; location_group: string | null; cleaning_duration_minutes: number | null }[];
+      const { data } = await supabase.from("listings").select("id, location_group, cleaning_duration_minutes, cleaning_fee").eq("status", "active");
+      return (data || []) as { id: string; location_group: string | null; cleaning_duration_minutes: number | null; cleaning_fee: number | null }[];
     },
   });
 
   const listingMap = useMemo(() => {
-    const m = new Map<string, { location_group: string | null; cleaning_duration_minutes: number | null }>();
+    const m = new Map<string, { location_group: string | null; cleaning_duration_minutes: number | null; cleaning_fee: number | null }>();
     listings.forEach(l => m.set(l.id, l));
     return m;
   }, [listings]);
@@ -87,7 +87,7 @@ export default function CleaningNumbers() {
     queryFn: async () => {
       const { data } = await supabase
         .from("clean_tasks" as any)
-        .select("id, assigned_cleaner_id, scheduled_date, status, cleaning_duration_minutes")
+        .select("id, assigned_cleaner_id, scheduled_date, status, cleaning_duration_minutes, listing_id")
         .gte("scheduled_date", rangeStartStr)
         .lte("scheduled_date", rangeEndStr);
       return (data || []) as any[];
@@ -150,6 +150,7 @@ export default function CleaningNumbers() {
       scheduled_date: t.scheduled_date,
       status: t.status,
       cleaning_duration_minutes: t.cleaning_duration_minutes ?? 90,
+      listing_id: t.listing_id ?? null,
       source: "db" as const,
     }));
 
@@ -202,6 +203,7 @@ export default function CleaningNumbers() {
           scheduled_date: r.check_out,
           status: "scheduled",
           cleaning_duration_minutes: listing?.cleaning_duration_minutes ?? 90,
+          listing_id: r.listing_id,
           source: "reservation",
         });
       });
@@ -232,29 +234,25 @@ export default function CleaningNumbers() {
   const completedCleans = tasks.filter((t: any) => t.status === "completed" || t.status === "complete").length;
   const pendingCleans = totalCleans - completedCleans;
 
-  const totalCost = useMemo(() => {
-    let cost = 0;
-    tasks.forEach((t: any) => {
-      const cleaner = cleaners.find(c => c.id === t.assigned_cleaner_id);
-      cost += cleaner?.rate_per_clean ?? 0;
-    });
-    return cost;
-  }, [tasks, cleaners]);
+  // Every clean is priced by its PROPERTY (listings.cleaning_fee), not the cleaner.
+  const cleanCost = (t: UnifiedTask) => Number(listingMap.get(t.listing_id ?? "")?.cleaning_fee ?? 0);
+  const totalCost = useMemo(() => tasks.reduce((s, t) => s + cleanCost(t), 0), [tasks, listingMap]);
 
   const avgPerDay = period === "week" ? (totalCleans / 7) : (totalCleans / (rangeEnd.getDate()));
 
   // Busiest cleaner
   const cleanerCounts = useMemo(() => {
-    const counts: Record<string, { completed: number; pending: number }> = {};
-    tasks.forEach((t: any) => {
+    const counts: Record<string, { completed: number; pending: number; completedCost: number; pendingCost: number }> = {};
+    tasks.forEach((t) => {
       const cid = t.assigned_cleaner_id;
       if (!cid) return;
-      if (!counts[cid]) counts[cid] = { completed: 0, pending: 0 };
-      if (t.status === "completed" || t.status === "complete") counts[cid].completed++;
-      else counts[cid].pending++;
+      if (!counts[cid]) counts[cid] = { completed: 0, pending: 0, completedCost: 0, pendingCost: 0 };
+      const cost = cleanCost(t);
+      if (t.status === "completed" || t.status === "complete") { counts[cid].completed++; counts[cid].completedCost += cost; }
+      else { counts[cid].pending++; counts[cid].pendingCost += cost; }
     });
     return counts;
-  }, [tasks]);
+  }, [tasks, listingMap]);
 
   const busiestCleaner = useMemo(() => {
     let best = { name: "—", count: 0 };
@@ -322,9 +320,9 @@ export default function CleaningNumbers() {
   // Cleaner breakdown
   const cleanerBreakdown = useMemo(() => {
     return cleaners.map(c => {
-      const counts = cleanerCounts[c.id] ?? { completed: 0, pending: 0 };
-      const actualCost = counts.completed * c.rate_per_clean;
-      const estimateCost = counts.pending * c.rate_per_clean;
+      const counts = cleanerCounts[c.id] ?? { completed: 0, pending: 0, completedCost: 0, pendingCost: 0 };
+      const actualCost = counts.completedCost;
+      const estimateCost = counts.pendingCost;
       const totalCleaner = actualCost + estimateCost;
       return {
         ...c,
@@ -345,7 +343,7 @@ export default function CleaningNumbers() {
       name: c.name,
       confirmed: c.completed,
       unconfirmed: c.pending,
-      cost: c.completed * c.rate_per_clean,
+      cost: c.actualCost,
       ready: c.pending === 0,
     }));
   }, [cleanerBreakdown, isPast, isCurrent]);
@@ -461,7 +459,7 @@ export default function CleaningNumbers() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="font-display font-semibold text-foreground text-sm">{c.name}</h4>
-                      <p className="text-[11px] text-muted-foreground">£{c.rate_per_clean}/clean</p>
+                      <p className="text-[11px] text-muted-foreground">{c.total} clean{c.total !== 1 ? "s" : ""} · priced per property</p>
                     </div>
                     {isPast ? (
                       <Badge className="bg-success/20 text-success border-success/30 text-[10px]">Actual</Badge>
