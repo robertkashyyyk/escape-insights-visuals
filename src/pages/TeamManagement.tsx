@@ -33,7 +33,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { AddPersonWizard } from "@/components/settings/AddPersonWizard";
-import { Loader2, Trash2, Users, Search, RefreshCw, ShieldCheck, KeyRound } from "lucide-react";
+import { ManagePersonSheet } from "@/components/settings/ManagePersonSheet";
+import { Loader2, Trash2, Users, Search, RefreshCw, ShieldCheck, KeyRound, SlidersHorizontal } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -79,6 +80,7 @@ export default function TeamManagement() {
   const [resetTarget, setResetTarget] = useState<ManagedUser | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [resetting, setResetting] = useState(false);
+  const [manageTarget, setManageTarget] = useState<ManagedUser | null>(null);
 
   const handleResetPassword = async () => {
     if (!resetTarget) return;
@@ -318,32 +320,15 @@ export default function TeamManagement() {
                                   : "Never"}
                               </TableCell>
                               <TableCell>
-                                <div className="flex items-center gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-primary"
-                                    disabled={updatingId === u.id}
-                                    onClick={() => { setResetTarget(u); setNewPassword(""); }}
-                                    title="Reset password"
-                                  >
-                                    <KeyRound className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                    disabled={isSelf || updatingId === u.id}
-                                    onClick={() => setDeleteTarget(u)}
-                                    title="Delete user"
-                                  >
-                                    {updatingId === u.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Trash2 className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1.5"
+                                  onClick={() => setManageTarget(u)}
+                                  title="Manage this user"
+                                >
+                                  <SlidersHorizontal className="h-3.5 w-3.5" /> Manage
+                                </Button>
                               </TableCell>
                             </TableRow>
                           );
@@ -428,6 +413,13 @@ export default function TeamManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ManagePersonSheet
+        user={manageTarget}
+        isSelf={manageTarget?.id === user?.id}
+        onClose={() => setManageTarget(null)}
+        onChanged={load}
+      />
     </AppLayout>
   );
 }

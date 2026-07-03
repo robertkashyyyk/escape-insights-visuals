@@ -9,7 +9,6 @@ import { IntegrationsSettings } from "@/components/settings/IntegrationsSettings
 import { CleanersSettings } from "@/components/settings/CleanersSettings";
 import { FinanceSettings } from "@/components/settings/FinanceSettings";
 import { AccountSettings } from "@/components/settings/AccountSettings";
-import { InviteUserForm } from "@/components/settings/InviteUserForm";
 import CleanReset from "@/pages/CleanReset";
 import { useAuth } from "@/contexts/AuthContext";
 import { Settings, Plug, SprayCan, PoundSterling, User, RotateCcw, Gift } from "lucide-react";
@@ -73,9 +72,6 @@ export default function SettingsPage() {
           <TabsContent value="account">
             <div className="space-y-6">
               <AccountSettings />
-              <div className="max-w-xl">
-                <InviteUserForm />
-              </div>
             </div>
           </TabsContent>
           {canCleanReset && (

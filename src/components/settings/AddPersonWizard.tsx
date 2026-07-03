@@ -13,11 +13,10 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useLocationGroups } from "@/hooks/useLocationGroups";
-import { UserPlus, Loader2, MapPin, Copy, KeyRound, Mail, ArrowRight, ArrowLeft, Check } from "lucide-react";
+import { CleanerProfileFields } from "@/components/settings/CleanerProfileFields";
+import { UserPlus, Loader2, Copy, KeyRound, Mail, ArrowRight, ArrowLeft } from "lucide-react";
 
 type Role = "super" | "senior" | "admin" | "client" | "cleaner";
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const ROLE_OPTIONS: { value: Role; label: string; needsSetup?: "cleaner" | "owner" }[] = [
   { value: "super", label: "Super — full access" },
@@ -37,8 +36,6 @@ interface Props {
 
 export function AddPersonWizard({ onDone }: Props) {
   const { toast } = useToast();
-  const { data: locationGroupsData = [] } = useLocationGroups();
-  const LOCATION_GROUPS = locationGroupsData.map((g: any) => g.name);
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
@@ -58,8 +55,6 @@ export function AddPersonWizard({ onDone }: Props) {
   const [homePostcode, setHomePostcode] = useState("");
   const [homeLat, setHomeLat] = useState<number | null>(null);
   const [homeLng, setHomeLng] = useState<number | null>(null);
-  const [geocoding, setGeocoding] = useState(false);
-  const [geocodeResult, setGeocodeResult] = useState<string | null>(null);
 
   // Step 2 — owner
   const [company, setCompany] = useState("");
@@ -100,27 +95,6 @@ export function AddPersonWizard({ onDone }: Props) {
 
   const toggle = (arr: string[], v: string, set: (x: string[]) => void) =>
     set(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
-
-  const geocode = async () => {
-    if (!homePostcode.trim()) return;
-    setGeocoding(true); setGeocodeResult(null);
-    try {
-      const res = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(homePostcode.trim())}`);
-      const data = await res.json();
-      if (data.status === 200 && data.result) {
-        setHomeLat(data.result.latitude);
-        setHomeLng(data.result.longitude);
-        const parts = [data.result.admin_district, data.result.admin_county].filter(Boolean);
-        setGeocodeResult(`📍 ${parts.join(", ") || "Location found"}`);
-      } else {
-        setGeocodeResult("❌ Postcode not found");
-      }
-    } catch {
-      setGeocodeResult("❌ Geocoding failed");
-    } finally {
-      setGeocoding(false);
-    }
-  };
 
   const step1Valid = name.trim() && email.trim() && role;
   const goFromStep1 = () => setStep(needsSetup ? 2 : 3);
@@ -249,61 +223,28 @@ export function AddPersonWizard({ onDone }: Props) {
           )}
 
           {step === 2 && needsSetup === "cleaner" && (
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Regions (location groups)</Label>
-                <div className="flex flex-wrap gap-1.5">
-                  {LOCATION_GROUPS.map((g) => (
-                    <Badge key={g} variant={locationGroups.includes(g) ? "default" : "outline"}
-                      className="cursor-pointer" onClick={() => toggle(locationGroups, g, setLocationGroups)}>
-                      {locationGroups.includes(g) && <Check className="h-3 w-3 mr-1" />}{g}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              {locationGroups.length > 0 && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Workload share (%) per region</Label>
-                  {locationGroups.map((g) => (
-                    <div key={g} className="flex items-center gap-2">
-                      <span className="text-sm w-40 truncate">{g}</span>
-                      <Input type="number" min={0} max={100} value={workloadShare[g] ?? ""} placeholder="0"
-                        onChange={(e) => setWorkloadShare({ ...workloadShare, [g]: Number(e.target.value) })}
-                        className="bg-secondary/50 border-border/40 h-8 w-24" />
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Non-working days</Label>
-                <div className="flex flex-wrap gap-1.5">
-                  {DAYS.map((d) => (
-                    <Badge key={d} variant={nonWorkingDays.includes(d) ? "default" : "outline"}
-                      className="cursor-pointer" onClick={() => toggle(nonWorkingDays, d, setNonWorkingDays)}>{d}</Badge>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Daily hours</Label>
-                  <Input type="number" min={1} max={16} value={dailyHours} onChange={(e) => setDailyHours(Number(e.target.value))} className="bg-secondary/50 border-border/40" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Rate per clean (£)</Label>
-                  <Input type="number" min={0} value={ratePerClean} onChange={(e) => setRatePerClean(Number(e.target.value))} className="bg-secondary/50 border-border/40" />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Home postcode (for routing)</Label>
-                <div className="flex gap-2">
-                  <Input value={homePostcode} onChange={(e) => setHomePostcode(e.target.value)} placeholder="BT74 4AA" className="bg-secondary/50 border-border/40" />
-                  <Button type="button" variant="outline" onClick={geocode} disabled={geocoding || !homePostcode.trim()}>
-                    {geocoding ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
-                  </Button>
-                </div>
-                {geocodeResult && <p className="text-[11px] text-muted-foreground">{geocodeResult}</p>}
-              </div>
-            </div>
+            <CleanerProfileFields
+              value={{
+                location_groups: locationGroups,
+                workload_share: workloadShare,
+                non_working_days: nonWorkingDays,
+                daily_working_hours: dailyHours,
+                rate_per_clean: ratePerClean,
+                home_postcode: homePostcode,
+                home_latitude: homeLat,
+                home_longitude: homeLng,
+              }}
+              onChange={(patch) => {
+                if (patch.location_groups !== undefined) setLocationGroups(patch.location_groups);
+                if (patch.workload_share !== undefined) setWorkloadShare(patch.workload_share);
+                if (patch.non_working_days !== undefined) setNonWorkingDays(patch.non_working_days);
+                if (patch.daily_working_hours !== undefined) setDailyHours(patch.daily_working_hours);
+                if (patch.rate_per_clean !== undefined) setRatePerClean(patch.rate_per_clean);
+                if (patch.home_postcode !== undefined) setHomePostcode(patch.home_postcode ?? "");
+                if (patch.home_latitude !== undefined) setHomeLat(patch.home_latitude);
+                if (patch.home_longitude !== undefined) setHomeLng(patch.home_longitude);
+              }}
+            />
           )}
 
           {step === 2 && needsSetup === "owner" && (
