@@ -26,7 +26,6 @@ interface Cleaner {
   workload_share: Record<string, number>;
   non_working_days: string[];
   daily_working_hours: number | null;
-  rate_per_clean: number | null;
   active: boolean;
   notify_email: boolean;
   notify_whatsapp: boolean;
@@ -42,7 +41,7 @@ type CleanerForm = Omit<Cleaner, "id" | "region" | "user_id">;
 const empty: CleanerForm = {
   name: "", phone: "", email: "",
   location_groups: [], workload_share: {},
-  non_working_days: [], daily_working_hours: 8, rate_per_clean: 0, active: true,
+  non_working_days: [], daily_working_hours: 8, active: true,
   notify_email: false, notify_whatsapp: false,
   home_postcode: "", home_latitude: null, home_longitude: null,
   color: null,
@@ -166,7 +165,7 @@ export function CleanersSettings() {
       workload_share: c.workload_share || {},
       non_working_days: c.non_working_days || [],
       daily_working_hours: c.daily_working_hours,
-      rate_per_clean: c.rate_per_clean, active: c.active,
+      active: c.active,
       notify_email: c.notify_email ?? false,
       notify_whatsapp: c.notify_whatsapp ?? false,
       home_postcode: c.home_postcode || "",
@@ -223,7 +222,7 @@ export function CleanersSettings() {
       workload_share: form.workload_share,
       non_working_days: form.non_working_days,
       daily_working_hours: form.daily_working_hours,
-      rate_per_clean: form.rate_per_clean, active: form.active,
+      active: form.active,
       notify_email: form.notify_email,
       notify_whatsapp: form.notify_whatsapp,
       region: form.location_groups[0] || "Other",
@@ -449,7 +448,7 @@ export function CleanersSettings() {
                 <div className="text-xs text-muted-foreground space-y-0.5">
                   {c.phone && <p>📞 {c.phone}</p>}
                   {c.email && <p>✉️ {c.email}</p>}
-                  <p>{c.daily_working_hours ?? 8}h/day · £{c.rate_per_clean}/clean</p>
+                  <p>{c.daily_working_hours ?? 8}h/day</p>
                   {c.home_postcode && <p>🏠 {c.home_postcode}</p>}
                   {c.location_groups?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1">
@@ -512,15 +511,9 @@ export function CleanersSettings() {
                 </p>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">Daily Working Hours</Label>
-                <Input type="number" min={1} max={16} step={0.5} value={form.daily_working_hours ?? 8} onChange={e => setForm({ ...form, daily_working_hours: parseFloat(e.target.value) || 8 })} className="bg-secondary/50 border-border/40" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Rate per Clean (£)</Label>
-                <Input type="number" min={0} value={form.rate_per_clean ?? 0} onChange={e => setForm({ ...form, rate_per_clean: parseFloat(e.target.value) || 0 })} className="bg-secondary/50 border-border/40" />
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Daily Working Hours</Label>
+              <Input type="number" min={1} max={16} step={0.5} value={form.daily_working_hours ?? 8} onChange={e => setForm({ ...form, daily_working_hours: parseFloat(e.target.value) || 8 })} className="bg-secondary/50 border-border/40" />
             </div>
 
             {/* Schedule colour swatch picker */}

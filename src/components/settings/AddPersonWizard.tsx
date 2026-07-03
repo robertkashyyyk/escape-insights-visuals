@@ -51,7 +51,6 @@ export function AddPersonWizard({ onDone }: Props) {
   const [workloadShare, setWorkloadShare] = useState<Record<string, number>>({});
   const [nonWorkingDays, setNonWorkingDays] = useState<string[]>([]);
   const [dailyHours, setDailyHours] = useState(8);
-  const [ratePerClean, setRatePerClean] = useState(0);
   const [homePostcode, setHomePostcode] = useState("");
   const [homeLat, setHomeLat] = useState<number | null>(null);
   const [homeLng, setHomeLng] = useState<number | null>(null);
@@ -85,7 +84,7 @@ export function AddPersonWizard({ onDone }: Props) {
   const reset = () => {
     setStep(1); setName(""); setEmail(""); setRole("");
     setLocationGroups([]); setWorkloadShare({}); setNonWorkingDays([]); setDailyHours(8);
-    setRatePerClean(0); setHomePostcode(""); setHomeLat(null); setHomeLng(null); setGeocodeResult(null);
+    setHomePostcode(""); setHomeLat(null); setHomeLng(null);
     setCompany(""); setPhone(""); setMgmtRate(null); setVatInclusive(false); setOwnerNotes("");
     setAssignedListingIds([]);
     setCredentialMode("invite"); setTempPassword(genPassword());
@@ -113,7 +112,6 @@ export function AddPersonWizard({ onDone }: Props) {
           workload_share: workloadShare,
           non_working_days: nonWorkingDays,
           daily_working_hours: dailyHours,
-          rate_per_clean: ratePerClean,
           active: true,
           notify_email: false, notify_whatsapp: false,
           region: locationGroups[0] || "Other",
@@ -229,7 +227,6 @@ export function AddPersonWizard({ onDone }: Props) {
                 workload_share: workloadShare,
                 non_working_days: nonWorkingDays,
                 daily_working_hours: dailyHours,
-                rate_per_clean: ratePerClean,
                 home_postcode: homePostcode,
                 home_latitude: homeLat,
                 home_longitude: homeLng,
@@ -239,7 +236,6 @@ export function AddPersonWizard({ onDone }: Props) {
                 if (patch.workload_share !== undefined) setWorkloadShare(patch.workload_share);
                 if (patch.non_working_days !== undefined) setNonWorkingDays(patch.non_working_days);
                 if (patch.daily_working_hours !== undefined) setDailyHours(patch.daily_working_hours);
-                if (patch.rate_per_clean !== undefined) setRatePerClean(patch.rate_per_clean);
                 if (patch.home_postcode !== undefined) setHomePostcode(patch.home_postcode ?? "");
                 if (patch.home_latitude !== undefined) setHomeLat(patch.home_latitude);
                 if (patch.home_longitude !== undefined) setHomeLng(patch.home_longitude);

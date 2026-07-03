@@ -58,7 +58,6 @@ interface Cleaner {
   workload_share: Record<string, number>;
   non_working_days: string[];
   daily_working_hours: number;
-  rate_per_clean: number;
   active: boolean;
   home_latitude: number | null;
   home_longitude: number | null;
@@ -69,6 +68,7 @@ interface Listing {
   name: string;
   location_group: string | null;
   cleaning_duration_minutes: number | null;
+  cleaning_fee: number | null;
   latitude: number | null;
   longitude: number | null;
   default_check_in_time: string | null;
@@ -147,7 +147,6 @@ export function useCleaningSchedule() {
         workload_share: c.workload_share || {},
         non_working_days: c.non_working_days || [],
         daily_working_hours: c.daily_working_hours ?? 8,
-        rate_per_clean: c.rate_per_clean ?? 0,
         active: c.active,
         home_latitude: c.home_latitude ?? null,
         home_longitude: c.home_longitude ?? null,
@@ -160,7 +159,7 @@ export function useCleaningSchedule() {
     queryFn: async () => {
       const { data } = await supabase
         .from("listings")
-        .select("id, name, location_group, cleaning_duration_minutes, latitude, longitude, default_check_in_time, default_check_out_time")
+        .select("id, name, location_group, cleaning_duration_minutes, cleaning_fee, latitude, longitude, default_check_in_time, default_check_out_time")
         .eq("status", "active");
       return (data || []) as Listing[];
     },
@@ -501,14 +500,13 @@ export function useCleaningSchedule() {
   }, [selectedDate, viewMode, buildDaySchedule]);
 
   const monthlyInvoice = useMemo(() => {
-    return cleaners.map(c => ({
-      id: c.id,
-      name: c.name,
-      cleans: daySchedule.cleanerDays.find(cd => cd.id === c.id)?.tasks.length ?? 0,
-      rate: c.rate_per_clean,
-      total: (daySchedule.cleanerDays.find(cd => cd.id === c.id)?.tasks.length ?? 0) * c.rate_per_clean,
-    })).filter(c => c.cleans > 0);
-  }, [cleaners, daySchedule]);
+    // Priced per PROPERTY (listings.cleaning_fee), not a per-cleaner rate.
+    return cleaners.map(c => {
+      const tasks = daySchedule.cleanerDays.find(cd => cd.id === c.id)?.tasks ?? [];
+      const total = tasks.reduce((s, t) => s + Number(listingMap.get(t.listingId)?.cleaning_fee ?? 0), 0);
+      return { id: c.id, name: c.name, cleans: tasks.length, total };
+    }).filter(c => c.cleans > 0);
+  }, [cleaners, daySchedule, listingMap]);
 
   const filteredCleanerDays = useMemo(() => {
     let days = daySchedule.cleanerDays;
