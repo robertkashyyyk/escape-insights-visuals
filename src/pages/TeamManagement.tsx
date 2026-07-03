@@ -32,7 +32,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { InviteUserForm } from "@/components/settings/InviteUserForm";
+import { AddPersonWizard } from "@/components/settings/AddPersonWizard";
 import { Loader2, Trash2, Users, Search, RefreshCw, ShieldCheck, KeyRound } from "lucide-react";
 import {
   Dialog,
@@ -370,7 +370,7 @@ export default function TeamManagement() {
           </div>
 
           <div>
-            <InviteUserForm onInvited={load} />
+            <AddPersonWizard onDone={load} />
           </div>
         </div>
       </div>
