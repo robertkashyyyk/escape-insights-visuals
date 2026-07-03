@@ -48,6 +48,7 @@ const emptyForm = {
   is_bundle: false,
   cleaning_fee: "",
   deep_fee: "",
+  cleaning_duration_minutes: "",
   is_communal: false,
   communal_group_id: "",
   communal_ratio_pct: "",
@@ -107,6 +108,7 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
         is_bundle: (listing as any).is_bundle ?? false,
         cleaning_fee: (listing as any).cleaning_fee?.toString() ?? "",
         deep_fee: (listing as any).deep_fee?.toString() ?? "",
+        cleaning_duration_minutes: (listing as any).cleaning_duration_minutes?.toString() ?? "",
         is_communal: (listing as any).is_communal ?? false,
         communal_group_id: (listing as any).communal_group_id ?? "",
         communal_ratio_pct: (listing as any).communal_ratio_pct?.toString() ?? "",
@@ -176,6 +178,7 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
       bundle_components: form.is_bundle && bundleComponents.length > 0 ? JSON.parse(JSON.stringify(bundleComponents)) : null,
       cleaning_fee: form.cleaning_fee ? parseFloat(form.cleaning_fee) : null,
       deep_fee: form.deep_fee ? parseFloat(form.deep_fee) : null,
+      cleaning_duration_minutes: form.cleaning_duration_minutes ? parseInt(form.cleaning_duration_minutes) : null,
       is_communal: form.is_communal,
       communal_group_id: form.is_communal && form.communal_group_id ? form.communal_group_id : null,
       communal_ratio_pct: form.is_communal && form.communal_ratio_pct ? parseFloat(form.communal_ratio_pct) : null,
@@ -255,10 +258,11 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
             </Select>
           </div>
 
-          {/* Cleaning fees */}
+          {/* Cleaning */}
           <div className="grid grid-cols-2 gap-3">
             {field("Cleaning Fee (£)", "cleaning_fee", "number")}
             {field("Deep Clean Fee (£)", "deep_fee", "number")}
+            {field("Cleaning Duration (mins)", "cleaning_duration_minutes", "number")}
           </div>
 
           {/* Communal */}
