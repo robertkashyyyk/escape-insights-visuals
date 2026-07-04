@@ -61,6 +61,9 @@ export interface OwnerKpis {
   prevAdr: number;
   prevBookings: number;
   prevNights: number;
+  // Pace/pickup projection of where the period lands (booked-now × prior-year late
+  // pickup from this lead point), capped at physical capacity. = booked for past periods.
+  projectedRevenue: number;
   // To-date pairs, retained for any like-for-like/graph use.
   revenueToDate: number;
   prevRevenueToDate: number;
@@ -425,6 +428,29 @@ export function useOwnerPortalData(
         ? capOcc((prevNightsAll / (prevPeriodDays * nonBundleCount)) * 100) : 0;
       const prevAdr = prevNightsAll > 0 ? prevRevenue / prevNightsAll : 0;
 
+      // ── Pace/pickup projection ──────────────────────────────────────────────
+      // How much of the prior-year period was already on the books at THIS lead
+      // point (one year ago today)? The gap up to prior-year's final is the late
+      // pickup we still expect; apply that factor to what's booked now.
+      const leadDateStr = format(subYears(now, 1), "yyyy-MM-dd");
+      let prevBookedByLead = 0;
+      componentListings.forEach((l: any) => {
+        expanded
+          .filter((r) => r._listing_id === l.id && inPeriod(r, prevStartStr, prevEndStr)
+            && r.reservation_date && String(r.reservation_date).slice(0, 10) <= leadDateStr)
+          .forEach((r) => { prevBookedByLead += revOf(r, prevStartStr, prevEndStr); });
+      });
+      const isPastPeriod = periodEnd.getTime() <= _todayMid.getTime();
+      const MIN_PACE_BASE = 500; // don't derive a multiplier from a tiny prior base
+      let paceFactor = 1;
+      if (!isPastPeriod && prevBookedByLead >= MIN_PACE_BASE && prevRevenue > 0) {
+        paceFactor = Math.min(2.5, prevRevenue / prevBookedByLead); // cap runaway factors
+      }
+      let projectedRevenue = totalRevenue * paceFactor;
+      // Physical cap: can't imply more than 100% occupancy for the period.
+      if (adr > 0) projectedRevenue = Math.min(projectedRevenue, adr * periodDays * nonBundleCount);
+      projectedRevenue = Math.max(projectedRevenue, totalRevenue); // never below what's booked
+
       const kpis: OwnerKpis = {
         totalRevenue,
         occupancy,
@@ -436,6 +462,7 @@ export function useOwnerPortalData(
         prevAdr,
         prevBookings: prevBookingsAll,
         prevNights: prevNightsAll,
+        projectedRevenue,
         revenueToDate: curCmpRevenue,
         prevRevenueToDate: prevCmpRevenue,
         occupancyToDate,

@@ -96,6 +96,7 @@ export default function OwnerPortfolio() {
   // capacity — a strong week books more than a week's worth); the hook leaves it uncapped.
   const kpiCards = kpis ? [
     { label: "Total Revenue", value: fmt(kpis.totalRevenue), icon: PoundSterling, prior: fmt(kpis.prevRevenue) },
+    { label: "Projected Revenue", value: fmt(kpis.projectedRevenue), icon: TrendingUp, prior: fmt(kpis.prevRevenue) },
     { label: "Bookings", value: kpis.totalBookings.toLocaleString(), icon: BookOpen, prior: kpis.prevBookings.toLocaleString() },
     { label: "Nights Sold", value: kpis.totalNights.toLocaleString(), icon: Moon, prior: kpis.prevNights.toLocaleString() },
     { label: "Occupancy Rate", value: `${kpis.occupancy.toFixed(0)}%`, icon: Percent, prior: `${kpis.prevOccupancy.toFixed(0)}%` },
@@ -219,7 +220,7 @@ export default function OwnerPortfolio() {
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {kpiCards.map((kpi) => (
             <Card key={kpi.label} className="border-border/30 bg-card/50 backdrop-blur-sm">
               <CardContent className="p-4 space-y-2">
