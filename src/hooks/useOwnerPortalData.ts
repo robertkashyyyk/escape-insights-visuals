@@ -53,8 +53,15 @@ export interface OwnerKpis {
   adr: number;
   totalBookings: number;
   totalNights: number;
-  // To-date pairs, used ONLY for the "vs last year" badges so the comparison stays
-  // like-for-like (period-to-date this year vs same-as-of-date last year).
+  // Prior-year FULL-period values (same window, one year back) — shown on each card
+  // as "Prior year: X" so the comparison ties to the headline number and %-metrics
+  // like occupancy read unambiguously (no signed-delta-on-a-percentage confusion).
+  prevRevenue: number;
+  prevOccupancy: number;
+  prevAdr: number;
+  prevBookings: number;
+  prevNights: number;
+  // To-date pairs, retained for any like-for-like/graph use.
   revenueToDate: number;
   prevRevenueToDate: number;
   occupancyToDate: number;
@@ -405,12 +412,30 @@ export function useOwnerPortalData(
       const adrToDate     = curCmpNights  > 0 ? curCmpRevenue  / curCmpNights  : 0;
       const prevAdrToDate = prevCmpNights > 0 ? prevCmpRevenue / prevCmpNights : 0;
 
+      // Prior-year FULL-period aggregates (same window a year back) — for the
+      // "Prior year: X" comparators on the headline cards.
+      const prevRevenue = properties.reduce((s, p) => s + p.revenuePrevYear, 0);
+      let prevNightsAll = 0, prevBookingsAll = 0;
+      componentListings.forEach((l: any) => {
+        expanded
+          .filter((r) => r._listing_id === l.id && inPeriod(r, prevStartStr, prevEndStr))
+          .forEach((r) => { prevNightsAll += nightsOf(r, prevStartStr, prevEndStr); prevBookingsAll += 1; });
+      });
+      const prevOccupancy = nonBundleCount > 0
+        ? capOcc((prevNightsAll / (prevPeriodDays * nonBundleCount)) * 100) : 0;
+      const prevAdr = prevNightsAll > 0 ? prevRevenue / prevNightsAll : 0;
+
       const kpis: OwnerKpis = {
         totalRevenue,
         occupancy,
         adr,
         totalBookings,
         totalNights: totalNightsAll,
+        prevRevenue,
+        prevOccupancy,
+        prevAdr,
+        prevBookings: prevBookingsAll,
+        prevNights: prevNightsAll,
         revenueToDate: curCmpRevenue,
         prevRevenueToDate: prevCmpRevenue,
         occupancyToDate,

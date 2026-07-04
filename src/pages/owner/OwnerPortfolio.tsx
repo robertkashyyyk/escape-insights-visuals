@@ -21,14 +21,11 @@ function getGreeting(): string {
   return "Good evening";
 }
 
-function TrendBadge({ current, previous }: { current: number; previous: number }) {
-  if (previous === 0) return null;
-  const pct = ((current - previous) / previous) * 100;
-  const isUp = pct >= 0;
+function PriorYear({ value }: { value: string | null }) {
+  if (value === null) return null;
   return (
-    <span className={`flex items-center gap-0.5 text-[10px] font-medium ${isUp ? "text-emerald-400" : "text-red-400"}`}>
-      {isUp ? <TrendingUp className="h-2.5 w-2.5" /> : <TrendingDown className="h-2.5 w-2.5" />}
-      {isUp ? "+" : ""}{pct.toFixed(0)}% vs same period last year
+    <span className="flex items-center gap-0.5 text-[10px] font-medium text-muted-foreground">
+      Prior year: {value}
     </span>
   );
 }
@@ -92,16 +89,17 @@ export default function OwnerPortfolio() {
   const firstName = owner?.name?.split(" ")[0] || "there";
   const todayStr = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
-  // Headline `value` shows the full selected period; the trend badge compares the
-  // to-date window (`current` vs `prev`) so the "vs last year" % stays like-for-like.
+  // Headline `value` = full selected period. Each card shows the same window a year
+  // back as "Prior year: X" — a plain absolute comparator that ties to the headline and
+  // avoids signed-delta-on-a-percentage confusion for occupancy.
   // On a Booking-Date basis occupancy can exceed 100% (nights booked vs the period's
   // capacity — a strong week books more than a week's worth); the hook leaves it uncapped.
   const kpiCards = kpis ? [
-    { label: "Total Revenue", value: fmt(kpis.totalRevenue), icon: PoundSterling, current: kpis.revenueToDate, prev: kpis.prevRevenueToDate },
-    { label: "Bookings", value: kpis.totalBookings.toLocaleString(), icon: BookOpen, current: null, prev: null },
-    { label: "Nights Sold", value: kpis.totalNights.toLocaleString(), icon: Moon, current: null, prev: null },
-    { label: "Occupancy Rate", value: `${kpis.occupancy.toFixed(0)}%`, icon: Percent, current: kpis.occupancyToDate, prev: kpis.prevOccupancyToDate },
-    { label: "Average Daily Rate", value: fmt(kpis.adr), icon: BedDouble, current: kpis.adrToDate, prev: kpis.prevAdrToDate },
+    { label: "Total Revenue", value: fmt(kpis.totalRevenue), icon: PoundSterling, prior: fmt(kpis.prevRevenue) },
+    { label: "Bookings", value: kpis.totalBookings.toLocaleString(), icon: BookOpen, prior: kpis.prevBookings.toLocaleString() },
+    { label: "Nights Sold", value: kpis.totalNights.toLocaleString(), icon: Moon, prior: kpis.prevNights.toLocaleString() },
+    { label: "Occupancy Rate", value: `${kpis.occupancy.toFixed(0)}%`, icon: Percent, prior: `${kpis.prevOccupancy.toFixed(0)}%` },
+    { label: "Average Daily Rate", value: fmt(kpis.adr), icon: BedDouble, prior: fmt(kpis.prevAdr) },
   ] : [];
 
   return (
@@ -230,9 +228,7 @@ export default function OwnerPortfolio() {
                   <span className="text-[10px] font-medium uppercase tracking-wider">{kpi.label}</span>
                 </div>
                 <p className="text-xl md:text-2xl font-display font-bold text-foreground">{kpi.value}</p>
-                {kpi.prev != null && kpi.current != null && (
-                  <TrendBadge current={kpi.current} previous={kpi.prev} />
-                )}
+                <PriorYear value={kpi.prior} />
               </CardContent>
             </Card>
           ))}
