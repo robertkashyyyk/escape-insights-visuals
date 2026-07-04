@@ -441,15 +441,23 @@ export function useOwnerPortalData(
           .forEach((r) => { prevBookedByLead += revOf(r, prevStartStr, prevEndStr); });
       });
       const isPastPeriod = periodEnd.getTime() <= _todayMid.getTime();
-      const MIN_PACE_BASE = 500; // don't derive a multiplier from a tiny prior base
-      let paceFactor = 1;
-      if (!isPastPeriod && prevBookedByLead >= MIN_PACE_BASE && prevRevenue > 0) {
-        paceFactor = Math.min(2.5, prevRevenue / prevBookedByLead); // cap runaway factors
+      // Anchor a future period to what the SAME period earned last year (seasonality
+      // baked in), floored at what's already booked. Both inputs are real achieved
+      // figures, so the result is always physically plausible — no runaway ratios.
+      // Add a pickup nudge ONLY when it's a modest, trustworthy signal: enough prior
+      // bookings existed at this lead point AND the implied multiple is sane. An
+      // extreme ratio from a near-empty far-out month (books late) is ignored.
+      let projectedRevenue = totalRevenue;
+      if (!isPastPeriod) {
+        projectedRevenue = Math.max(totalRevenue, prevRevenue);
+        const MIN_PACE_BASE = 3000; // need a solid early-booking base to trust the pace
+        if (prevBookedByLead >= MIN_PACE_BASE && prevRevenue > 0) {
+          const paceFactor = prevRevenue / prevBookedByLead;
+          if (paceFactor <= 1.6) projectedRevenue = Math.max(projectedRevenue, totalRevenue * paceFactor);
+        }
+        // Safety net: never imply more than full physical occupancy.
+        if (adr > 0) projectedRevenue = Math.min(projectedRevenue, adr * periodDays * nonBundleCount);
       }
-      let projectedRevenue = totalRevenue * paceFactor;
-      // Physical cap: can't imply more than 100% occupancy for the period.
-      if (adr > 0) projectedRevenue = Math.min(projectedRevenue, adr * periodDays * nonBundleCount);
-      projectedRevenue = Math.max(projectedRevenue, totalRevenue); // never below what's booked
 
       const kpis: OwnerKpis = {
         totalRevenue,
