@@ -34,6 +34,7 @@ import CleaningSchedule from "./pages/CleaningSchedule";
 import CleaningNumbers from "./pages/CleaningNumbers";
 import CleanerPortal from "./pages/CleanerPortal";
 import OwnerPortfolio from "./pages/owner/OwnerPortfolio";
+import OwnerCalendar from "./pages/owner/OwnerCalendar";
 import OwnerReservations from "./pages/owner/OwnerReservations";
 import OwnerStatements from "./pages/owner/OwnerStatements";
 import OwnerGraphs from "./pages/owner/OwnerGraphs";
@@ -72,6 +73,7 @@ const App = () => (
             <Route path="/stay/:slug" element={<GuestPortal />} />
             <Route path="/cleaner" element={<CleanerPortal />} />
             <Route path="/owner" element={<ProtectedRoute requiredRoles={["client", "super", "senior"]}><OwnerPreviewProvider><OwnerPortfolio /></OwnerPreviewProvider></ProtectedRoute>} />
+            <Route path="/owner/calendar" element={<ProtectedRoute requiredRoles={["client", "super", "senior"]}><OwnerPreviewProvider><OwnerCalendar /></OwnerPreviewProvider></ProtectedRoute>} />
             <Route path="/owner/reservations" element={<ProtectedRoute requiredRoles={["client", "super", "senior"]}><OwnerPreviewProvider><OwnerReservations /></OwnerPreviewProvider></ProtectedRoute>} />
             <Route path="/owner/statements" element={<ProtectedRoute requiredRoles={["client", "super", "senior"]}><OwnerPreviewProvider><OwnerStatements /></OwnerPreviewProvider></ProtectedRoute>} />
             <Route path="/owner/graphs" element={<ProtectedRoute requiredRoles={["client", "super", "senior"]}><OwnerPreviewProvider><OwnerGraphs /></OwnerPreviewProvider></ProtectedRoute>} />

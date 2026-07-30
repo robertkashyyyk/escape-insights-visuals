@@ -4,13 +4,14 @@ import { OwnerProfileMenu } from "@/components/owner/OwnerProfileMenu";
 import { useTheme } from "@/contexts/ThemeContext";
 import { ThemePicker } from "@/components/ThemePicker";
 import { NavLink, useNavigate } from "react-router-dom";
-import { LogOut, Home, CalendarDays, FileText, Eye, BarChart3, Sun, Moon } from "lucide-react";
+import { LogOut, Home, CalendarDays, CalendarRange, FileText, Eye, BarChart3, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { OrinChatFAB } from "@/components/orin/OrinChatFAB";
 
 const navItems = [
   { to: "/owner", label: "My Portfolio", icon: Home },
+  { to: "/owner/calendar", label: "My Calendar", icon: CalendarRange },
   { to: "/owner/reservations", label: "My Reservations", icon: CalendarDays },
   { to: "/owner/statements", label: "My Statements", icon: FileText },
   { to: "/owner/graphs", label: "My Graphs", icon: BarChart3 },
