@@ -25,6 +25,7 @@ export interface CalProperty {
   name: string;
   blocks: CalBlock[];
   orphanGaps: Set<string>;   // YYYY-MM-DD orphan (unfillable) nights within window
+  bookedDays: Set<string>;   // YYYY-MM-DD nights covered by a booking (for gap detection)
   occPct: number;            // occupancy across the visible window
   revenue: number;           // clipped revenue within window
   adr: number;
@@ -96,7 +97,8 @@ export function useOwnerCalendar(): { data?: OwnerCalendar; isLoading: boolean }
       });
 
       const windowNights = days.length;
-      let totalSellable = 0, totalPotential = 0, totalBookedNights = 0;
+      const forwardDays = days.filter((d) => d >= todayStr).length; // today → window end
+      let totalSellable = 0, totalPotential = 0, totalBookedFwd = 0;
 
       const properties: CalProperty[] = mine
         .map((l: any) => {
@@ -124,31 +126,43 @@ export function useOwnerCalendar(): { data?: OwnerCalendar; isLoading: boolean }
           const orphanInWindow = new Set<string>();
           orphanGaps.forEach((d) => { if (d >= wStartStr && d < wEndExcl) orphanInWindow.add(d); });
 
-          const bookedNights = rs.reduce((s: number, r: any) => s + clampNights(r.check_in, r.check_out, wStartStr, wEndExcl), 0);
+          // Whole-window row stats (the per-property line under the name).
+          const bookedNightsWin = rs.reduce((s: number, r: any) => s + clampNights(r.check_in, r.check_out, wStartStr, wEndExcl), 0);
           const revenue = rs.reduce((s: number, r: any) => {
             const total = Number(r.total_amount) || 0;
             const totalN = Math.max(1, differenceInDays(parseISO(r.check_out), parseISO(r.check_in)));
             return s + total * (clampNights(r.check_in, r.check_out, wStartStr, wEndExcl) / totalN);
           }, 0);
-          const adr = bookedNights > 0 ? revenue / bookedNights : 0;
-          const occPct = Math.round((bookedNights / windowNights) * 100);
+          const adr = bookedNightsWin > 0 ? revenue / bookedNightsWin : 0;
+          const occPct = Math.round((bookedNightsWin / windowNights) * 100);
 
-          const sellableNights = Math.max(0, windowNights - bookedNights - orphanInWindow.size);
-          totalSellable += sellableNights;
-          totalPotential += sellableNights * adr;
-          totalBookedNights += bookedNights;
+          // Booked-day set + FORWARD-only opportunity (today → window end). You can't
+          // sell the past, so sellable nights / potential only count from today on.
+          const bookedDays = new Set<string>();
+          let fBooked = 0, fSellable = 0;
+          for (const d of days) {
+            const booked = rs.some((r: any) => r.check_in <= d && d < r.check_out);
+            if (booked) bookedDays.add(d);
+            if (d < todayStr) continue;
+            if (booked) { fBooked++; continue; }
+            if (orphanInWindow.has(d)) continue; // unfillable — not an opportunity
+            fSellable++;
+          }
+          totalSellable += fSellable;
+          totalPotential += fSellable * adr; // per-property ADR
+          totalBookedFwd += fBooked;
 
-          return { id: l.id, name: l.name, blocks, orphanGaps: orphanInWindow, occPct, revenue, adr };
+          return { id: l.id, name: l.name, blocks, orphanGaps: orphanInWindow, bookedDays, occPct, revenue, adr };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
 
-      const capacity = windowNights * Math.max(1, properties.length);
+      const fwdCapacity = forwardDays * Math.max(1, properties.length);
       return {
         days, todayStr, todayIdx: dayIndex.get(todayStr) ?? -1, properties,
         summary: {
           sellableNights: totalSellable,
           potential: Math.round(totalPotential),
-          occPct: Math.round((totalBookedNights / capacity) * 100),
+          occPct: fwdCapacity > 0 ? Math.round((totalBookedFwd / fwdCapacity) * 100) : 0,
         },
       };
     },

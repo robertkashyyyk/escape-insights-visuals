@@ -30,6 +30,19 @@ export default function OwnerCalendar() {
   const { data, isLoading } = useOwnerCalendar();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<{ block: CalBlock; property: string } | null>(null);
+  const [gapSel, setGapSel] = useState<{ property: string; startDate: string; endDate: string; nights: number; potential: number } | null>(null);
+
+  // Contiguous open (sellable, future) run around a clicked gap cell.
+  const handleGapClick = (p: (typeof data.properties)[number], i: number) => {
+    if (!data) return;
+    const ok = (idx: number) => idx >= 0 && idx < data.days.length
+      && !p.bookedDays.has(data.days[idx]) && !p.orphanGaps.has(data.days[idx]);
+    let s = i, e = i;
+    while (s - 1 >= data.todayIdx && ok(s - 1)) s--;
+    while (e + 1 < data.days.length && ok(e + 1)) e++;
+    const nights = e - s + 1;
+    setGapSel({ property: p.name, startDate: data.days[s], endDate: data.days[e], nights, potential: Math.round(nights * p.adr) });
+  };
 
   // Open scrolled to today.
   useEffect(() => {
@@ -74,7 +87,7 @@ export default function OwnerCalendar() {
               </div>
               <div className="h-8 w-px bg-border/40" />
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Occupancy</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Occupancy ahead</p>
                 <p className="text-lg font-display font-bold text-foreground">{data.summary.occPct}%</p>
               </div>
             </div>
@@ -143,10 +156,12 @@ export default function OwnerCalendar() {
                       const weekend = dow === 0 || dow === 6;
                       const past = d < data.todayStr;
                       const orphan = p.orphanGaps.has(d);
+                      const sellableFuture = !past && !orphan && !p.bookedDays.has(d);
                       return (
                         <div
                           key={d}
-                          className={`absolute top-0 border-l border-border/10 ${weekend ? "bg-secondary/20" : ""} ${past ? "opacity-60" : ""}`}
+                          onClick={sellableFuture ? () => handleGapClick(p, i) : undefined}
+                          className={`absolute top-0 border-l border-border/10 ${weekend ? "bg-secondary/20" : ""} ${past ? "opacity-60" : ""} ${sellableFuture ? "cursor-pointer hover:bg-emerald-500/10" : ""}`}
                           style={{ left: i * CELL_W, width: CELL_W, height: ROW_H }}
                         >
                           {orphan && (
@@ -198,8 +213,31 @@ export default function OwnerCalendar() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Gap detail */}
+      <Dialog open={!!gapSel} onOpenChange={(o) => { if (!o) setGapSel(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>{gapSel?.property} — open gap</DialogTitle></DialogHeader>
+          {gapSel && (
+            <div className="space-y-2 text-sm">
+              <p className="text-lg font-display font-bold text-foreground">
+                {gapSel.nights} night{gapSel.nights === 1 ? "" : "s"} open · <span className="text-emerald-400">{fmt(gapSel.potential)} potential</span>
+              </p>
+              <Row label="From" value={format(parseISO(gapSel.startDate), "EEE d MMM")} />
+              <Row label="Until" value={format(parseISO(addOneDay(gapSel.endDate)), "EEE d MMM")} />
+              <p className="text-[11px] text-muted-foreground pt-1">Potential = open nights × this property's average nightly rate.</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </OwnerLayout>
   );
+}
+
+function addOneDay(d: string): string {
+  const dt = parseISO(d);
+  dt.setDate(dt.getDate() + 1);
+  return format(dt, "yyyy-MM-dd");
 }
 
 function Row({ label, value }: { label: string; value: string }) {
