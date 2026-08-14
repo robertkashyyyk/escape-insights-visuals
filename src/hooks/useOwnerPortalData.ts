@@ -9,6 +9,7 @@ import {
   format,
 } from "date-fns";
 import { REVENUE_FIELDS, getGrossRevenue } from "@/lib/revenue";
+import { projectRevenue } from "@/lib/ownerProjection";
 import { periodRevenue, overlapsPeriod } from "@/lib/metrics";
 
 export type OwnerPeriodType = "Week" | "Month" | "Quarter" | "Year";
@@ -428,36 +429,18 @@ export function useOwnerPortalData(
         ? capOcc((prevNightsAll / (prevPeriodDays * nonBundleCount)) * 100) : 0;
       const prevAdr = prevNightsAll > 0 ? prevRevenue / prevNightsAll : 0;
 
-      // ── Pace/pickup projection ──────────────────────────────────────────────
-      // How much of the prior-year period was already on the books at THIS lead
-      // point (one year ago today)? The gap up to prior-year's final is the late
-      // pickup we still expect; apply that factor to what's booked now.
-      const leadDateStr = format(subYears(now, 1), "yyyy-MM-dd");
-      let prevBookedByLead = 0;
-      componentListings.forEach((l: any) => {
-        expanded
-          .filter((r) => r._listing_id === l.id && inPeriod(r, prevStartStr, prevEndStr)
-            && r.reservation_date && String(r.reservation_date).slice(0, 10) <= leadDateStr)
-          .forEach((r) => { prevBookedByLead += revOf(r, prevStartStr, prevEndStr); });
+      // Projection engine: per-property, per-month target occupancy (last-year
+      // same month × this-year lift, learned + capped), pickup valued at blended
+      // ADR, elapsed empty nights excluded. See src/lib/ownerProjection.ts.
+      const projectedRevenue = projectRevenue({
+        reservations: expanded,
+        listingIds: componentListings.map((l: any) => l.id),
+        periodType,
+        periodStart,
+        now,
+        useCreatedDate,
+        bookedRevenue: totalRevenue,
       });
-      const isPastPeriod = periodEnd.getTime() <= _todayMid.getTime();
-      // Anchor a future period to what the SAME period earned last year (seasonality
-      // baked in), floored at what's already booked. Both inputs are real achieved
-      // figures, so the result is always physically plausible — no runaway ratios.
-      // Add a pickup nudge ONLY when it's a modest, trustworthy signal: enough prior
-      // bookings existed at this lead point AND the implied multiple is sane. An
-      // extreme ratio from a near-empty far-out month (books late) is ignored.
-      let projectedRevenue = totalRevenue;
-      if (!isPastPeriod) {
-        projectedRevenue = Math.max(totalRevenue, prevRevenue);
-        const MIN_PACE_BASE = 3000; // need a solid early-booking base to trust the pace
-        if (prevBookedByLead >= MIN_PACE_BASE && prevRevenue > 0) {
-          const paceFactor = prevRevenue / prevBookedByLead;
-          if (paceFactor <= 1.6) projectedRevenue = Math.max(projectedRevenue, totalRevenue * paceFactor);
-        }
-        // Safety net: never imply more than full physical occupancy.
-        if (adr > 0) projectedRevenue = Math.min(projectedRevenue, adr * periodDays * nonBundleCount);
-      }
 
       const kpis: OwnerKpis = {
         totalRevenue,
