@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Bed, Bath, Users, MapPin, PoundSterling, Brush, Building2, Wrench, Key, ClipboardList, Clock, SprayCan } from "lucide-react";
+import { ArrowLeft, Bed, Bath, Users, MapPin, PoundSterling, Brush, Building2, Wrench, Key, ClipboardList, Clock, SprayCan, ChefHat, BedDouble, Layers, Boxes } from "lucide-react";
 import { displayName, brandedName } from "@/lib/listingName";
+import { useCommunalGroups } from "@/hooks/useCommunalGroups";
 
 const DURATION_OPTIONS = [60, 90, 120, 150, 180];
 
@@ -33,6 +34,41 @@ export default function PropertyDetail() {
     },
     enabled: !!id,
   });
+
+  // Bed inventory (read-only mirror of the edit form's Beds editor) + laundry cost.
+  const { data: beds = [] } = useQuery({
+    enabled: !!id,
+    queryKey: ["pd-beds", id],
+    queryFn: async () => {
+      const [rowsRes, typesRes] = await Promise.all([
+        (supabase.from as any)("property_beds").select("bedroom_label, bed_type_id, quantity, sort_order").eq("listing_id", id).order("sort_order"),
+        (supabase.from as any)("bed_types").select("id, name, laundry_cost"),
+      ]);
+      const tmap = new Map((typesRes.data ?? []).map((t: any) => [t.id, t]));
+      return (rowsRes.data ?? []).map((b: any) => ({
+        ...b,
+        type: tmap.get(b.bed_type_id)?.name ?? "Bed",
+        cost: Number(tmap.get(b.bed_type_id)?.laundry_cost ?? 0),
+      }));
+    },
+  });
+
+  // Per-property equipment (photo-required checks on the cleaner's job).
+  const { data: equipment = [] } = useQuery({
+    enabled: !!id,
+    queryKey: ["pd-equip", id],
+    queryFn: async () => ((await (supabase.from as any)("property_equipment").select("name, active").eq("listing_id", id).order("name")).data ?? []) as any[],
+  });
+
+  // Names for bundle components + communal group.
+  const { data: listingMap } = useQuery({
+    queryKey: ["pd-listing-names"],
+    queryFn: async () => {
+      const { data } = await supabase.from("listings").select("id, name, internal_name");
+      return new Map((data ?? []).map((l: any) => [l.id, l]));
+    },
+  });
+  const { data: communalGroups = [] } = useCommunalGroups();
 
   if (isLoading) {
     return (
@@ -60,6 +96,15 @@ export default function PropertyDetail() {
   const troubleshootingNotes = (listing as any).troubleshooting_notes;
   const accessDetails = (listing as any).access_details;
   const isClean = (listing as any).is_clean ?? true;
+
+  const l = listing as any;
+  const isCommunal = l.is_communal ?? false;
+  const communalGroupName = l.communal_group_id
+    ? (communalGroups.find((g: any) => g.id === l.communal_group_id)?.name ?? "—")
+    : null;
+  const isBundle = l.is_bundle ?? false;
+  const bundleComponents = Array.isArray(l.bundle_components) ? l.bundle_components : [];
+  const laundryTotal = beds.reduce((s: number, b: any) => s + b.cost * b.quantity, 0);
 
   return (
     <AppLayout>
@@ -109,6 +154,7 @@ export default function PropertyDetail() {
           <div className="flex flex-wrap gap-3 mt-5 pt-4 border-t border-border/20">
             {listing.bedrooms != null && <InfoChip icon={Bed} label={`${listing.bedrooms} bedrooms`} />}
             {listing.bathrooms != null && <InfoChip icon={Bath} label={`${listing.bathrooms} bathrooms`} />}
+            {l.kitchens != null && <InfoChip icon={ChefHat} label={`${l.kitchens} kitchen${l.kitchens === 1 ? "" : "s"}`} />}
             {listing.max_guests != null && <InfoChip icon={Users} label={`${listing.max_guests} guests max`} />}
             {listing.city && <InfoChip icon={MapPin} label={listing.city} />}
             {listing.property_type && <InfoChip icon={Building2} label={listing.property_type} />}
@@ -145,8 +191,10 @@ export default function PropertyDetail() {
             <DetailRow label="Tags" value={listing.tags} />
           </DetailCard>
 
-          <DetailCard title="Settings" icon={Clock}>
-            <div className="space-y-2">
+          <DetailCard title="Cleaning" icon={SprayCan}>
+            <DetailRow label="Cleaning Fee" value={l.cleaning_fee != null ? `£${Number(l.cleaning_fee).toFixed(0)}` : null} />
+            <DetailRow label="Deep Clean Fee" value={l.deep_fee != null ? `£${Number(l.deep_fee).toFixed(0)}` : null} />
+            <div className="space-y-2 pt-1.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Cleaning Duration</span>
                 <div className="flex items-center gap-2">
@@ -193,6 +241,58 @@ export default function PropertyDetail() {
                 </div>
               </div>
             </div>
+          </DetailCard>
+
+          <DetailCard title="Layout & Beds" icon={BedDouble}>
+            <DetailRow label="Bedrooms" value={listing.bedrooms?.toString()} />
+            <DetailRow label="Bathrooms" value={listing.bathrooms?.toString()} />
+            <DetailRow label="Kitchens" value={l.kitchens?.toString()} />
+            <DetailRow label="Max Guests" value={listing.max_guests?.toString()} />
+            {beds.length > 0 && (
+              <div className="pt-2 mt-1 border-t border-border/15 space-y-1.5">
+                {beds.map((b: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">{b.bedroom_label}</span>
+                    <span className="text-foreground font-medium">{b.quantity}× {b.type}</span>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <span className="text-muted-foreground">Laundry / turnover</span>
+                  <span className="text-foreground font-medium">£{laundryTotal.toFixed(2)}</span>
+                </div>
+              </div>
+            )}
+          </DetailCard>
+
+          <DetailCard title="Equipment" icon={Boxes}>
+            {equipment.length === 0 ? (
+              <p className="text-xs text-muted-foreground/40">No equipment recorded.</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {equipment.map((e: any, i: number) => (
+                  <span key={i} className={`text-xs px-2 py-0.5 rounded-md ${e.active === false ? "bg-secondary/40 text-muted-foreground/50 line-through" : "bg-secondary/60 text-foreground"}`}>
+                    {e.name}
+                  </span>
+                ))}
+              </div>
+            )}
+          </DetailCard>
+
+          <DetailCard title="Communal & Bundle" icon={Layers}>
+            <DetailRow label="Cost sharing" value={isCommunal ? "Communal" : "Self-Contained"} />
+            {isCommunal && <DetailRow label="Communal Group" value={communalGroupName} />}
+            {isCommunal && <DetailRow label="Communal Share" value={l.communal_ratio_pct != null ? `${l.communal_ratio_pct}%` : null} />}
+            <DetailRow label="Bundle listing" value={isBundle ? "Yes" : "No"} />
+            {isBundle && bundleComponents.length > 0 && (
+              <div className="pt-2 mt-1 border-t border-border/15 space-y-1.5">
+                {bundleComponents.map((c: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">{displayName(listingMap?.get(c.listing_id)) || "Property"}</span>
+                    <span className="text-foreground font-medium">{c.split_pct}%</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </DetailCard>
         </div>
 
