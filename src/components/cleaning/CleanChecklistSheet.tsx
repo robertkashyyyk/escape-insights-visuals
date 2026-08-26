@@ -2,7 +2,26 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, Check, ConciergeBell, SprayCan, Wrench, ListChecks } from "lucide-react";
+import { Loader2, Check, ConciergeBell, SprayCan, Wrench, ListChecks, Camera } from "lucide-react";
+import { toast } from "sonner";
+
+/** Downscale a phone photo to keep uploads small + reliable on cleaner mobile data. */
+async function compressImage(file: File, maxDim = 1600, quality = 0.8): Promise<Blob> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = document.createElement("img");
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+    let { width, height } = img;
+    if (width >= height && width > maxDim) { height = Math.round((height * maxDim) / width); width = maxDim; }
+    else if (height > maxDim) { width = Math.round((width * maxDim) / height); height = maxDim; }
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+    return await new Promise<Blob>((res) => canvas.toBlob((b) => res(b ?? file), "image/jpeg", quality));
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 export interface ChecklistItem {
   id: string;
@@ -31,6 +50,7 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<string | null>(null);
 
   useEffect(() => {
     if (!task) return;
@@ -80,6 +100,26 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
       .update({ checked: next, checked_at: next ? now : null, checked_by: userId, check_all: false }).eq("id", item.id);
     setBusy(null);
     onChanged?.();
+  };
+
+  const handlePhoto = async (item: ChecklistItem, file: File) => {
+    if (!task) return;
+    setUploading(item.id);
+    try {
+      const blob = await compressImage(file);
+      const path = `${task.id}/${item.id}.jpg`;
+      const { error: upErr } = await supabase.storage.from("clean-photos").upload(path, blob, { upsert: true, contentType: "image/jpeg" });
+      if (upErr) throw upErr;
+      const url = `${supabase.storage.from("clean-photos").getPublicUrl(path).data.publicUrl}?t=${Date.now()}`;
+      const now = new Date().toISOString();
+      await supabase.from("clean_checklist_items").update({ photo_url: url, checked: true, checked_at: now, checked_by: userId }).eq("id", item.id);
+      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, photo_url: url, checked: true, checked_at: now } : i)));
+      onChanged?.();
+    } catch (e: any) {
+      toast.error(`Photo upload failed: ${e?.message ?? "try again"}`);
+    } finally {
+      setUploading(null);
+    }
   };
 
   const checkAll = async (groupItems: ChecklistItem[]) => {
@@ -172,9 +212,32 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
             {equipment.length > 0 && (
               <Section icon={Wrench} title="Equipment">
                 <div className="rounded-lg border border-border/40 divide-y divide-border/20 overflow-hidden">
-                  {equipment.map((i) => <Row key={i.id} item={i} />)}
+                  {equipment.map((i) => (
+                    <div key={i.id} className="flex items-center gap-3 px-3 py-2.5">
+                      <span className={`h-5 w-5 rounded-md border flex items-center justify-center shrink-0 ${i.photo_url ? "bg-emerald-500 border-emerald-500 text-white" : "border-border"}`}>
+                        {i.photo_url && <Check className="h-3.5 w-3.5" />}
+                      </span>
+                      <span className={`text-sm flex-1 ${i.photo_url ? "text-muted-foreground" : "text-foreground"}`}>{i.label}</span>
+                      {i.photo_url ? (
+                        <div className="flex items-center gap-2">
+                          <img src={i.photo_url} alt={i.label} className="h-9 w-9 rounded object-cover border border-border/40" />
+                          <label className="text-[11px] text-primary cursor-pointer">
+                            Retake
+                            <input type="file" accept="image/*" capture="environment" className="hidden"
+                              onChange={(e) => e.target.files?.[0] && handlePhoto(i, e.target.files[0])} />
+                          </label>
+                        </div>
+                      ) : (
+                        <label className={`text-xs font-medium px-2.5 py-1.5 rounded-md border inline-flex items-center gap-1.5 cursor-pointer ${uploading === i.id ? "opacity-60" : "border-primary/40 text-primary hover:bg-primary/10"}`}>
+                          {uploading === i.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />} Photo
+                          <input type="file" accept="image/*" capture="environment" className="hidden" disabled={uploading === i.id}
+                            onChange={(e) => e.target.files?.[0] && handlePhoto(i, e.target.files[0])} />
+                        </label>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-1.5">Photo capture for equipment lands in the next update.</p>
+                <p className="text-[11px] text-muted-foreground mt-1.5">Each item must be photographed in approved condition.</p>
               </Section>
             )}
           </div>
