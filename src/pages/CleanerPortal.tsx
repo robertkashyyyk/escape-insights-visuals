@@ -840,18 +840,8 @@ export default function CleanerPortal() {
                               </div>
                             )}
 
-                            {(accessByTask[task.id]?.length ?? 0) > 0 && (
-                              <div className="mt-2 rounded-lg border border-border/40 bg-secondary/20 px-2.5 py-2 space-y-1">
-                                {accessByTask[task.id].map((a, i) => (
-                                  <div key={i} className="text-xs leading-snug">
-                                    <span className="text-muted-foreground">{a.name}: </span>
-                                    {a.url
-                                      ? <a href={a.url} target="_blank" rel="noreferrer" className="text-primary underline">open link</a>
-                                      : <span className="text-foreground break-words whitespace-pre-wrap">{a.value}</span>}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                            {/* Access custom fields (door code/deposit/etc.) are guest-facing —
+                                deliberately NOT shown to the cleaner. Only requests (above). */}
 
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2.5 text-[14px] text-muted-foreground">
                               {proposed && (
