@@ -4,6 +4,7 @@ import { GeneralSettings } from "@/components/settings/GeneralSettings";
 import { LocationGroupsSettings } from "@/components/settings/LocationGroupsSettings";
 import { CommunalGroupsSettings } from "@/components/settings/CommunalGroupsSettings";
 import { RequestsSettings } from "@/components/settings/RequestsSettings";
+import { ConsumablesSettings } from "@/components/settings/ConsumablesSettings";
 import { WelcomeBasketsSettings } from "@/components/settings/WelcomeBasketsSettings";
 import { IntegrationsSettings } from "@/components/settings/IntegrationsSettings";
 import { CleanersSettings } from "@/components/settings/CleanersSettings";
@@ -62,6 +63,9 @@ export default function SettingsPage() {
               </div>
               <div className="max-w-xl">
                 <RequestsSettings />
+              </div>
+              <div className="max-w-xl">
+                <ConsumablesSettings />
               </div>
             </div>
           </TabsContent>

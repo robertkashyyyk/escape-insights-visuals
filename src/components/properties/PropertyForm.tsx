@@ -14,6 +14,7 @@ import { useLocationGroups } from "@/hooks/useLocationGroups";
 import { useCommunalGroups } from "@/hooks/useCommunalGroups";
 import { AlertTriangle } from "lucide-react";
 import { PropertyBedsEditor } from "@/components/properties/PropertyBedsEditor";
+import { PropertyEquipmentEditor } from "@/components/properties/PropertyEquipmentEditor";
 import { displayName } from "@/lib/listingName";
 
 interface PropertyFormProps {
@@ -40,6 +41,7 @@ const emptyForm = {
   property_type: "",
   bedrooms: "",
   bathrooms: "",
+  kitchens: "1",
   max_guests: "",
   nightly_rate: "",
   min_rate: "",
@@ -100,6 +102,7 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
         property_type: listing.property_type ?? "",
         bedrooms: listing.bedrooms?.toString() ?? "",
         bathrooms: listing.bathrooms?.toString() ?? "",
+        kitchens: (listing as any).kitchens?.toString() ?? "1",
         max_guests: listing.max_guests?.toString() ?? "",
         nightly_rate: listing.nightly_rate?.toString() ?? "",
         min_rate: listing.min_rate?.toString() ?? "",
@@ -169,6 +172,7 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
       property_type: form.property_type || null,
       bedrooms: form.bedrooms ? parseInt(form.bedrooms) : null,
       bathrooms: form.bathrooms ? parseInt(form.bathrooms) : null,
+      kitchens: form.kitchens ? parseInt(form.kitchens) : 1,
       max_guests: form.max_guests ? parseInt(form.max_guests) : null,
       nightly_rate: form.nightly_rate ? parseFloat(form.nightly_rate) : null,
       min_rate: form.min_rate ? parseFloat(form.min_rate) : null,
@@ -239,6 +243,7 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
           <div className="grid grid-cols-3 gap-3">
             {field("Bedrooms", "bedrooms", "number")}
             {field("Bathrooms", "bathrooms", "number")}
+            {field("Kitchens", "kitchens", "number")}
             {field("Max Guests", "max_guests", "number")}
           </div>
           <div className="grid grid-cols-3 gap-3">
@@ -279,12 +284,15 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
             onRatioChange={(v) => set("communal_ratio_pct", v)}
           />
 
-          {/* Bedrooms & Beds (drives laundry cost) — needs a saved listing id */}
+          {/* Bedrooms & Beds (drives laundry cost) + Equipment — need a saved listing id */}
           {isEdit ? (
-            <PropertyBedsEditor listingId={listing!.id} />
+            <>
+              <PropertyBedsEditor listingId={listing!.id} />
+              <PropertyEquipmentEditor listingId={listing!.id} />
+            </>
           ) : (
             <div className="border border-dashed border-border/40 rounded-lg p-4 text-[11px] text-muted-foreground">
-              Save the property first, then reopen it to set up Bedrooms &amp; Beds (laundry).
+              Save the property first, then reopen it to set up Bedrooms &amp; Beds and Equipment.
             </div>
           )}
 
