@@ -5,21 +5,40 @@ import { Progress } from "@/components/ui/progress";
 import { Loader2, Check, ConciergeBell, SprayCan, Wrench, ListChecks, Camera, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 
-/** Downscale a phone photo to keep uploads small + reliable on cleaner mobile data. */
-async function compressImage(file: File, maxDim = 1600, quality = 0.8): Promise<Blob> {
-  const url = URL.createObjectURL(file);
-  try {
+/** Downscale a phone photo to keep uploads small + reliable — and, crucially,
+ *  low-memory on iOS, where decoding a full 12MP shot into an <img> can crash the
+ *  tab. Prefer createImageBitmap (decodes off the main thread, lower peak memory);
+ *  fall back to <img> only if it's unavailable. Releases buffers promptly. */
+async function compressImage(file: File, maxDim = 1440, quality = 0.7): Promise<Blob> {
+  let bmp: ImageBitmap | null = null;
+  try { bmp = await createImageBitmap(file); } catch { bmp = null; }
+
+  let source: CanvasImageSource;
+  let sw: number, sh: number;
+  let objectUrl: string | null = null;
+  if (bmp) {
+    source = bmp; sw = bmp.width; sh = bmp.height;
+  } else {
+    objectUrl = URL.createObjectURL(file);
     const img = document.createElement("img");
-    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
-    let { width, height } = img;
-    if (width >= height && width > maxDim) { height = Math.round((height * maxDim) / width); width = maxDim; }
-    else if (height > maxDim) { width = Math.round((width * maxDim) / height); height = maxDim; }
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = objectUrl!; });
+    source = img; sw = img.naturalWidth || img.width; sh = img.naturalHeight || img.height;
+  }
+
+  let w = sw, h = sh;
+  if (w >= h && w > maxDim) { h = Math.round((h * maxDim) / w); w = maxDim; }
+  else if (h > maxDim) { w = Math.round((w * maxDim) / h); h = maxDim; }
+
+  try {
     const canvas = document.createElement("canvas");
-    canvas.width = width; canvas.height = height;
-    canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-    return await new Promise<Blob>((res) => canvas.toBlob((b) => res(b ?? file), "image/jpeg", quality));
+    canvas.width = w; canvas.height = h;
+    canvas.getContext("2d")!.drawImage(source, 0, 0, w, h);
+    const blob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b ?? file), "image/jpeg", quality));
+    canvas.width = 0; canvas.height = 0;   // free the backing store immediately (iOS is tight)
+    return blob;
   } finally {
-    URL.revokeObjectURL(url);
+    if (bmp) bmp.close();
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
   }
 }
 
