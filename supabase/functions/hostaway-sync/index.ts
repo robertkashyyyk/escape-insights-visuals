@@ -151,6 +151,9 @@ Deno.serve(async (req) => {
         return {
           hostaway_listing_id: l.id,
           name: l.name || `Listing ${l.id}`,
+          // Hostaway's operational/internal name (e.g. "Castle Hume 9"), distinct
+          // from the branded guest-facing `name`. Used to identify renamed props.
+          internal_name: l.internalListingName ?? null,
           address: l.address || null,
           city: l.city || null,
           country: l.countryCode || null,
