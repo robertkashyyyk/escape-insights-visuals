@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+/* Fonts moved to a non-blocking <link> in index.html — see the note there.
+   Keeping @import here made this whole stylesheet wait on Google Fonts, which
+   stalled into a dark unreadable page on iOS Safari. */
 
 @tailwind base;
 @tailwind components;

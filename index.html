@@ -3,6 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Fonts loaded non-blocking. Previously @import'd at the top of index.css,
+         which made the ENTIRE stylesheet (incl. all theme colour variables) wait
+         on this cross-origin fetch — on iOS Safari that stalled into a dark,
+         unreadable, half-styled page. Now index.css applies immediately and the
+         fonts swap in when ready. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" />
+    <noscript>
+      <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" />
+    </noscript>
     <script>
       // Set the theme before first paint to avoid a flash of the wrong theme.
       (function () {
