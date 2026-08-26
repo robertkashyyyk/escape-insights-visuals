@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { StickyNote, MessageSquare } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { StickyNote, MessageSquare, ConciergeBell, KeyRound, ExternalLink } from "lucide-react";
+import { parseCustomFields } from "@/lib/customFields";
 
 interface Props {
   reservationId: string | null;
@@ -25,7 +27,8 @@ export function BookingDetailDialog({ reservationId, guestName, open, onOpenChan
   });
 
   const customFields: { name?: string; value?: any }[] = Array.isArray(data?.custom_fields) ? data!.custom_fields : [];
-  const hasAny = data && (data.host_note || data.guest_note || customFields.length > 0);
+  const { requests, access } = parseCustomFields(customFields);
+  const hasAny = data && (data.host_note || data.guest_note || requests.length > 0 || access.length > 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -54,14 +57,32 @@ export function BookingDetailDialog({ reservationId, guestName, open, onOpenChan
                 <p className="text-sm whitespace-pre-wrap rounded-md bg-secondary/30 border border-border/30 p-2">{data.guest_note}</p>
               </div>
             )}
-            {customFields.length > 0 && (
+            {requests.length > 0 && (
               <div className="space-y-1.5">
-                <div className="text-xs font-medium text-muted-foreground">Custom Fields</div>
+                <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><ConciergeBell className="h-3.5 w-3.5" /> Guest Requests</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {requests.map((r, i) => (
+                    <Badge key={i} variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                      {r.label}{/^\d+$/.test(r.value) && Number(r.value) > 1 ? ` ×${r.value}` : ""}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {access.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><KeyRound className="h-3.5 w-3.5" /> Access &amp; Info</div>
                 <div className="rounded-md border border-border/30 divide-y divide-border/20">
-                  {customFields.map((cf, i) => (
+                  {access.map((a, i) => (
                     <div key={i} className="flex items-start gap-3 px-3 py-1.5 text-sm">
-                      <span className="text-muted-foreground min-w-32">{cf.name ?? "Field"}</span>
-                      <span className="flex-1 break-words">{String(cf.value ?? "")}</span>
+                      <span className="text-muted-foreground min-w-32 shrink-0">{a.name}</span>
+                      {a.url ? (
+                        <a href={a.url} target="_blank" rel="noreferrer" className="flex-1 break-all text-primary hover:underline inline-flex items-center gap-1">
+                          {a.value} <ExternalLink className="h-3 w-3 shrink-0" />
+                        </a>
+                      ) : (
+                        <span className="flex-1 break-words whitespace-pre-wrap">{a.value}</span>
+                      )}
                     </div>
                   ))}
                 </div>

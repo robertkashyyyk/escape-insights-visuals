@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag, Sunrise, Play, X, Undo2 } from "lucide-react";
+import { parseCustomFields, cleanerAccess, type AccessItem } from "@/lib/customFields";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, addDays, startOfWeek, endOfWeek, parseISO } from "date-fns";
@@ -86,6 +87,7 @@ export default function CleanerPortal() {
   const [startingId, setStartingId] = useState<string | null>(null);
   const [flagTask, setFlagTask] = useState<CleanTask | null>(null);
   const [requestsByTask, setRequestsByTask] = useState<Record<string, BookingRequest[]>>({});
+  const [accessByTask, setAccessByTask] = useState<Record<string, AccessItem[]>>({});
   const [reminderTask, setReminderTask] = useState<CleanTask | null>(null);
   const [activePeriod, setActivePeriod] = useState<PeriodKey>("today");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -331,23 +333,45 @@ export default function CleanerPortal() {
       }
       if (arrivalIds.size === 0) { setRequestsByTask({}); return; }
 
-      const { data: reqs } = await supabase
-        .from("booking_requests")
-        .select("reservation_id, quantity, requests(name, icon)")
-        .in("reservation_id", Array.from(arrivalIds));
+      const arrivalIdArr = Array.from(arrivalIds);
+      const [reqRes, cfRes] = await Promise.all([
+        supabase.from("booking_requests").select("reservation_id, quantity, requests(name, icon)").in("reservation_id", arrivalIdArr),
+        supabase.from("reservations").select("id, custom_fields").in("id", arrivalIdArr),
+      ]);
       if (cancelled) return;
 
       const byRes: Record<string, BookingRequest[]> = {};
-      for (const row of (reqs ?? []) as any[]) {
+      for (const row of (reqRes.data ?? []) as any[]) {
         (byRes[row.reservation_id] ??= []).push({
           name: row.requests?.name ?? "Request",
           icon: row.requests?.icon ?? null,
           quantity: row.quantity,
         });
       }
+      // Auto-feed requests + access straight from the arriving guest's Hostaway custom fields.
+      const accessByRes: Record<string, AccessItem[]> = {};
+      for (const r of (cfRes.data ?? []) as any[]) {
+        const { requests: cfReqs, access } = parseCustomFields(r.custom_fields);
+        for (const q of cfReqs) {
+          const list = (byRes[r.id] ??= []);
+          if (!list.some((x) => x.name.toLowerCase() === q.label.toLowerCase())) {
+            list.push({ name: q.label, icon: null, quantity: /^\d+$/.test(q.value) ? Number(q.value) : 1 });
+          }
+        }
+        const ca = cleanerAccess(access);
+        if (ca.length) accessByRes[r.id] = ca;
+      }
+
       const byTask: Record<string, BookingRequest[]> = {};
-      for (const t of tasks) { const rid = arrivalForTask[t.id]; if (rid && byRes[rid]) byTask[t.id] = byRes[rid]; }
+      const accessTask: Record<string, AccessItem[]> = {};
+      for (const t of tasks) {
+        const rid = arrivalForTask[t.id];
+        if (!rid) continue;
+        if (byRes[rid]) byTask[t.id] = byRes[rid];
+        if (accessByRes[rid]) accessTask[t.id] = accessByRes[rid];
+      }
       setRequestsByTask(byTask);
+      setAccessByTask(accessTask);
     })();
     return () => { cancelled = true; };
   }, [taskKey]);
@@ -812,6 +836,19 @@ export default function CleanerPortal() {
                                     <RequestIcon icon={r.icon} className="h-3 w-3" />
                                     {r.name}{r.quantity > 1 ? ` ×${r.quantity}` : ""}
                                   </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {(accessByTask[task.id]?.length ?? 0) > 0 && (
+                              <div className="mt-2 rounded-lg border border-border/40 bg-secondary/20 px-2.5 py-2 space-y-1">
+                                {accessByTask[task.id].map((a, i) => (
+                                  <div key={i} className="text-xs leading-snug">
+                                    <span className="text-muted-foreground">{a.name}: </span>
+                                    {a.url
+                                      ? <a href={a.url} target="_blank" rel="noreferrer" className="text-primary underline">open link</a>
+                                      : <span className="text-foreground break-words whitespace-pre-wrap">{a.value}</span>}
+                                  </div>
                                 ))}
                               </div>
                             )}
