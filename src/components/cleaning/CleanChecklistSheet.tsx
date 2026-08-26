@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, Check, ConciergeBell, SprayCan, Wrench, ListChecks, Camera } from "lucide-react";
+import { Loader2, Check, ConciergeBell, SprayCan, Wrench, ListChecks, Camera, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 
 /** Downscale a phone photo to keep uploads small + reliable on cleaner mobile data. */
@@ -193,8 +193,21 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
 
   return (
     <Sheet open={!!task} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto p-0">
-        <SheetHeader className="px-4 pt-4 pb-3 border-b border-border/30 sticky top-0 bg-background/95 backdrop-blur z-10">
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-md overflow-y-auto p-0"
+        hideClose
+        // Don't let the native camera handing focus back count as a click-away —
+        // that was closing the panel after each equipment photo. Close via Back only.
+        onInteractOutside={(e) => e.preventDefault()}
+      >
+        <SheetHeader className="px-4 pt-3 pb-3 border-b border-border/30 sticky top-0 bg-background/95 backdrop-blur z-10 space-y-1">
+          <button
+            onClick={onClose}
+            className="inline-flex items-center gap-1 -ml-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors self-start"
+          >
+            <ChevronLeft className="h-4 w-4" /> Back
+          </button>
           <SheetTitle className="flex items-center gap-2"><ListChecks className="h-5 w-5 text-primary" /> {task?.property_name}</SheetTitle>
           <SheetDescription>Tick each item. Everything must be done to complete the job.</SheetDescription>
           {!loading && total > 0 && (
