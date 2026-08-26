@@ -2,8 +2,9 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag, Sunrise, Play, X, Undo2 } from "lucide-react";
+import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag, Sunrise, Play, X, Undo2, ListChecks } from "lucide-react";
 import { parseCustomFields, cleanerAccess, type AccessItem } from "@/lib/customFields";
+import { CleanChecklistSheet } from "@/components/cleaning/CleanChecklistSheet";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, addDays, startOfWeek, endOfWeek, parseISO } from "date-fns";
@@ -89,6 +90,7 @@ export default function CleanerPortal() {
   const [requestsByTask, setRequestsByTask] = useState<Record<string, BookingRequest[]>>({});
   const [accessByTask, setAccessByTask] = useState<Record<string, AccessItem[]>>({});
   const [reminderTask, setReminderTask] = useState<CleanTask | null>(null);
+  const [checklistTask, setChecklistTask] = useState<CleanTask | null>(null);
   const [activePeriod, setActivePeriod] = useState<PeriodKey>("today");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const pageLoadTime = useRef(new Date().toISOString());
@@ -865,6 +867,14 @@ export default function CleanerPortal() {
                               </div>
                             ) : (
                               <>
+                                {/* Open the job checklist (requests + consumables + equipment) */}
+                                <button
+                                  onClick={() => setChecklistTask(task)}
+                                  className="w-full mt-4 min-h-[48px] rounded-lg font-semibold text-sm flex items-center justify-center gap-2 border border-primary/40 text-primary hover:bg-primary/10 transition-colors"
+                                >
+                                  <ListChecks className="h-4 w-4" /> Open Checklist
+                                </button>
+
                                 {/* Start Job */}
                                 {canStart && (
                                   <button
@@ -995,6 +1005,13 @@ export default function CleanerPortal() {
           cleanerName={cleaner.name}
         />
       )}
+
+      <CleanChecklistSheet
+        task={checklistTask ? { id: checklistTask.id, listing_id: checklistTask.listing_id, property_name: checklistTask.property_name } : null}
+        requestLabels={checklistTask ? requestsForTask(checklistTask).map((r) => r.name) : []}
+        userId={user?.id ?? null}
+        onClose={() => setChecklistTask(null)}
+      />
 
       {/* Requests reminder — shown before the standard "Yes, confirm" when the booking has requests */}
       <AlertDialog open={!!reminderTask} onOpenChange={(o) => !o && setReminderTask(null)}>
