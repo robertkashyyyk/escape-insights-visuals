@@ -191,6 +191,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
   let arrivalListingIds: string[] = [];
 
   if (isCurrentDayRefresh) {
+    // Arrivals today drive the P0 escalation (dirty property, guest incoming).
     const { data: arrivalsTodayRaw } = await supabase
       .from("reservations")
       .select("listing_id")
@@ -199,90 +200,111 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     arrivalListingIds = Array.from(
       new Set((arrivalsTodayRaw || []).map((r: any) => String(r.listing_id)))
     );
-  }
+    const arrivalSet = new Set(arrivalListingIds);
 
-  if (isCurrentDayRefresh && arrivalListingIds.length > 0) {
-    // Promote ANY incomplete prior-day task for a listing with arrival today.
-    // Operational rule: the clean did not happen yesterday, so the active
-    // responsibility moves to today as P0. The prior-day row is repurposed
-    // (UPDATE moves scheduled_date to today) — never duplicated. If multiple
-    // prior tasks exist for the same listing, keep one and delete the rest so
-    // we never end up with consecutive-day duplicate active cleans.
+    // Which cleaners are actually working today — for reassigning a carryover whose
+    // owner is off. Off = a non-working weekday, or on holiday covering today.
+    const { data: availCleaners } = await supabase
+      .from("cleaners").select("id, non_working_days").eq("active", true);
+    const { data: todayHolidays } = await supabase
+      .from("cleaner_holidays").select("cleaner_id")
+      .lte("start_date", targetDate).gte("end_date", targetDate);
+    const onHolidayToday = new Set((todayHolidays || []).map((h: any) => String(h.cleaner_id)));
+    const availableToday = new Set(
+      (availCleaners || [])
+        .filter((c: any) => !(c.non_working_days || []).includes(targetDayOfWeek) && !onHolidayToday.has(String(c.id)))
+        .map((c: any) => String(c.id))
+    );
+
+    // Roll EVERY incomplete prior-day clean forward to today — not only arrivals —
+    // so a missed turnover never gets stranded on a past date (the cleaner app and
+    // Today board only show today-onward, so a past-dated clean is invisible). The
+    // prior-day row is repurposed (UPDATE moves its date) — never duplicated.
     const { data: priorOpen } = await supabase
       .from("clean_tasks")
       .select("id, listing_id, scheduled_date, status, override_assignment, assigned_cleaner_id, notes, priority_level, priority, source, reservation_id")
-      .in("listing_id", arrivalListingIds)
       .lt("scheduled_date", targetDate)
       .not("status", "in", CANCELLED_TASK_STATUSES)
       .order("scheduled_date", { ascending: false });
 
-    // Don't promote into a listing that already has a clean scheduled for today.
-    const { data: existingToday } = await supabase
-      .from("clean_tasks")
-      .select("listing_id")
-      .in("listing_id", arrivalListingIds)
-      .eq("scheduled_date", targetDate);
-    const haveToday = new Set((existingToday || []).map((r: any) => String(r.listing_id)));
-    const promotedListings = new Set<string>();
+    if ((priorOpen || []).length > 0) {
+      const priorListingIds = Array.from(new Set((priorOpen || []).map((t: any) => String(t.listing_id))));
 
-    // Re-occupancy guard: a prior clean is STALE if the property was re-let after
-    // that clean's source checkout (a later guest checked in and has since been
-    // turned over). Without this, an un-completed old clean gets dragged forward
-    // day after day as a phantom P0 (e.g. CHC 12: 26 Jun checkout still showing
-    // "today" weeks later). Cancel such cleans instead of promoting them.
-    const priorResIds = (priorOpen || []).map((t: any) => t.reservation_id).filter(Boolean);
-    const { data: priorResRows } = await supabase
-      .from("reservations")
-      .select("id, check_out")
-      .in("id", priorResIds.length ? priorResIds : ["00000000-0000-0000-0000-000000000000"]);
-    const checkoutByRes = new Map((priorResRows || []).map((r: any) => [String(r.id), r.check_out]));
-    const { data: reoccArrivals } = await supabase
-      .from("reservations")
-      .select("listing_id, check_in")
-      .in("listing_id", arrivalListingIds)
-      .eq("status", "confirmed")
-      .lte("check_in", targetDate);
-    const checkinsByListing: Record<string, string[]> = {};
-    for (const r of reoccArrivals || []) {
-      (checkinsByListing[String(r.listing_id)] ||= []).push(r.check_in);
-    }
-
-    for (const t of priorOpen || []) {
-      const lid = String(t.listing_id);
-      // Skip + retire cleans the property was already re-let (and turned over) for.
-      const srcCheckout = t.reservation_id ? checkoutByRes.get(String(t.reservation_id)) : t.scheduled_date;
-      if (srcCheckout && (checkinsByListing[lid] || []).some((ci) => ci > srcCheckout && ci <= targetDate)) {
-        await supabase.from("clean_tasks").update({ status: "cancelled" }).eq("id", t.id);
-        continue;
-      }
-      if (haveToday.has(lid) || promotedListings.has(lid)) {
-        // Already covered today (or sibling just promoted) — delete the
-        // redundant prior task so no duplicate active cleans remain.
-        await supabase.from("clean_tasks").delete().eq("id", t.id);
-        continue;
-      }
-      // Preserve any existing assignment (manual override OR routine assignment)
-      // so the carryover is owned by the same cleaner today.
-      const keepCleaner = !!t.assigned_cleaner_id;
-      const priorDate = t.scheduled_date;
-      await supabase
+      // Don't roll into a listing that already has a clean scheduled for today.
+      const { data: existingToday } = await supabase
         .from("clean_tasks")
-        .update({
-          scheduled_date: targetDate,
-          priority: "arrival_risk_orphan",
-          priority_level: 0,
-          status: keepCleaner ? "scheduled" : "unassigned",
-          assigned_cleaner_id: keepCleaner ? t.assigned_cleaner_id : null,
-          override_assignment: false,
-          estimated_start_time: null,
-          warning_reason: keepCleaner
-            ? `Carried over from ${priorDate} — clean not completed`
-            : "Promoted from prior incomplete clean — property already vacant, guest arriving today",
-          overloaded: false,
-        })
-        .eq("id", t.id);
-      promotedListings.add(lid);
-      haveToday.add(lid);
+        .select("listing_id")
+        .in("listing_id", priorListingIds)
+        .eq("scheduled_date", targetDate);
+      const haveToday = new Set((existingToday || []).map((r: any) => String(r.listing_id)));
+      const promotedListings = new Set<string>();
+
+      // Re-occupancy guard: a prior clean is STALE if the property was re-let after
+      // that clean's source checkout (a later guest checked in and has since been
+      // turned over). Cancel such cleans instead of dragging them forward forever.
+      const priorResIds = (priorOpen || []).map((t: any) => t.reservation_id).filter(Boolean);
+      const { data: priorResRows } = await supabase
+        .from("reservations")
+        .select("id, check_out")
+        .in("id", priorResIds.length ? priorResIds : ["00000000-0000-0000-0000-000000000000"]);
+      const checkoutByRes = new Map((priorResRows || []).map((r: any) => [String(r.id), r.check_out]));
+      const { data: reoccArrivals } = await supabase
+        .from("reservations")
+        .select("listing_id, check_in")
+        .in("listing_id", priorListingIds)
+        .eq("status", "confirmed")
+        .lte("check_in", targetDate);
+      const checkinsByListing: Record<string, string[]> = {};
+      for (const r of reoccArrivals || []) {
+        (checkinsByListing[String(r.listing_id)] ||= []).push(r.check_in);
+      }
+
+      for (const t of priorOpen || []) {
+        const lid = String(t.listing_id);
+        // Skip + retire cleans the property was already re-let (and turned over) for.
+        const srcCheckout = t.reservation_id ? checkoutByRes.get(String(t.reservation_id)) : t.scheduled_date;
+        if (srcCheckout && (checkinsByListing[lid] || []).some((ci) => ci > srcCheckout && ci <= targetDate)) {
+          await supabase.from("clean_tasks").update({ status: "cancelled" }).eq("id", t.id);
+          continue;
+        }
+        if (haveToday.has(lid) || promotedListings.has(lid)) {
+          // Already covered today (or a sibling just rolled) — delete the redundant
+          // prior task so no duplicate active cleans remain.
+          await supabase.from("clean_tasks").delete().eq("id", t.id);
+          continue;
+        }
+        const isArrival = arrivalSet.has(lid);
+        // Keep the same cleaner ONLY if they're actually working today; otherwise
+        // drop the assignment so it re-enters the fair-share pool below (§7b) and
+        // lands on an available, eligible cleaner.
+        const ownerOff = !!t.assigned_cleaner_id && !availableToday.has(String(t.assigned_cleaner_id));
+        const keepCleaner = !!t.assigned_cleaner_id && availableToday.has(String(t.assigned_cleaner_id));
+        const priorDate = t.scheduled_date;
+        const warning = isArrival
+          ? (ownerOff
+              ? `Carried over from ${priorDate} — guest arriving today; original cleaner off, reassigning`
+              : `Carried over from ${priorDate} — not completed, guest arriving today`)
+          : (ownerOff
+              ? `Carried over from ${priorDate} — not completed; original cleaner off, reassigning`
+              : `Carried over from ${priorDate} — clean not completed`);
+        await supabase
+          .from("clean_tasks")
+          .update({
+            scheduled_date: targetDate,
+            // Arrival today → P0 arrival-risk; otherwise a standard (but flagged) carryover.
+            priority: isArrival ? "arrival_risk_orphan" : "standard",
+            priority_level: isArrival ? 0 : 2,
+            status: keepCleaner ? "scheduled" : "unassigned",
+            assigned_cleaner_id: keepCleaner ? t.assigned_cleaner_id : null,
+            override_assignment: false,
+            estimated_start_time: null,
+            warning_reason: warning,
+            overloaded: false,
+          })
+          .eq("id", t.id);
+        promotedListings.add(lid);
+        haveToday.add(lid);
+      }
     }
   }
 
