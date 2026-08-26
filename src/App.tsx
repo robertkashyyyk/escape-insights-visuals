@@ -32,6 +32,7 @@ import SyncHealth from "./pages/SyncHealth";
 import MonthlyReport from "./pages/MonthlyReport";
 import CleaningSchedule from "./pages/CleaningSchedule";
 import CleaningNumbers from "./pages/CleaningNumbers";
+import CleaningAudit from "./pages/CleaningAudit";
 import CleanerPortal from "./pages/CleanerPortal";
 import OwnerPortfolio from "./pages/owner/OwnerPortfolio";
 import OwnerCalendar from "./pages/owner/OwnerCalendar";
@@ -105,6 +106,7 @@ const App = () => (
             <Route path="/finance/expenses" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ExpensesPage /></ProtectedRoute>} />
             <Route path="/finance/bills-on-behalf" element={<ProtectedRoute requiredRoles={["super", "senior"]}><BillsOnBehalf /></ProtectedRoute>} />
             <Route path="/operations/numbers" element={<ProtectedRoute requiredRoles={["super", "senior"]}><CleaningNumbers /></ProtectedRoute>} />
+            <Route path="/operations/audit" element={<ProtectedRoute requiredRoles={["super", "senior", "admin"]}><CleaningAudit /></ProtectedRoute>} />
             <Route path="/property-knowledge" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PropertyKnowledge /></ProtectedRoute>} />
             <Route path="/property-knowledge/:listingId" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PropertyKnowledgeDetail /></ProtectedRoute>} />
             <Route path="/amenities" element={<ProtectedRoute requiredRoles={["super", "senior", "admin"]}><Amenities /></ProtectedRoute>} />
