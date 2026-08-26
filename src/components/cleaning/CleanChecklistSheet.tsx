@@ -33,6 +33,7 @@ export interface ChecklistItem {
   checked_at: string | null;
   check_all: boolean;
   photo_url: string | null;
+  flagged: boolean;
 }
 
 interface Props {
@@ -41,16 +42,18 @@ interface Props {
   userId: string | null;
   onClose: () => void;
   onChanged?: () => void;
+  onComplete?: () => void;   // fired from the sheet's "Complete Job" button (only when 100%)
 }
 
 const roomTitle = (type: string, index: number, count: number) =>
   count > 1 ? `${type === "kitchen" ? "Kitchen" : "Bathroom"} ${index}` : (type === "kitchen" ? "Kitchen" : "Bathroom");
 
-export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onChanged }: Props) {
+export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onChanged, onComplete }: Props) {
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
     if (!task) return;
@@ -130,6 +133,35 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
     await supabase.from("clean_checklist_items")
       .update({ checked: true, checked_at: now, checked_by: userId, check_all: true }).in("id", ids);
     onChanged?.();
+  };
+
+  // Red-flag rushed rooms: a consumables room where every item was ticked via
+  // "Check All" or within <5s of each other — "Check All Without Due Attention".
+  const flagRushedRooms = async () => {
+    if (!task) return;
+    const groups = new Map<string, ChecklistItem[]>();
+    for (const c of items.filter((i) => i.category === "consumable")) {
+      const k = `${c.room_type}-${c.room_index}`;
+      (groups.get(k) ?? groups.set(k, []).get(k)!).push(c);
+    }
+    const toFlag: string[] = [];
+    for (const its of groups.values()) {
+      if (!its.length || !its.every((i) => i.checked)) continue;
+      const times = its.map((i) => (i.checked_at ? Date.parse(i.checked_at) : NaN)).filter((t) => !isNaN(t));
+      const span = times.length ? Math.max(...times) - Math.min(...times) : 0;
+      if (its.length > 1 && (its.some((i) => i.check_all) || span < 5000)) toFlag.push(...its.map((i) => i.id));
+    }
+    if (toFlag.length) await supabase.from("clean_checklist_items").update({ flagged: true }).in("id", toFlag);
+  };
+
+  const handleComplete = async () => {
+    setCompleting(true);
+    try {
+      await flagRushedRooms();
+      onComplete?.();
+    } finally {
+      setCompleting(false);
+    }
   };
 
   const { requests, roomGroups, equipment, done, total, kitchenCount, bathCount } = useMemo(() => {
@@ -240,6 +272,23 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
                 <p className="text-[11px] text-muted-foreground mt-1.5">Each item must be photographed in approved condition.</p>
               </Section>
             )}
+          </div>
+        )}
+
+        {onComplete && !loading && total > 0 && (
+          <div className="sticky bottom-0 bg-background/95 backdrop-blur border-t border-border/30 p-4">
+            <button
+              onClick={handleComplete}
+              disabled={done < total || completing}
+              className={`w-full min-h-[48px] rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-colors ${
+                done < total
+                  ? "bg-secondary text-muted-foreground cursor-not-allowed"
+                  : "bg-emerald-600 text-white hover:bg-emerald-700"
+              }`}
+            >
+              {completing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              {done < total ? `${done}/${total} done — finish all to complete` : "Complete Job"}
+            </button>
           </div>
         )}
       </SheetContent>

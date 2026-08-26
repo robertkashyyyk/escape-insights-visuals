@@ -91,6 +91,7 @@ export default function CleanerPortal() {
   const [accessByTask, setAccessByTask] = useState<Record<string, AccessItem[]>>({});
   const [reminderTask, setReminderTask] = useState<CleanTask | null>(null);
   const [checklistTask, setChecklistTask] = useState<CleanTask | null>(null);
+  const [checklistByTask, setChecklistByTask] = useState<Record<string, { done: number; total: number }>>({});
   const [activePeriod, setActivePeriod] = useState<PeriodKey>("today");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const pageLoadTime = useRef(new Date().toISOString());
@@ -380,10 +381,43 @@ export default function CleanerPortal() {
 
   const requestsForTask = (task: CleanTask): BookingRequest[] => requestsByTask[task.id] ?? [];
 
-  // Tap "Mark Complete": if the booking has requests, show the reminder first;
-  // otherwise go straight to the standard "Yes, confirm" step.
+  // Load per-task checklist progress (done/total) so the "Complete" gate knows
+  // whether every request/consumable/equipment item has been ticked.
+  const loadChecklistProgress = async (ids: string[]) => {
+    if (!ids.length) return;
+    const { data } = await supabase
+      .from("clean_checklist_items").select("clean_task_id, checked").in("clean_task_id", ids);
+    const agg: Record<string, { done: number; total: number }> = {};
+    for (const r of (data ?? []) as any[]) {
+      const a = (agg[r.clean_task_id] ??= { done: 0, total: 0 });
+      a.total++;
+      if (r.checked) a.done++;
+    }
+    setChecklistByTask((prev) => ({
+      ...prev,
+      ...Object.fromEntries(ids.map((id) => [id, agg[id] ?? { done: 0, total: 0 }])),
+    }));
+  };
+
+  useEffect(() => {
+    const ids = tasks.map((t) => t.id);
+    if (ids.length) loadChecklistProgress(ids);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskKey]);
+
+  // Tap "Mark Complete": the checklist must be 100% first. If it isn't (or hasn't
+  // been generated yet), open the checklist instead of completing. Then, if the
+  // booking has requests, show the reminder; otherwise the standard confirm step.
   const handleCompleteClick = (task: CleanTask) => {
     if (isPreviewMode) { toast.info("Preview mode — actions are disabled"); return; }
+    const prog = checklistByTask[task.id];
+    if (!prog || prog.total === 0 || prog.done < prog.total) {
+      setChecklistTask(task);
+      toast.info(prog && prog.total > 0
+        ? `Finish the checklist first — ${prog.done}/${prog.total} done`
+        : "Open the checklist and complete it first");
+      return;
+    }
     if (requestsForTask(task).length > 0) { setReminderTask(task); return; }
     requestConfirmComplete(task.id);
   };
@@ -1010,7 +1044,8 @@ export default function CleanerPortal() {
         task={checklistTask ? { id: checklistTask.id, listing_id: checklistTask.listing_id, property_name: checklistTask.property_name } : null}
         requestLabels={checklistTask ? requestsForTask(checklistTask).map((r) => r.name) : []}
         userId={user?.id ?? null}
-        onClose={() => setChecklistTask(null)}
+        onClose={() => { const id = checklistTask?.id; setChecklistTask(null); if (id) loadChecklistProgress([id]); }}
+        onComplete={() => { const t = checklistTask; setChecklistTask(null); if (t) handleMarkComplete(t); }}
       />
 
       {/* Requests reminder — shown before the standard "Yes, confirm" when the booking has requests */}
