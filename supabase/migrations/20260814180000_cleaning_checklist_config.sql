@@ -47,7 +47,8 @@ select l.id, e.name
 from public.listings l
 cross join (values ('Hot Tub','hot tub'),('BBQ','bbq'),('Sauna','sauna'),('Pizza Oven','pizza oven')) e(name, kw)
 where l.is_bundle = false
-  and exists (select 1 from unnest(coalesce(l.amenities, '{}')) a where lower(a) like '%' || e.kw || '%')
+  and jsonb_typeof(l.amenities) = 'array'
+  and exists (select 1 from jsonb_array_elements_text(l.amenities) a where lower(a) like '%' || e.kw || '%')
 on conflict (listing_id, name) do nothing;
 
 -- ── RLS: catalogue/equipment readable by any signed-in user (cleaners need it);
