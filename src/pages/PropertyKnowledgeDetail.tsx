@@ -17,6 +17,7 @@ import {
   type PropertyKnowledge,
 } from "@/hooks/usePropertyKnowledge";
 import { KField, KSection } from "@/components/property-knowledge/KField";
+import { displayName } from "@/lib/listingName";
 import { PropertyAmenitiesTab } from "@/components/amenities/PropertyAmenitiesTab";
 import { formatDistanceToNow } from "date-fns";
 
@@ -69,7 +70,7 @@ export default function PropertyKnowledgeDetail() {
         {/* Header */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex-1 min-w-0">
-            <h1 className="text-3xl font-display font-bold tracking-tight">{data.listing.name}</h1>
+            <h1 className="text-3xl font-display font-bold tracking-tight">{displayName(data.listing)}</h1>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               {data.listing.location_group && (
                 <Badge variant="outline">{data.listing.location_group}</Badge>

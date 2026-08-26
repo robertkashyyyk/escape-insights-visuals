@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/fetchAllRows";
 import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
+import { displayName } from "@/lib/listingName";
 
 interface MonthlyData {
   month: string;
@@ -39,7 +40,7 @@ export function useAgencyRevenue() {
       const [reservations, { data: owners, error: oErr }] = await Promise.all([
         fetchAllRows<any>(() => supabase
           .from("reservations")
-          .select(`check_in, listing_id, listings(name, city, location_group, owner_id), ${REVENUE_FIELDS}`)
+          .select(`check_in, listing_id, listings(name, internal_name, city, location_group, owner_id), ${REVENUE_FIELDS}`)
           .gte("check_in", startOfYear)
           .lte("check_in", endOfYear)
           .eq("status", "confirmed")),
@@ -90,7 +91,7 @@ export function useAgencyRevenue() {
         } else {
           propertyMap.set(r.listing_id, {
             listingId: r.listing_id,
-            name: listing.name,
+            name: displayName(listing),
             location: listing.city || listing.location_group || "—",
             totalRevenue: total,
             agencyRevenue: agencyRev,

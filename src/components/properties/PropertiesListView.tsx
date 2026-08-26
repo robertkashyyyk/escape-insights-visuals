@@ -2,10 +2,12 @@ import { Link } from "react-router-dom";
 import { Bed, Bath, Users, MapPin, Pencil, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { PropertyFeatures } from "./PropertyFeatures";
+import { displayName } from "@/lib/listingName";
 
 interface ListingRow {
   id: string;
   name: string;
+  internal_name?: string | null;
   city?: string | null;
   location_group?: string | null;
   bedrooms?: number | null;
@@ -51,7 +53,7 @@ export function PropertiesListView({ rows, onEdit }: Props) {
               return (
                 <tr key={l.id} className="border-t border-border/20 hover:bg-secondary/20 transition-colors">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-foreground truncate max-w-[240px]">{l.name}</div>
+                    <div className="font-medium text-foreground truncate max-w-[240px]">{displayName(l)}</div>
                     {l.is_bundle && <span className="text-[9px] text-primary">Bundle</span>}
                   </td>
                   <td className="px-3 py-3 text-muted-foreground truncate max-w-[160px]">{ownerName || "—"}</td>

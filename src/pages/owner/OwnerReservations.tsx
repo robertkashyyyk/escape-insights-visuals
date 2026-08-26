@@ -13,6 +13,7 @@ import {
   format, differenceInDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
   startOfQuarter, endOfQuarter, startOfYear, endOfYear,
 } from "date-fns";
+import { displayName } from "@/lib/listingName";
 
 const fmt = (n: number) => `£${n.toLocaleString("en-GB", { maximumFractionDigits: 0 })}`;
 
@@ -49,7 +50,7 @@ export default function OwnerReservations() {
     staleTime: 30_000,
     refetchOnMount: true,
     queryFn: async () => {
-      let listingsQuery = supabase.from("listings").select("id, name, owner_id");
+      let listingsQuery = supabase.from("listings").select("id, name, internal_name, owner_id");
       let ownerQuery = supabase.from("property_owners").select("name");
 
       if (isPreviewMode && selectedOwnerId) {
@@ -110,8 +111,10 @@ export default function OwnerReservations() {
     return list;
   }, [data, propertyFilter, dateFilter, today, sortBy]);
 
-  const getPropertyName = (listingId: string) =>
-    data?.listings.find((l) => l.id === listingId)?.name || "Property";
+  const getPropertyName = (listingId: string) => {
+    const l = data?.listings.find((l) => l.id === listingId);
+    return l ? displayName(l) : "Property";
+  };
 
   if (isLoading) {
     return (
@@ -144,7 +147,7 @@ export default function OwnerReservations() {
             <SelectContent>
               <SelectItem value="all">All properties</SelectItem>
               {data?.listings.map((l) => (
-                <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                <SelectItem key={l.id} value={l.id}>{displayName(l)}</SelectItem>
               ))}
             </SelectContent>
           </Select>

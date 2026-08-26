@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { differenceInDays, format } from "date-fns";
 import { nightsBetween, nightsInPeriod, overlapsPeriod } from "@/lib/metrics";
+import { displayName } from "@/lib/listingName";
 
 // Layers the gross-model settlement onto the owner report:
 //  - Booking Fees + Card Processing as REAL cost lines (OTA settlement truth,
@@ -272,14 +273,14 @@ export function useManualEntries(ownerId: string | null, periodStart: string, pe
         .eq("owner_id", ownerId).eq("period_start", periodStart).maybeSingle();
       if (!period?.id) return { costs: [], adjustments: [] };
       const { data: pcs } = await db.from("property_costs")
-        .select("id, actual_amount, listing_id, cost_line_types(code, display_name), listings(name)")
+        .select("id, actual_amount, listing_id, cost_line_types(code, display_name), listings(name, internal_name)")
         .eq("report_period_id", period.id);
       const { data: adj } = await db.from("line_adjustments")
         .select("id, target, amount, reason, cost_line_types(code)").eq("report_period_id", period.id);
       return {
         costs: (pcs ?? []).map((c: any) => ({
           id: c.id, cost_code: c.cost_line_types?.code, display_name: c.cost_line_types?.display_name,
-          listing_id: c.listing_id, listing_name: c.listings?.name ?? null, amount: Number(c.actual_amount),
+          listing_id: c.listing_id, listing_name: c.listings ? displayName(c.listings) : null, amount: Number(c.actual_amount),
         })),
         adjustments: (adj ?? []).map((a: any) => ({
           id: a.id, target: a.target, cost_code: a.cost_line_types?.code ?? null,

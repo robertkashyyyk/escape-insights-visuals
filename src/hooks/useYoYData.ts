@@ -15,6 +15,7 @@ import {
   format,
 } from "date-fns";
 import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
+import { displayName } from "@/lib/listingName";
 
 export type PeriodType = "week" | "month" | "quarter";
 
@@ -81,7 +82,7 @@ export function useYoYData(periodType: PeriodType, periodValue: number, year: nu
           .gte("check_in", fmt(previous.start))
           .lte("check_in", fmt(previous.end))
           .eq("status", "confirmed")),
-        supabase.from("listings").select("id, name, city"),
+        supabase.from("listings").select("id, name, internal_name, city"),
       ]);
 
       if (listingsRes.error) throw listingsRes.error;
@@ -123,7 +124,7 @@ export function useYoYData(periodType: PeriodType, periodValue: number, year: nu
 
         results.push({
           listingId: id,
-          name: listing.name,
+          name: displayName(listing),
           city: listing.city,
           currentRevenue: cur.revenue,
           previousRevenue: prev.revenue,

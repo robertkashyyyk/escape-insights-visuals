@@ -15,6 +15,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { CleanerProfileFields } from "@/components/settings/CleanerProfileFields";
 import { UserPlus, Loader2, Copy, KeyRound, Mail, ArrowRight, ArrowLeft } from "lucide-react";
+import { displayName } from "@/lib/listingName";
 
 type Role = "super" | "senior" | "admin" | "client" | "cleaner";
 
@@ -61,7 +62,7 @@ export function AddPersonWizard({ onDone }: Props) {
   const [mgmtRate, setMgmtRate] = useState<number | null>(null);
   const [vatInclusive, setVatInclusive] = useState(false);
   const [ownerNotes, setOwnerNotes] = useState("");
-  const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
+  const [properties, setProperties] = useState<{ id: string; name: string; internal_name?: string | null }[]>([]);
   const [assignedListingIds, setAssignedListingIds] = useState<string[]>([]);
 
   // Step 3 — credentials
@@ -75,7 +76,7 @@ export function AddPersonWizard({ onDone }: Props) {
   useEffect(() => {
     if (needsSetup === "owner" && properties.length === 0) {
       (async () => {
-        const { data } = await supabase.from("listings").select("id, name").order("name");
+        const { data } = await supabase.from("listings").select("id, name, internal_name").order("name");
         setProperties((data as any) ?? []);
       })();
     }
@@ -274,7 +275,7 @@ export function AddPersonWizard({ onDone }: Props) {
                     <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer">
                       <input type="checkbox" checked={assignedListingIds.includes(p.id)}
                         onChange={() => toggle(assignedListingIds, p.id, setAssignedListingIds)} />
-                      {p.name}
+                      {displayName(p)}
                     </label>
                   ))}
                 </div>

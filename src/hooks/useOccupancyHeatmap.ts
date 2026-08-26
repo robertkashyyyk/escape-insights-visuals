@@ -13,6 +13,7 @@ import {
   format,
 } from "date-fns";
 import { computeOrphanGapDates } from "@/lib/orphanGaps";
+import { displayName } from "@/lib/listingName";
 
 export interface MonthCell {
   occupancy: number;
@@ -39,7 +40,7 @@ export function useOccupancyHeatmap(year: number) {
       const yearEnd = `${year}-12-31`;
 
       const [{ data: listings }, reservations] = await Promise.all([
-        supabase.from("listings").select("id, name, location_group, min_stay_nights").eq("status", "active").order("name"),
+        supabase.from("listings").select("id, name, internal_name, location_group, min_stay_nights").eq("status", "active").order("name"),
         fetchAllRows<any>(() => supabase
           .from("reservations")
           .select("listing_id, check_in, check_out, total_amount, status")
@@ -106,7 +107,7 @@ export function useOccupancyHeatmap(year: number) {
 
         return {
           id: listing.id,
-          name: listing.name,
+          name: displayName(listing),
           locationGroup: listing.location_group || "Ungrouped",
           minStayNights: minStay,
           months,

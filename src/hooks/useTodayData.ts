@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfDay, addDays, startOfMonth, endOfMonth } from "date-fns";
 import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
+import { displayName } from "@/lib/listingName";
 
 interface Movement {
   propertyName: string;
@@ -43,7 +44,7 @@ export function useTodayData() {
 
       const { data: weekRes } = await supabase
         .from("reservations")
-        .select("check_in, check_out, guest_name, listing_id, listings(name)")
+        .select("check_in, check_out, guest_name, listing_id, listings(name, internal_name)")
         .or(`check_in.gte.${todayStr},check_out.gte.${todayStr}`)
         .lte("check_in", weekEnd)
         .eq("status", "confirmed");
@@ -82,7 +83,7 @@ export function useTodayData() {
 
       for (const r of allRes) {
         const listing = r.listings as any;
-        const propName = listing?.name || "Unknown Property";
+        const propName = listing ? displayName(listing) : "Unknown Property";
 
         if (r.check_out === todayStr) {
           movements.push({ propertyName: propName, guestName: r.guest_name, type: "checkout", listingId: r.listing_id });

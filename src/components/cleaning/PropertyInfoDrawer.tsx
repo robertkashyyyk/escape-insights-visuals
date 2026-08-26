@@ -9,6 +9,7 @@ import {
   BedDouble, Bath, MapPin, Clock, KeyRound, Flame, Wifi, Sparkles,
   Hammer, ExternalLink, StickyNote, Users, Hash,
 } from "lucide-react";
+import { displayName } from "@/lib/listingName";
 
 interface Props {
   listingId: string | null;
@@ -25,7 +26,7 @@ export function PropertyInfoDrawer({ listingId, onOpenChange }: Props) {
       const [{ data: listing }, { data: knowledge }] = await Promise.all([
         supabase
           .from("listings")
-          .select("id, name, address, city, postcode, location_group, bedrooms, bathrooms, max_guests, default_check_in_time, default_check_out_time, min_stay_nights, cleaning_duration_minutes, has_hot_tub, pet_friendly, self_check_in, operational_notes, troubleshooting_notes, access_details")
+          .select("id, name, internal_name, address, city, postcode, location_group, bedrooms, bathrooms, max_guests, default_check_in_time, default_check_out_time, min_stay_nights, cleaning_duration_minutes, has_hot_tub, pet_friendly, self_check_in, operational_notes, troubleshooting_notes, access_details")
           .eq("id", listingId!)
           .maybeSingle(),
         supabase
@@ -54,7 +55,7 @@ export function PropertyInfoDrawer({ listingId, onOpenChange }: Props) {
           <>
             <SheetHeader className="space-y-2">
               <SheetTitle className="font-display text-lg leading-tight pr-6">
-                {listing.name}
+                {displayName(listing)}
               </SheetTitle>
               <SheetDescription className="flex items-center gap-1.5 text-xs">
                 <MapPin className="h-3 w-3" />

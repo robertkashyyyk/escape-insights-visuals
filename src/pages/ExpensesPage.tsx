@@ -19,6 +19,7 @@ import { Receipt, ChevronDown, Plus, Upload, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { TurnoverRatesTab } from "@/components/expenses/TurnoverRatesTab";
 import { UtilitiesTab } from "@/components/expenses/UtilitiesTab";
+import { displayName } from "@/lib/listingName";
 
 const fmtGbp = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(n || 0);
 
@@ -53,7 +54,7 @@ function ConsumablesTab() {
   const { data: listings = [] } = useQuery({
     queryKey: ["expenses_listings"],
     queryFn: async () => {
-      const { data } = await supabase.from("listings").select("id, name").eq("status", "active").order("name");
+      const { data } = await supabase.from("listings").select("id, name, internal_name").eq("status", "active").order("name");
       return data ?? [];
     },
   });
@@ -71,7 +72,7 @@ function ConsumablesTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("expense_consumables")
-        .select("*, listings:listing_id (name)")
+        .select("*, listings:listing_id (name, internal_name)")
         .order("purchase_date", { ascending: false });
       if (error) throw error;
       return data ?? [];
@@ -87,7 +88,7 @@ function ConsumablesTab() {
 
   // Multi-select targets (properties or regions) with even-split-default attribution.
   const targets: { id: string; label: string }[] = allocType === "property"
-    ? (listings as any[]).map((l) => ({ id: l.id, label: l.name }))
+    ? (listings as any[]).map((l) => ({ id: l.id, label: displayName(l) }))
     : (locationGroups as any[]).map((g) => ({ id: g.name, label: g.name }));
   const round3 = (n: number) => Math.round(n * 1000) / 1000;
   const evenSplit = (ids: string[]) => {
@@ -275,7 +276,7 @@ function ConsumablesTab() {
                   <TableCell>{fmtGbp(Number(e.receipt_value))}</TableCell>
                   <TableCell><Badge variant={e.payer === "company" ? "secondary" : "outline"}>{e.payer}</Badge></TableCell>
                   <TableCell className="text-xs">
-                    {e.allocation_type === "property" ? (e.listings?.name ?? "—") : `Region: ${e.region}`}
+                    {e.allocation_type === "property" ? (e.listings ? displayName(e.listings) : "—") : `Region: ${e.region}`}
                   </TableCell>
                   <TableCell className="text-xs">{e.purchased_by_name ?? "—"}</TableCell>
                   <TableCell>
@@ -337,7 +338,7 @@ function LaundryTab() {
   const { data: scopeListings = [] } = useQuery({
     queryKey: ["laundry_scope_listings"],
     queryFn: async () => {
-      const { data } = await supabase.from("listings").select("id, name, location_group").eq("status", "active").order("name");
+      const { data } = await supabase.from("listings").select("id, name, internal_name, location_group").eq("status", "active").order("name");
       return data ?? [];
     },
   });
@@ -399,7 +400,7 @@ function LaundryTab() {
     // Find bookings overlapping period
     const resv = await fetchAllRows<any>(() => supabase
       .from("reservations")
-      .select("listing_id, listings:listing_id (name, bedrooms)")
+      .select("listing_id, listings:listing_id (name, internal_name, bedrooms)")
       .lt("check_in", periodEnd)
       .gt("check_out", periodStart)
       .not("status", "in", "(cancelled,canceled,declined,expired,inquiry)"));
@@ -408,7 +409,7 @@ function LaundryTab() {
     (resv ?? []).forEach((r: any) => {
       if (!r.listing_id) return;
       if (allowedIds && !allowedIds.has(r.listing_id)) return;
-      const cur = byListing.get(r.listing_id) ?? { name: r.listings?.name ?? "Unknown", bedrooms: r.listings?.bedrooms ?? 0, bookings: 0 };
+      const cur = byListing.get(r.listing_id) ?? { name: r.listings ? displayName(r.listings) : "Unknown", bedrooms: r.listings?.bedrooms ?? 0, bookings: 0 };
       cur.bookings += 1;
       byListing.set(r.listing_id, cur);
     });
@@ -499,7 +500,7 @@ function LaundryTab() {
                   {(scopeListings as any[]).map((l) => (
                     <label key={l.id} className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-muted/30">
                       <input type="checkbox" checked={pickListings.includes(l.id)} onChange={() => setPickListings((p) => toggleIn(p, l.id))} className="accent-primary" />
-                      <span className="truncate">{l.name}</span>
+                      <span className="truncate">{displayName(l)}</span>
                     </label>
                   ))}
                 </div>

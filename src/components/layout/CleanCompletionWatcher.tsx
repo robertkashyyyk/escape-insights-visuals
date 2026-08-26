@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { createElement } from "react";
+import { displayName } from "@/lib/listingName";
 
 export function CleanCompletionWatcher() {
   const seenRef = useRef<Set<string>>(new Set());
@@ -25,14 +26,14 @@ export function CleanCompletionWatcher() {
 
           const [{ data: listing }, { data: cleaner }] = await Promise.all([
             newRow.listing_id
-              ? supabase.from("listings").select("name").eq("id", newRow.listing_id).maybeSingle()
+              ? supabase.from("listings").select("name, internal_name").eq("id", newRow.listing_id).maybeSingle()
               : Promise.resolve({ data: null } as any),
             newRow.assigned_cleaner_id
               ? supabase.from("cleaners" as any).select("name").eq("id", newRow.assigned_cleaner_id).maybeSingle()
               : Promise.resolve({ data: null } as any),
           ]);
 
-          const listingName = (listing as any)?.name ?? "Property";
+          const listingName = listing ? displayName(listing as any) : "Property";
           const cleanerName = (cleaner as any)?.name ?? "Unassigned cleaner";
           const completedAt = newRow.completed_at ? new Date(newRow.completed_at) : new Date();
           const timeStr = format(completedAt, "h:mmaaa").replace("AM", "am").replace("PM", "pm");

@@ -8,6 +8,7 @@ import { Users, Plus, Trash2, Check, X, Pencil } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { displayName } from "@/lib/listingName";
 
 interface GroupRow {
   id: string;
@@ -17,6 +18,7 @@ interface GroupRow {
 interface MemberRow {
   id: string;
   name: string;
+  internal_name?: string | null;
   communal_group_id: string | null;
   communal_ratio_pct: number | null;
   is_communal: boolean;
@@ -43,7 +45,7 @@ export function CommunalGroupsSettings() {
         (supabase.from as any)("communal_groups").select("id, name, notes").order("name"),
         supabase
           .from("listings")
-          .select("id, name, communal_group_id, communal_ratio_pct, is_communal, is_bundle")
+          .select("id, name, internal_name, communal_group_id, communal_ratio_pct, is_communal, is_bundle")
           .order("name"),
       ]);
       return {
@@ -294,7 +296,7 @@ export function CommunalGroupsSettings() {
                     ) : (
                       members.map((m) => (
                         <div key={m.id} className="flex items-center gap-2">
-                          <span className="flex-1 text-sm text-foreground truncate">{m.name}</span>
+                          <span className="flex-1 text-sm text-foreground truncate">{displayName(m)}</span>
                           <div className="w-24 flex items-center gap-1">
                             <Input
                               type="number"
@@ -357,7 +359,7 @@ export function CommunalGroupsSettings() {
                               <div className="px-2 py-1.5 text-[11px] text-muted-foreground">No unassigned properties</div>
                             ) : (
                               unassigned.map((l) => (
-                                <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                                <SelectItem key={l.id} value={l.id}>{displayName(l)}</SelectItem>
                               ))
                             )}
                           </SelectContent>

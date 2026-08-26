@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { differenceInDays, parseISO, startOfYear, endOfYear, format } from "date-fns";
 import { getNetRevenue, REVENUE_FIELDS } from "@/lib/revenue";
+import { displayName } from "@/lib/listingName";
 
 interface PropertyBreakdown {
   listingId: string;
@@ -36,7 +37,7 @@ export function useOwnerPortfolio(ownerId: string | null, year: number) {
       // Get listings for this owner
       const { data: listings } = await supabase
         .from("listings")
-        .select("id, name, status")
+        .select("id, name, internal_name, status")
         .eq("owner_id", ownerId!);
 
       if (!listings?.length) {
@@ -86,7 +87,7 @@ export function useOwnerPortfolio(ownerId: string | null, year: number) {
       const monthlyRevenue = monthOrder.map((m) => ({ label: m, revenue: monthlyMap[m] || 0 }));
 
       // Property breakdown
-      const listingMap = Object.fromEntries(listings.map((l) => [l.id, l.name]));
+      const listingMap = Object.fromEntries(listings.map((l) => [l.id, displayName(l)]));
       const properties: PropertyBreakdown[] = Object.entries(byListing)
         .map(([id, v]) => ({
           listingId: id,

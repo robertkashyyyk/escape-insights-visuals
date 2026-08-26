@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { displayName } from "@/lib/listingName";
 
 export type MaintenanceTaskType = "maintenance" | "setup";
 export type MaintenanceTaskScope = "property" | "communal";
@@ -37,12 +38,12 @@ export function useMaintenanceTasks() {
     queryKey: ["maintenance_tasks"],
     queryFn: async (): Promise<MaintenanceTask[]> => {
       const { data, error } = await (supabase.from as any)("maintenance_tasks")
-        .select("*, listings(name), communal_groups(name)")
+        .select("*, listings(name, internal_name), communal_groups(name)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return ((data ?? []) as any[]).map((t) => ({
         ...t,
-        listing_name: t.listings?.name ?? null,
+        listing_name: t.listings ? displayName(t.listings) : null,
         communal_group_name: t.communal_groups?.name ?? null,
       })) as MaintenanceTask[];
     },

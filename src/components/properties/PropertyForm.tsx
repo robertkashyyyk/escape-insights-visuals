@@ -14,6 +14,7 @@ import { useLocationGroups } from "@/hooks/useLocationGroups";
 import { useCommunalGroups } from "@/hooks/useCommunalGroups";
 import { AlertTriangle } from "lucide-react";
 import { PropertyBedsEditor } from "@/components/properties/PropertyBedsEditor";
+import { displayName } from "@/lib/listingName";
 
 interface PropertyFormProps {
   open: boolean;
@@ -76,7 +77,7 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
       if (!form.owner_id) return [];
       const { data } = await supabase
         .from("listings")
-        .select("id, name, is_bundle")
+        .select("id, name, internal_name, is_bundle")
         .eq("owner_id", form.owner_id)
         .order("name");
       // Exclude the current listing and other bundles
@@ -327,7 +328,7 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
                         </SelectTrigger>
                         <SelectContent>
                           {siblingListings?.map((sl) => (
-                            <SelectItem key={sl.id} value={sl.id}>{sl.name}</SelectItem>
+                            <SelectItem key={sl.id} value={sl.id}>{displayName(sl)}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

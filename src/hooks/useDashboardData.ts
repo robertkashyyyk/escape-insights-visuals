@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { differenceInDays, startOfDay, format, startOfWeek, startOfMonth, startOfQuarter } from "date-fns";
 import { periodRevenue } from "@/lib/metrics";
+import { displayName } from "@/lib/listingName";
 
 export type PeriodType = "Year" | "Quarter" | "Month" | "Week" | "Custom";
 
@@ -92,7 +93,7 @@ export function useDashboardData(dateRange: DateRange, periodType: PeriodType) {
       for (let offset = 0; ; offset += PAGE) {
         const { data, error } = await supabase
           .from("reservations")
-          .select("*, listings(name, city, location_group, bedrooms, bathrooms, max_guests, owner_id)")
+          .select("*, listings(name, internal_name, city, location_group, bedrooms, bathrooms, max_guests, owner_id)")
           .or(`check_in.lte.${toStr},check_out.gte.${fromStr}`)
           .gte("check_in", fromStr)
           .lte("check_in", toStr)
@@ -137,7 +138,7 @@ export function useDashboardData(dateRange: DateRange, periodType: PeriodType) {
         const listing = r.listings as any;
         if (listing) {
           const existing = propertyRevMap.get(r.listing_id) || {
-            name: listing.name,
+            name: displayName(listing),
             location: listing.location_group || listing.city || "",
             revenue: 0,
             nights: 0,

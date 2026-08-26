@@ -11,6 +11,7 @@ import {
 import { REVENUE_FIELDS, getGrossRevenue } from "@/lib/revenue";
 import { projectRevenue } from "@/lib/ownerProjection";
 import { periodRevenue, overlapsPeriod } from "@/lib/metrics";
+import { displayName } from "@/lib/listingName";
 
 export type OwnerPeriodType = "Week" | "Month" | "Quarter" | "Year";
 export type OwnerDateMode = "check_in" | "created";
@@ -230,7 +231,7 @@ export function useOwnerPortalData(
     refetchOnMount: true,
     queryFn: async () => {
       /* ── 1. Listings + owner ── */
-      let listingsQuery = supabase.from("listings").select("id, name, location_group, bedrooms, owner_id, is_bundle, bundle_components");
+      let listingsQuery = supabase.from("listings").select("id, name, internal_name, location_group, bedrooms, owner_id, is_bundle, bundle_components");
       let ownerQuery    = supabase.from("property_owners").select("id, name");
       if (isPreviewMode && selectedOwnerId) {
         listingsQuery = listingsQuery.eq("owner_id", selectedOwnerId);
@@ -247,7 +248,7 @@ export function useOwnerPortalData(
       const owner       = ownerRes.data?.[0];
       const lastSyncAt  = syncRes.data?.[0]?.completed_at ?? null;
       const listingIds  = listings.map((l) => l.id);
-      const listingName = new Map<string, string>(listings.map((l: any) => [l.id, l.name]));
+      const listingName = new Map<string, string>(listings.map((l: any) => [l.id, displayName(l)]));
 
       // Bundle map
       const bundlesById = new Map<string, Array<{ listing_id: string; split_pct: number }>>();
@@ -377,7 +378,7 @@ export function useOwnerPortalData(
           }));
 
         return {
-          id: l.id, name: l.name, location_group: l.location_group, bedrooms: l.bedrooms,
+          id: l.id, name: displayName(l), location_group: l.location_group, bedrooms: l.bedrooms,
           isBundle: false,
           revenueThisYear, revenuePrevYear, occupancyPct, adr, totalNights, totalBookings,
           monthlyRevenue, upcomingCount, reservations, duplicatesDropped,

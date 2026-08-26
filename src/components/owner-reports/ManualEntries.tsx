@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useManualEntries } from "@/hooks/useOwnerSettlement";
+import { displayName } from "@/lib/listingName";
 
 const db = supabase as any;
 const gbp = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 2 }).format(n);
@@ -19,7 +20,7 @@ export function ManualEntries({ ownerId, periodStart, periodEnd }: { ownerId: st
   const { entries, addCost, addAdjustment, removeCost, removeAdjustment } = useManualEntries(ownerId, periodStart, periodEnd);
   const { data: listings = [] } = useQuery({
     queryKey: ["owner_listings_min", ownerId],
-    queryFn: async () => (await db.from("listings").select("id, name").eq("owner_id", ownerId).order("name")).data ?? [],
+    queryFn: async () => (await db.from("listings").select("id, name, internal_name").eq("owner_id", ownerId).order("name")).data ?? [],
   });
   const { data: lineTypes = [] } = useQuery({
     queryKey: ["cost_line_types_min"],
@@ -56,7 +57,7 @@ export function ManualEntries({ ownerId, periodStart, periodEnd }: { ownerId: st
           <div className="flex flex-wrap items-center gap-2">
             <Select value={cListing} onValueChange={setCListing}>
               <SelectTrigger className="w-44"><SelectValue placeholder="Property" /></SelectTrigger>
-              <SelectContent>{(listings as any[]).map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
+              <SelectContent>{(listings as any[]).map((l) => <SelectItem key={l.id} value={l.id}>{displayName(l)}</SelectItem>)}</SelectContent>
             </Select>
             <Select value={cCode} onValueChange={setCCode}>
               <SelectTrigger className="w-40"><SelectValue placeholder="Cost line" /></SelectTrigger>

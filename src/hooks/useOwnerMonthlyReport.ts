@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOwnerPreview } from "@/contexts/OwnerPreviewContext";
+import { displayName } from "@/lib/listingName";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
@@ -47,7 +48,7 @@ export function useOwnerMonthlyReport(year: number) {
     enabled: !!(isPreviewMode ? selectedOwnerId : user),
     staleTime: 60_000,
     queryFn: async (): Promise<{ year: number; properties: ReportProperty[] }> => {
-      let lq = supabase.from("listings").select("id, name, is_bundle, bundle_components, owner_id");
+      let lq = supabase.from("listings").select("id, name, internal_name, is_bundle, bundle_components, owner_id");
       if (isPreviewMode && selectedOwnerId) lq = lq.eq("owner_id", selectedOwnerId);
       const { data: listings } = await lq;
       const mine = (listings || []).filter((l: any) => (isPreviewMode ? l.owner_id === selectedOwnerId : true));
@@ -89,7 +90,7 @@ export function useOwnerMonthlyReport(year: number) {
               prevNights: prev.nights, prevRevenue: prev.revenue, prevOcc: prev.occ, prevAdr: prev.adr,
             });
           }
-          return { id: l.id, name: l.name, months };
+          return { id: l.id, name: displayName(l), months };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
 

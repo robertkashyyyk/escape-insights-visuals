@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfMonth, endOfMonth, subYears, differenceInDays, format, addDays, subDays } from "date-fns";
 import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
+import { displayName } from "@/lib/listingName";
 
 interface PacingData {
   currentOTB: number;
@@ -65,7 +66,7 @@ async function fetchAllReservations(
 async function fetchListings() {
   const { data } = await supabase
     .from("listings")
-    .select("id, name, location_group")
+    .select("id, name, internal_name, location_group")
     .eq("status", "active");
   return data || [];
 }
@@ -180,7 +181,7 @@ export function useRevenuePacing(targetMonth: Date) {
           const ly = lyByListing[lid] || 0;
           return {
             listingId: lid,
-            propertyName: listing?.name || "Unknown Property",
+            propertyName: listing ? displayName(listing) : "Unknown Property",
             locationGroup: listing?.location_group || null,
             currentOTB: cur,
             samePointLY: ly,

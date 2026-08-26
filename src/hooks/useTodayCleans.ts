@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfDay } from "date-fns";
+import { displayName } from "@/lib/listingName";
 
 export interface TodayCleanRow {
   id: string;
@@ -24,7 +25,7 @@ export function useTodayCleans() {
       const { data } = await supabase
         .from("clean_tasks" as any)
         .select(
-          "id, status, assigned_cleaner_id, completed_at, priority_level, checkout_time, checkin_time, is_same_day_turnaround, listings(name), cleaners(name)"
+          "id, status, assigned_cleaner_id, completed_at, priority_level, checkout_time, checkin_time, is_same_day_turnaround, listings(name, internal_name), cleaners(name)"
         )
         .eq("scheduled_date", todayStr)
         .not("status", "in", "(cancelled,canceled)")
@@ -39,7 +40,7 @@ export function useTodayCleans() {
         checkout_time: r.checkout_time,
         checkin_time: r.checkin_time,
         is_same_day_turnaround: r.is_same_day_turnaround,
-        listing_name: r.listings?.name ?? "Unknown property",
+        listing_name: r.listings ? displayName(r.listings) : "Unknown property",
         cleaner_name: r.cleaners?.name ?? null,
       }));
     },

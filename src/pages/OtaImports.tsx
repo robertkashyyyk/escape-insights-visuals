@@ -17,6 +17,7 @@ import {
   useOtaBatches, useOtaTransactions, useOtaMutations, useListings, fetchReservationCandidates, ListingLite,
   useAttributionDecisions, useSecurityDeposits,
 } from "@/hooks/useOtaIngestion";
+import { displayName } from "@/lib/listingName";
 import {
   OtaTransaction, OtaPlatform, ResvCandidate, scoreCandidate, fuzzyListingScore, fmtGBP, reconBadgeClass,
 } from "@/lib/ota";
@@ -209,7 +210,7 @@ function ReconRow({ txn, listings, m }: {
               <Select value={pickListing} onValueChange={setPickListing}>
                 <SelectTrigger className="w-80"><SelectValue placeholder="Pick listing…" /></SelectTrigger>
                 <SelectContent>
-                  {rankedListings.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                  {rankedListings.map((l) => <SelectItem key={l.id} value={l.id}>{displayName(l)}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Button size="sm" disabled={!pickListing} onClick={() =>
@@ -299,7 +300,7 @@ function AttributionRow({ txn, listings, m }: {
         <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
           <Select value={listingId} onValueChange={setListingId}>
             <SelectTrigger className="w-72"><SelectValue placeholder="Allocate to listing…" /></SelectTrigger>
-            <SelectContent>{listings.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
+            <SelectContent>{listings.map((l) => <SelectItem key={l.id} value={l.id}>{displayName(l)}</SelectItem>)}</SelectContent>
           </Select>
           <Button size="sm" disabled={!listingId} onClick={() =>
             m.attributionDecision.mutate(
@@ -367,7 +368,7 @@ function AttributionTab() {
 function MatchedTab() {
   const { data: rows = [], isLoading } = useOtaTransactions({ statuses: ["auto_matched", "matched"], revenueOnly: true });
   const { data: listings = [] } = useListings();
-  const nameById = new Map(listings.map((l) => [l.id, l.name]));
+  const nameById = new Map(listings.map((l) => [l.id, displayName(l)]));
   return (
     <div className="space-y-3">
       {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}

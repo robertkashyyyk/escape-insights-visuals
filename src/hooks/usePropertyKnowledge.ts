@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { displayName } from "@/lib/listingName";
 
 export type Listing = {
   id: string;
@@ -135,7 +136,7 @@ export function usePropertyKnowledgeList() {
       const [listingsRes, knowledgeRes] = await Promise.all([
         supabase
           .from("listings")
-          .select("id, name, bedrooms, location_group, city, status")
+          .select("id, name, internal_name, bedrooms, location_group, city, status")
           .eq("status", "active")
           .order("name"),
         supabase
@@ -152,6 +153,7 @@ export function usePropertyKnowledgeList() {
 
       return (listingsRes.data || []).map((l) => ({
         ...l,
+        name: displayName(l),
         completion_score: knowledgeMap.get(l.id)?.completion_score ?? 0,
         updated_at: knowledgeMap.get(l.id)?.updated_at ?? null,
       }));
@@ -290,7 +292,7 @@ export function usePropertyKnowledgeSearch(query: string) {
 
       const [knowledgeRes, listingsRes, maintRes, issuesRes] = await Promise.all([
         supabase.from("property_knowledge").select("*").or(orFilter).limit(50),
-        supabase.from("listings").select("id, name").ilike("name", q).eq("status", "active").limit(20),
+        supabase.from("listings").select("id, name, internal_name").ilike("name", q).eq("status", "active").limit(20),
         supabase.from("property_maintenance_log").select("*").ilike("issue_description", q).limit(20),
         supabase.from("property_known_issues").select("*").or(`title.ilike.${q},description.ilike.${q}`).limit(20),
       ]);
@@ -304,9 +306,9 @@ export function usePropertyKnowledgeSearch(query: string) {
 
       const { data: listings } = await supabase
         .from("listings")
-        .select("id, name")
+        .select("id, name, internal_name")
         .in("id", Array.from(allListingIds));
-      const nameMap = new Map((listings || []).map((l: any) => [l.id, l.name]));
+      const nameMap = new Map((listings || []).map((l: any) => [l.id, displayName(l)]));
 
       type Hit = {
         listingId: string;
@@ -370,9 +372,9 @@ export function usePropertyKnowledgeSearch(query: string) {
       (listingsRes.data || []).forEach((l: any) => {
         hits.push({
           listingId: l.id,
-          propertyName: l.name,
+          propertyName: displayName(l),
           section: "Property name",
-          snippet: l.name,
+          snippet: displayName(l),
         });
       });
 

@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Shirt, Package, Plus, Trash2, BedDouble } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { displayName } from "@/lib/listingName";
 
 const fmtGbp = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(n || 0);
 
@@ -101,7 +102,7 @@ function ConsumableRates() {
 
   const { data: listings = [] } = useQuery({
     queryKey: ["lc_listings"],
-    queryFn: async () => (await supabase.from("listings").select("id, name").eq("status", "active").order("name")).data ?? [],
+    queryFn: async () => (await supabase.from("listings").select("id, name, internal_name").eq("status", "active").order("name")).data ?? [],
   });
   const { data: regions = [] } = useQuery({
     queryKey: ["lc_location_groups"],
@@ -114,7 +115,7 @@ function ConsumableRates() {
   const { data: rates = [], refetch } = useQuery({
     queryKey: ["consumable_rates_admin"],
     queryFn: async () => (await (supabase.from as any)("consumable_rates")
-      .select("id, name, amount, type, active, listing_id, region, communal_group_id, listings(name), communal_groups(name)")
+      .select("id, name, amount, type, active, listing_id, region, communal_group_id, listings(name, internal_name), communal_groups(name)")
       .order("created_at", { ascending: false })).data ?? [],
   });
 
@@ -135,7 +136,7 @@ function ConsumableRates() {
   const remove = async (id: string) => { if (!window.confirm("Delete this consumable rate? Existing accrued charges are kept.")) return; await (supabase.from as any)("consumable_rates").delete().eq("id", id); refetch(); };
 
   const targetLabel = (r: any) =>
-    r.type === "direct_to_property" ? (r.listings?.name ?? "property")
+    r.type === "direct_to_property" ? (r.listings ? displayName(r.listings) : "property")
     : r.type === "region" ? r.region
     : (r.communal_groups?.name ?? "communal group");
 
@@ -162,7 +163,7 @@ function ConsumableRates() {
           {type === "direct_to_property" && (
             <div className="space-y-1.5"><Label className="text-xs">Property</Label>
               <Select value={listingId} onValueChange={setListingId}><SelectTrigger className="w-48"><SelectValue placeholder="Select" /></SelectTrigger>
-                <SelectContent>{listings.map((l: any) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent></Select></div>
+                <SelectContent>{listings.map((l: any) => <SelectItem key={l.id} value={l.id}>{displayName(l)}</SelectItem>)}</SelectContent></Select></div>
           )}
           {type === "region" && (
             <div className="space-y-1.5"><Label className="text-xs">Region</Label>
@@ -212,9 +213,9 @@ function Accruals() {
       const [laundry, consum, listings] = await Promise.all([
         (supabase.from as any)("laundry_charges").select("listing_id, amount").gte("charge_date", periodStart).lt("charge_date", periodEnd),
         (supabase.from as any)("consumable_charges").select("listing_id, amount").gte("charge_date", periodStart).lt("charge_date", periodEnd),
-        supabase.from("listings").select("id, name"),
+        supabase.from("listings").select("id, name, internal_name"),
       ]);
-      const names = new Map<string, string>((listings.data ?? []).map((l: any) => [l.id, l.name]));
+      const names = new Map<string, string>((listings.data ?? []).map((l: any) => [l.id, displayName(l)]));
       const map = new Map<string, { name: string; laundry: number; consumables: number }>();
       const ensure = (id: string) => map.get(id) ?? map.set(id, { name: names.get(id) ?? "Unknown", laundry: 0, consumables: 0 }).get(id)!;
       for (const c of (laundry.data ?? []) as any[]) ensure(c.listing_id).laundry += Number(c.amount);

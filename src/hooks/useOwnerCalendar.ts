@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOwnerPreview } from "@/contexts/OwnerPreviewContext";
 import { computeOrphanGapDates } from "@/lib/orphanGaps";
+import { displayName } from "@/lib/listingName";
 import {
   eachDayOfInterval, startOfMonth, endOfMonth, subMonths, addMonths, addDays,
   differenceInDays, parseISO, format,
@@ -68,7 +69,7 @@ export function useOwnerCalendar(): { data?: OwnerCalendar; isLoading: boolean }
     queryFn: async (): Promise<OwnerCalendar> => {
       let listingsQuery = supabase
         .from("listings")
-        .select("id, name, min_stay_nights, is_bundle, owner_id")
+        .select("id, name, internal_name, min_stay_nights, is_bundle, owner_id")
         .eq("is_bundle", false);
       if (isPreviewMode && selectedOwnerId) listingsQuery = listingsQuery.eq("owner_id", selectedOwnerId);
 
@@ -152,7 +153,7 @@ export function useOwnerCalendar(): { data?: OwnerCalendar; isLoading: boolean }
           totalPotential += fSellable * adr; // per-property ADR
           totalBookedFwd += fBooked;
 
-          return { id: l.id, name: l.name, blocks, orphanGaps: orphanInWindow, bookedDays, occPct, revenue, adr };
+          return { id: l.id, name: displayName(l), blocks, orphanGaps: orphanInWindow, bookedDays, occPct, revenue, adr };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
 

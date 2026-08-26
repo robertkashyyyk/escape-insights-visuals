@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { differenceInDays, parseISO, format, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
 import { getGrossRevenue, REVENUE_FIELDS } from "@/lib/revenue";
 import { periodRevenue, nightsInPeriod as canonicalNightsInPeriod } from "@/lib/metrics";
+import { displayName } from "@/lib/listingName";
 
 export interface ReportPropertyRow {
   listingId: string;
@@ -83,7 +84,7 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
 
       const { data: listings } = await supabase
         .from("listings")
-        .select("id, name, status, is_bundle")
+        .select("id, name, internal_name, status, is_bundle")
         .eq("owner_id", ownerId!);
       if (!listings?.length) return null;
 
@@ -233,7 +234,7 @@ export function useMonthlyReport(ownerId: string | null, periodStart: Date, peri
           const occ = l.status === "active" ? (agg.nights / daysInPeriod) * 100 : 0;
           return {
             listingId: l.id,
-            name: l.name,
+            name: displayName(l),
             nights: agg.nights,
             revenue: agg.revenue,
             adr: agg.nights > 0 ? agg.revenue / agg.nights : 0,

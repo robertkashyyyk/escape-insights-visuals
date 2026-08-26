@@ -14,6 +14,7 @@ import { differenceInDays, format, parseISO } from "date-fns";
 import { useLocationGroups } from "@/hooks/useLocationGroups";
 import { BookingRequestsDialog } from "@/components/requests/BookingRequestsDialog";
 import { BookingDetailDialog } from "@/components/reservations/BookingDetailDialog";
+import { displayName } from "@/lib/listingName";
 
 type SortKey = "guest_name" | "property" | "check_in" | "check_out" | "nights" | "lead_time" | "amount" | "platform" | "status";
 type SortDir = "asc" | "desc";
@@ -76,7 +77,7 @@ export function ReservationsTable() {
       while (true) {
         const { data, error } = await supabase
           .from("reservations")
-          .select("*, listings(id, name, location_group, property_owners(id, name))")
+          .select("*, listings(id, name, internal_name, location_group, property_owners(id, name))")
           .order("check_in", { ascending: false })
           .range(offset, offset + batchSize - 1);
         if (error) throw error;
@@ -98,7 +99,7 @@ export function ReservationsTable() {
     const owners = new Map<string, string>();
     for (const r of reservations) {
       const listing = r.listings as any;
-      if (listing?.id && listing?.name) props.set(listing.id, listing.name);
+      if (listing?.id && listing?.name) props.set(listing.id, displayName(listing));
       const owner = listing?.property_owners as any;
       if (owner?.id && owner?.name) owners.set(owner.id, owner.name);
       if (r.platform) plats.add(r.platform);
@@ -126,7 +127,7 @@ export function ReservationsTable() {
         ...r,
         nights,
         leadDays,
-        propertyName: listing?.name || "—",
+        propertyName: listing ? displayName(listing) : "—",
         propertyId: listing?.id || null,
         locationGroup: listing?.location_group || null,
         ownerId: owner?.id || null,

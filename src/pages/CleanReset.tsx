@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { Sparkles, Brush, AlertTriangle, Search, Loader2, CheckCircle2, XCircle, HelpCircle } from "lucide-react";
 import { format } from "date-fns";
+import { displayName } from "@/lib/listingName";
 
 type CleanState = "clean" | "dirty" | "unknown";
 
@@ -70,7 +71,7 @@ export default function CleanReset({ embedded = false }: { embedded?: boolean } 
         await Promise.all([
           supabase
             .from("listings")
-            .select("id,name,is_clean,status")
+            .select("id,name,internal_name,is_clean,status")
             .eq("status", "active")
             .order("name"),
           supabase
@@ -133,7 +134,7 @@ export default function CleanReset({ embedded = false }: { embedded?: boolean } 
         const nextOut = nextOutByListing.get(l.id) || null;
         return {
           id: l.id,
-          name: l.name,
+          name: displayName(l),
           is_clean: !!l.is_clean,
           status: l.status,
           state,

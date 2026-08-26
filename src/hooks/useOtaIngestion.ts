@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { OtaBatch, OtaTransaction, ResvCandidate, OtaPlatform } from "@/lib/ota";
+import { displayName } from "@/lib/listingName";
 
 // New tables aren't in the generated Database types yet — cast like the rest of
 // the codebase does (e.g. useMaintenanceQueue casts clean_issues writes).
@@ -10,13 +11,13 @@ async function getUid() {
   return (await supabase.auth.getUser()).data.user?.id ?? null;
 }
 
-export interface ListingLite { id: string; name: string }
+export interface ListingLite { id: string; name: string; internal_name?: string | null }
 
 export function useListings() {
   return useQuery({
     queryKey: ["listings_lite"],
     queryFn: async (): Promise<ListingLite[]> => {
-      const { data } = await db.from("listings").select("id, name").order("name");
+      const { data } = await db.from("listings").select("id, name, internal_name").order("name");
       return data ?? [];
     },
   });
@@ -79,11 +80,11 @@ export function useAttributionDecisions() {
     queryKey: ["attribution_decisions"],
     queryFn: async (): Promise<AttributionDecisionRow[]> => {
       const { data } = await db.from("ota_attribution_decisions")
-        .select("id, ota_transaction_id, outcome, allocated_listing_id, reason, listings(name), ota_transactions(platform, txn_type, statement_descriptor, property_name_raw, guest_name, check_in, net_amount, gross_amount)")
+        .select("id, ota_transaction_id, outcome, allocated_listing_id, reason, listings(name, internal_name), ota_transactions(platform, txn_type, statement_descriptor, property_name_raw, guest_name, check_in, net_amount, gross_amount)")
         .order("decided_at", { ascending: false });
       return (data ?? []).map((d: any) => ({
         id: d.id, ota_transaction_id: d.ota_transaction_id, outcome: d.outcome,
-        allocated_listing_id: d.allocated_listing_id, allocated_listing_name: d.listings?.name ?? null,
+        allocated_listing_id: d.allocated_listing_id, allocated_listing_name: d.listings ? displayName(d.listings) : null,
         reason: d.reason, txn: d.ota_transactions ?? {},
       }));
     },

@@ -17,6 +17,7 @@ import {
   parseWiseStatement, normalisePayee, classifyTxn, STRIP_CLASSES,
   type RawTxn, type PayeeRuleLite,
 } from "@/lib/billClassify";
+import { displayName } from "@/lib/listingName";
 
 const db = supabase as any;
 const fmtGbp = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(n || 0);
@@ -34,7 +35,7 @@ async function uploadBillDoc(file: File | null, userId: string | null): Promise<
 
 type TargetType = "property" | "communal" | "region";
 
-interface Listing { id: string; name: string; owner_id: string | null; location_group: string | null; communal_group_id: string | null; is_communal: boolean | null; communal_ratio_pct: number | null; bedrooms: number | null }
+interface Listing { id: string; name: string; internal_name?: string | null; owner_id: string | null; location_group: string | null; communal_group_id: string | null; is_communal: boolean | null; communal_ratio_pct: number | null; bedrooms: number | null }
 type RegionMethod = "equal" | "bedrooms";
 interface Owner { id: string; name: string; company: string | null }
 interface CostType { id: string; code: string; display_name: string; source_category: string }
@@ -54,7 +55,7 @@ export default function BillsOnBehalf() {
   }});
   const { data: listings = [] } = useQuery({ queryKey: ["bills_listings"], queryFn: async () => {
     const { data } = await db.from("listings")
-      .select("id, name, owner_id, location_group, communal_group_id, is_communal, communal_ratio_pct, bedrooms")
+      .select("id, name, internal_name, owner_id, location_group, communal_group_id, is_communal, communal_ratio_pct, bedrooms")
       .eq("is_bundle", false); return (data ?? []) as Listing[];
   }});
   const { data: costTypes = [] } = useQuery({ queryKey: ["bills_cost_types"], queryFn: async () => {
@@ -347,7 +348,7 @@ function ReviewRow({ txn, rule, listings, owners, costTypes, groups, regions, us
             {targetType === "property" && (
               <Select value={listingId} onValueChange={setListingId}>
                 <SelectTrigger className="h-9"><SelectValue placeholder="Which property…" /></SelectTrigger>
-                <SelectContent>{listings.map((l) => <SelectItem key={l.id} value={l.id}>{l.name} · {ownerName(l.owner_id)}</SelectItem>)}</SelectContent>
+                <SelectContent>{listings.map((l) => <SelectItem key={l.id} value={l.id}>{displayName(l)} · {ownerName(l.owner_id)}</SelectItem>)}</SelectContent>
               </Select>
             )}
             {targetType === "communal" && (
@@ -381,7 +382,7 @@ function ReviewRow({ txn, rule, listings, owners, costTypes, groups, regions, us
               <div className="grid gap-0.5">
                 {allocations.map((a) => {
                   const l = listings.find((x) => x.id === a.listing_id);
-                  return <div key={a.listing_id} className="flex justify-between"><span>{l?.name ?? a.listing_id}{a.ratio_pct != null && a.ratio_pct !== 100 ? ` (${a.ratio_pct}%)` : ""}</span><span className="tabular-nums">{fmtGbp(a.amount)}</span></div>;
+                  return <div key={a.listing_id} className="flex justify-between"><span>{l ? displayName(l) : a.listing_id}{a.ratio_pct != null && a.ratio_pct !== 100 ? ` (${a.ratio_pct}%)` : ""}</span><span className="tabular-nums">{fmtGbp(a.amount)}</span></div>;
                 })}
               </div>
             </div>

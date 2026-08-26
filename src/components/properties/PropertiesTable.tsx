@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Plus, Search, Pencil } from "lucide-react";
 import { PropertyForm } from "./PropertyForm";
+import { displayName } from "@/lib/listingName";
 
 export function PropertiesTable() {
   const [search, setSearch] = useState("");
@@ -33,7 +34,7 @@ export function PropertiesTable() {
     if (cleanFilter === "dirty" && l.is_clean !== false) return false;
     const q = search.toLowerCase();
     return (
-      l.name.toLowerCase().includes(q) ||
+      displayName(l).toLowerCase().includes(q) ||
       l.city?.toLowerCase().includes(q) ||
       l.location_group?.toLowerCase().includes(q) ||
       l.postcode?.toLowerCase().includes(q) ||
@@ -105,7 +106,7 @@ export function PropertiesTable() {
               )}
               {filtered?.map((l) => (
                 <TableRow key={l.id}>
-                  <TableCell className="font-medium">{l.name}</TableCell>
+                  <TableCell className="font-medium">{displayName(l)}</TableCell>
                   <TableCell>{l.location_group || "—"}</TableCell>
                   <TableCell>{l.city || "—"}</TableCell>
                   <TableCell>{l.postcode || "—"}</TableCell>

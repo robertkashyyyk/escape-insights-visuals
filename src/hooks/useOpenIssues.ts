@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { displayName } from "@/lib/listingName";
 
 export interface OpenIssue {
   id: string;
@@ -27,7 +28,7 @@ export function useOpenIssues() {
       .select(`
         id, listing_id, issue_type, description, urgency, status, photo_paths, created_at,
         reported_by_cleaner_id,
-        listings!clean_issues_listing_id_fkey (name),
+        listings!clean_issues_listing_id_fkey (name, internal_name),
         cleaners!clean_issues_reported_by_cleaner_id_fkey (name)
       `)
       .in("status", ["open", "acknowledged"])
@@ -51,7 +52,7 @@ export function useOpenIssues() {
         return {
           id: r.id,
           listing_id: r.listing_id,
-          property_name: r.listings?.name ?? "Unknown",
+          property_name: r.listings ? displayName(r.listings) : "Unknown",
           issue_type: r.issue_type,
           description: r.description,
           urgency: r.urgency,

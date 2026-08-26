@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plug, Plus, Trash2, Search } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { displayName } from "@/lib/listingName";
 
 const fmtGbp = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(n || 0);
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
@@ -31,9 +32,9 @@ export function UtilitiesTab() {
 
   const { data: listings = [] } = useQuery({
     queryKey: ["util_listings"],
-    queryFn: async () => (await supabase.from("listings").select("id, name").eq("status", "active").order("name")).data ?? [],
+    queryFn: async () => (await supabase.from("listings").select("id, name, internal_name").eq("status", "active").order("name")).data ?? [],
   });
-  const nameOf = useMemo(() => new Map<string, string>((listings as any[]).map((l) => [l.id, l.name])), [listings]);
+  const nameOf = useMemo(() => new Map<string, string>((listings as any[]).map((l) => [l.id, displayName(l)])), [listings]);
 
   const { data: entries = [], refetch } = useQuery({
     queryKey: ["utility_expenses"],
@@ -63,7 +64,7 @@ export function UtilitiesTab() {
   const total = round3(selected.reduce((s, id) => s + (parseFloat(pcts[id] ?? "") || 0), 0));
   const valid = selected.length > 0 && total === 100;
 
-  const filtered = (listings as any[]).filter((l) => l.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = (listings as any[]).filter((l) => displayName(l).toLowerCase().includes(search.toLowerCase()));
 
   const save = async () => {
     const v = parseFloat(value);
@@ -127,7 +128,7 @@ export function UtilitiesTab() {
                 {filtered.map((l: any) => (
                   <label key={l.id} className="flex items-center gap-2 px-2 py-1.5 text-sm cursor-pointer hover:bg-secondary/30">
                     <input type="checkbox" checked={selected.includes(l.id)} onChange={() => toggle(l.id)} className="accent-primary" />
-                    <span className="truncate">{l.name}</span>
+                    <span className="truncate">{displayName(l)}</span>
                   </label>
                 ))}
               </div>

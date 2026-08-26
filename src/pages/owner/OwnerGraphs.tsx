@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { displayName } from "@/lib/listingName";
 import {
   ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from "recharts";
@@ -41,7 +42,7 @@ export default function OwnerGraphs() {
     queryKey: ["owner_graph_listings", isPreviewMode ? selectedOwnerId : user?.id],
     enabled: !!(isPreviewMode ? selectedOwnerId : user),
     queryFn: async () => {
-      let q = supabase.from("listings").select("id, name").order("name");
+      let q = supabase.from("listings").select("id, name, internal_name").order("name");
       if (isPreviewMode && selectedOwnerId) {
         q = q.eq("owner_id", selectedOwnerId);
       }
@@ -180,7 +181,7 @@ export default function OwnerGraphs() {
               <SelectContent>
                 <SelectItem value="all">All Properties</SelectItem>
                 {ownerListings?.map(l => (
-                  <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                  <SelectItem key={l.id} value={l.id}>{displayName(l)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

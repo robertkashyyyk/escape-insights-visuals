@@ -13,6 +13,7 @@ import { PropertyForm } from "@/components/properties/PropertyForm";
 import { PropertyFeatures } from "@/components/properties/PropertyFeatures";
 import { PropertiesListView } from "@/components/properties/PropertiesListView";
 import { Link } from "react-router-dom";
+import { displayName } from "@/lib/listingName";
 
 export default function Properties() {
   const [search, setSearch] = useState("");
@@ -42,7 +43,7 @@ export default function Properties() {
     const q = search.toLowerCase();
     const matchesSearch =
       !q ||
-      l.name.toLowerCase().includes(q) ||
+      displayName(l).toLowerCase().includes(q) ||
       l.city?.toLowerCase().includes(q) ||
       l.location_group?.toLowerCase().includes(q) ||
       (l.property_owners as any)?.name?.toLowerCase().includes(q);
@@ -145,7 +146,7 @@ export default function Properties() {
                   )}
 
                   <div>
-                    <h3 className="font-display font-bold text-foreground text-base truncate">{l.name}</h3>
+                    <h3 className="font-display font-bold text-foreground text-base truncate">{displayName(l)}</h3>
                     {ownerName && <p className="text-xs text-muted-foreground mt-0.5 truncate">{ownerName}</p>}
                   </div>
 

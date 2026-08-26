@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Bed, Bath, Users, MapPin, PoundSterling, Brush, Building2, Wrench, Key, ClipboardList, Clock, SprayCan } from "lucide-react";
+import { displayName, brandedName } from "@/lib/listingName";
 
 const DURATION_OPTIONS = [60, 90, 120, 150, 180];
 
@@ -71,7 +72,7 @@ export default function PropertyDetail() {
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-display font-bold text-foreground">{listing.name}</h1>
+                <h1 className="text-2xl font-display font-bold text-foreground">{displayName(listing)}</h1>
                 {isClean ? (
                   <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
                     <SprayCan className="h-3 w-3 mr-1" /> Clean
@@ -82,6 +83,9 @@ export default function PropertyDetail() {
                   </Badge>
                 )}
               </div>
+              {brandedName(listing) && (
+                <p className="text-sm text-muted-foreground mt-1">{brandedName(listing)}</p>
+              )}
               {owner?.name && <p className="text-sm text-muted-foreground mt-1">Owned by {owner.name}</p>}
               <div className="flex flex-wrap gap-2 mt-3">
                 {listing.location_group && (

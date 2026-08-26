@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/fetchAllRows";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfWeek } from "date-fns";
+import { displayName } from "@/lib/listingName";
 
 export interface MatrixListing {
   id: string;
@@ -86,13 +87,13 @@ export function useMatrixSchedule(weekAnchor: Date) {
     queryFn: async () => {
       const { data } = await supabase
         .from("listings")
-        .select("id, name, location_group, default_check_in_time, default_check_out_time, status, is_bundle, min_stay_nights")
+        .select("id, name, internal_name, location_group, default_check_in_time, default_check_out_time, status, is_bundle, min_stay_nights")
         .eq("status", "active");
       return ((data || []) as any[])
         .filter(l => !l.is_bundle)
         .map(l => ({
           id: l.id,
-          name: l.name,
+          name: displayName(l),
           location_group: l.location_group,
           default_check_in_time: l.default_check_in_time,
           default_check_out_time: l.default_check_out_time,

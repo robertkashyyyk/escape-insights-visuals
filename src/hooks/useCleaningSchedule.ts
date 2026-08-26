@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/fetchAllRows";
 import { format, addDays, startOfWeek, endOfWeek, isSameDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { displayName } from "@/lib/listingName";
 
 /* ── types ── */
 export type Priority = "ARRIVAL_RISK" | "SAME_DAY" | "TIGHT_WINDOW" | "STANDARD" | "GAP_FILL";
@@ -159,9 +160,9 @@ export function useCleaningSchedule() {
     queryFn: async () => {
       const { data } = await supabase
         .from("listings")
-        .select("id, name, location_group, cleaning_duration_minutes, cleaning_fee, latitude, longitude, default_check_in_time, default_check_out_time")
+        .select("id, name, internal_name, location_group, cleaning_duration_minutes, cleaning_fee, latitude, longitude, default_check_in_time, default_check_out_time")
         .eq("status", "active");
-      return (data || []) as Listing[];
+      return ((data || []) as any[]).map((l) => ({ ...l, name: displayName(l) })) as Listing[];
     },
   });
 

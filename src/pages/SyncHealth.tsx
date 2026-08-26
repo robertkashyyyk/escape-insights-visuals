@@ -11,6 +11,7 @@ import { RefreshCw, AlertTriangle, CheckCircle2, XCircle, Clock, Building2, User
 import { format } from "date-fns";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { displayName } from "@/lib/listingName";
 
 export default function SyncHealth() {
   const queryClient = useQueryClient();
@@ -35,7 +36,7 @@ export default function SyncHealth() {
     queryFn: async () => {
       const { data } = await supabase
         .from("listings")
-        .select("id, name, city, hostaway_listing_id, location_group")
+        .select("id, name, internal_name, city, hostaway_listing_id, location_group")
         .is("owner_id", null);
       return data || [];
     },
@@ -209,7 +210,7 @@ export default function SyncHealth() {
                 <TableBody>
                   {unownedListings.map((listing) => (
                     <TableRow key={listing.id}>
-                      <TableCell className="font-medium">{listing.name}</TableCell>
+                      <TableCell className="font-medium">{displayName(listing)}</TableCell>
                       <TableCell className="text-muted-foreground">{listing.location_group || listing.city || "—"}</TableCell>
                       <TableCell className="text-muted-foreground">{listing.hostaway_listing_id}</TableCell>
                       <TableCell>
