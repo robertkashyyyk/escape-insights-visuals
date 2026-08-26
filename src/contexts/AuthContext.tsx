@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -34,6 +34,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
   const [loading, setLoading] = useState(true);
+  // Tracks which user's data is already loaded, so a SIGNED_IN that Supabase
+  // re-fires on tab focus doesn't trigger a full reload of an already-loaded user.
+  const loadedUserIdRef = useRef<string | null>(null);
 
   const fetchUserData = async (userId: string) => {
     const userDataPromise = Promise.all([
@@ -58,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const loadUserData = async (userId: string) => {
       try {
         await fetchUserData(userId);
+        loadedUserIdRef.current = userId;
       } catch (error) {
         console.error("Failed to load authenticated user data", error);
         if (!isMounted) return;
@@ -79,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
 
         if (_event === 'SIGNED_OUT') {
+          loadedUserIdRef.current = null;
           setProfile(null);
           setRole(null);
           setLoading(false);
@@ -86,6 +91,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (_event === 'SIGNED_IN' && session?.user) {
+          // Supabase re-fires SIGNED_IN whenever the tab regains focus. If it's
+          // the same user we've already loaded, just keep the refreshed session —
+          // do NOT flip into loading and reload everything (that's what made the
+          // page "refresh" every time you moved off-screen and back).
+          if (loadedUserIdRef.current === session.user.id) {
+            setLoading(false);
+            return;
+          }
           setLoading(true);
           // Defer Supabase queries until after the auth callback returns.
           setTimeout(() => {
