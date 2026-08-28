@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocationGroups } from "@/hooks/useLocationGroups";
 import { PropertyBedsEditor } from "@/components/properties/PropertyBedsEditor";
 import { displayName } from "@/lib/listingName";
+import { PROPERTY_TYPES } from "@/lib/propertyTypes";
 import { Search, Save, BedDouble, Loader2 } from "lucide-react";
 
 // ── Column config — add a variable here and it appears in the grid. ────────────
@@ -75,7 +76,7 @@ export default function PropertyMatrix() {
   const dataCols: Col[] = useMemo(() => [
     { key: "owner_id", label: "Owner", type: "select", group: "Basics", width: 150, options: ownerOptions },
     { key: "location_group", label: "Region", type: "select", group: "Basics", width: 130, options: regionOptions },
-    { key: "property_type", label: "Type", type: "text", group: "Basics", width: 110 },
+    { key: "property_type", label: "Type", type: "select", group: "Basics", width: 120, options: PROPERTY_TYPES.map((t) => ({ value: t, label: t })) },
     { key: "status", label: "Status", type: "select", group: "Basics", width: 100, options: [{ value: "active", label: "active" }, { value: "inactive", label: "inactive" }] },
     NUM("bedrooms", "Beds#", "Layout"), NUM("bathrooms", "Baths", "Layout"), NUM("kitchens", "Kitchens", "Layout"), NUM("max_guests", "Guests", "Layout"),
     NUM("cleaning_fee", "Clean £", "Cleaning"), NUM("cleaning_duration_minutes", "Clean min", "Cleaning", 90),

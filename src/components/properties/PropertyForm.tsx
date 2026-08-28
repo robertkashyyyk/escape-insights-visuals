@@ -16,6 +16,7 @@ import { AlertTriangle } from "lucide-react";
 import { PropertyBedsEditor } from "@/components/properties/PropertyBedsEditor";
 import { PropertyEquipmentEditor } from "@/components/properties/PropertyEquipmentEditor";
 import { displayName } from "@/lib/listingName";
+import { PROPERTY_TYPES } from "@/lib/propertyTypes";
 
 interface PropertyFormProps {
   open: boolean;
@@ -239,7 +240,18 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
             {field("Country", "country")}
             <LocationGroupField value={form.location_group} onChange={(v) => set("location_group", v)} />
           </div>
-          {field("Property Type", "property_type")}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Property Type</Label>
+            <Select value={form.property_type} onValueChange={(v) => set("property_type", v)}>
+              <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+              <SelectContent>
+                {(form.property_type && !PROPERTY_TYPES.includes(form.property_type as any)
+                  ? [form.property_type, ...PROPERTY_TYPES]
+                  : [...PROPERTY_TYPES]
+                ).map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="grid grid-cols-3 gap-3">
             {field("Bedrooms", "bedrooms", "number")}
             {field("Bathrooms", "bathrooms", "number")}

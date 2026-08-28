@@ -22,12 +22,32 @@ export function PropertyBedsEditor({ listingId }: { listingId: string }) {
     queryKey: ["bed_types_active"],
     queryFn: async () => ((await (supabase.from as any)("bed_types").select("id, name, laundry_cost").eq("active", true).order("display_order")).data ?? []) as BedType[],
   });
-  const { data: beds = [], refetch } = useQuery({
+  const { data: beds = [], refetch, isFetched } = useQuery({
     queryKey: ["property_beds", listingId],
     queryFn: async () => ((await (supabase.from as any)("property_beds")
       .select("id, bedroom_label, bed_type_id, quantity, sort_order")
       .eq("listing_id", listingId).order("sort_order")).data ?? []) as BedRow[],
   });
+
+  // The property already knows its bedroom count — so when no beds have been set
+  // yet, pre-seed one row per bedroom (Bedroom 1..N) so every room shows up ready
+  // to fill in. Only seeds when totally empty (respects a hand-built setup).
+  const { data: listing } = useQuery({
+    queryKey: ["listing_bedrooms", listingId],
+    queryFn: async () => ((await supabase.from("listings").select("bedrooms").eq("id", listingId).single()).data) as { bedrooms: number | null } | null,
+  });
+  const seededRef = useRef<string | null>(null);
+  useEffect(() => {
+    const bedroomCount = listing?.bedrooms ?? 0;
+    if (!isFetched || seededRef.current === listingId) return;
+    if (beds.length === 0 && bedroomCount > 0 && bedTypes.length > 0) {
+      seededRef.current = listingId;
+      const rows = Array.from({ length: bedroomCount }, (_, i) => ({
+        listing_id: listingId, bedroom_label: `Bedroom ${i + 1}`, bed_type_id: bedTypes[0].id, quantity: 1, sort_order: i,
+      }));
+      (supabase.from as any)("property_beds").insert(rows).then(({ error }: any) => { if (!error) refetch(); });
+    }
+  }, [isFetched, beds.length, listing?.bedrooms, bedTypes.length, listingId, refetch]);
 
   const costOf = (id: string) => Number(bedTypes.find((b) => b.id === id)?.laundry_cost ?? 0);
   const laundryTotal = beds.reduce((s, b) => s + costOf(b.bed_type_id) * b.quantity, 0);
