@@ -90,7 +90,14 @@ export function ManagePersonSheet({ user, isSelf, onClose, onChanged }: Props) {
     const { data, error } = await supabase.functions.invoke("manage-users", { body });
     setBusy(null);
     if (error || data?.error) {
-      toast({ title: "Action failed", description: error?.message || data?.error, variant: "destructive" });
+      // A non-2xx from the function surfaces as a generic "non-2xx status code" —
+      // the useful message is in the JSON body on error.context. Dig it out.
+      let detail: string = data?.error || error?.message || "Unknown error";
+      const ctx = (error as any)?.context;
+      if (ctx && typeof ctx.json === "function") {
+        try { const j = await ctx.json(); if (j?.error) detail = j.error; } catch { /* keep generic */ }
+      }
+      toast({ title: "Action failed", description: detail, variant: "destructive" });
       return null;
     }
     return data ?? {};
