@@ -80,7 +80,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!['SIGNED_IN', 'SIGNED_OUT', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(_event)) return;
 
         setSession(session);
-        setUser(session?.user ?? null);
+        // Keep the SAME user object reference when it's the same person. Supabase
+        // hands us a fresh user object on every event (incl. the SIGNED_IN it
+        // re-fires when the tab/camera returns focus); a new reference re-runs any
+        // effect keyed on `user`, which was remounting the cleaner portal after an
+        // equipment photo (resetting the selected cleaner + closing the checklist).
+        setUser((prev) =>
+          prev && session?.user && prev.id === session.user.id ? prev : (session?.user ?? null),
+        );
 
         if (_event === 'SIGNED_OUT') {
           loadedUserIdRef.current = null;

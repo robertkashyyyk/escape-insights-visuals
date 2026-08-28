@@ -123,7 +123,9 @@ export default function CleanerPortal() {
         .order("name");
       if (data && data.length > 0) {
         setAllCleaners(data as any as CleanerProfile[]);
-        setSelectedCleanerId(data[0].id);
+        // Only default the picked cleaner on first load — never clobber an
+        // already-chosen one if this effect re-runs (e.g. an auth refocus).
+        setSelectedCleanerId((prev) => prev ?? data[0].id);
       }
     };
     fetchCleaners();
