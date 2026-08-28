@@ -70,6 +70,30 @@ export default function PropertyMatrix() {
     },
   });
 
+  // Equipment presence per listing (from property_equipment) — drives the Coffee
+  // toggle column. Toggling writes straight through, like the Beds cell.
+  const { data: equipByListing = {}, refetch: refetchEquip } = useQuery({
+    queryKey: ["matrix_equipment"],
+    queryFn: async () => {
+      const { data } = await (supabase.from as any)("property_equipment").select("listing_id, name");
+      const out: Record<string, Set<string>> = {};
+      for (const e of data ?? []) (out[e.listing_id] ||= new Set<string>()).add(String(e.name).toLowerCase());
+      return out;
+    },
+  });
+  const [coffeeBusy, setCoffeeBusy] = useState<string | null>(null);
+  const toggleCoffee = async (listingId: string, on: boolean) => {
+    setCoffeeBusy(listingId);
+    if (on) {
+      await (supabase.from as any)("property_equipment").insert({ listing_id: listingId, name: "Coffee Machine", requires_photo: false });
+    } else {
+      await (supabase.from as any)("property_equipment").delete().eq("listing_id", listingId).eq("name", "Coffee Machine");
+    }
+    await refetchEquip();
+    qc.invalidateQueries({ queryKey: ["property_equipment", listingId] });
+    setCoffeeBusy(null);
+  };
+
   const ownerOptions = useMemo(() => (owners as any[]).map((o) => ({ value: o.id, label: o.name })), [owners]);
   const regionOptions = useMemo(() => (locationGroups as any[]).map((g) => ({ value: g.name, label: g.name })), [locationGroups]);
 
@@ -215,6 +239,7 @@ export default function PropertyMatrix() {
                     <th key={g} colSpan={dataCols.filter((c) => c.group === g).length}
                       className="border-b border-l border-border/60 px-2 py-1 text-left text-[10px] uppercase tracking-wider text-muted-foreground">{g}</th>
                   ))}
+                  <th className="border-b border-l border-border/60 px-2 py-1 text-left text-[10px] uppercase tracking-wider text-muted-foreground">Equipment</th>
                   <th className="border-b border-l border-border/60 px-2 py-1 text-left text-[10px] uppercase tracking-wider text-muted-foreground">Beds</th>
                 </tr>
                 <tr className="bg-card">
@@ -222,6 +247,7 @@ export default function PropertyMatrix() {
                   {dataCols.map((c) => (
                     <th key={c.key} style={{ minWidth: c.width }} className="border-b border-border/40 px-2 py-1 text-left text-[10px] text-muted-foreground font-medium">{c.label}</th>
                   ))}
+                  <th className="border-b border-border/40 px-2 py-1 text-left text-[10px] text-muted-foreground font-medium">Coffee</th>
                   <th className="border-b border-border/40 px-2 py-1 text-left text-[10px] text-muted-foreground">setup</th>
                 </tr>
               </thead>
@@ -264,6 +290,13 @@ export default function PropertyMatrix() {
                         </td>
                       );
                     })}
+                    <td className="border-b border-l border-border/30 px-1 py-0.5 text-center">
+                      <Switch
+                        checked={!!equipByListing[l.id]?.has("coffee machine")}
+                        disabled={coffeeBusy === l.id}
+                        onCheckedChange={(v) => toggleCoffee(l.id, v)}
+                      />
+                    </td>
                     <td className="border-b border-l border-border/30 px-1 py-0.5">
                       <button onClick={() => setBedsFor({ id: l.id, name: displayName(l) })}
                         className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground max-w-[200px] truncate" title={bedsSummary[l.id] || "Set beds"}>
