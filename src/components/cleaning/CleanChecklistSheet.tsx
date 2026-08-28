@@ -5,42 +5,18 @@ import { Progress } from "@/components/ui/progress";
 import { Loader2, Check, ConciergeBell, SprayCan, Wrench, ListChecks, Camera, ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 
-/** Downscale a phone photo to keep uploads small + reliable — and, crucially,
- *  low-memory on iOS, where decoding a full 12MP shot into an <img> can crash the
- *  tab. Prefer createImageBitmap (decodes off the main thread, lower peak memory);
- *  fall back to <img> only if it's unavailable. Releases buffers promptly. */
-async function compressImage(file: File, maxDim = 1440, quality = 0.7): Promise<Blob> {
-  let bmp: ImageBitmap | null = null;
-  try { bmp = await createImageBitmap(file); } catch { bmp = null; }
+// NB: we deliberately do NOT resize equipment photos in the browser. Decoding a
+// full 12MP phone shot into a canvas spikes memory hard enough for iOS Safari to
+// evict + reload the tab mid-capture (which read as the checklist "throwing you
+// out"). We upload the original file straight to storage instead — a few MB is a
+// non-issue for internal equipment checks, and it can never crash the tab.
 
-  let source: CanvasImageSource;
-  let sw: number, sh: number;
-  let objectUrl: string | null = null;
-  if (bmp) {
-    source = bmp; sw = bmp.width; sh = bmp.height;
-  } else {
-    objectUrl = URL.createObjectURL(file);
-    const img = document.createElement("img");
-    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = objectUrl!; });
-    source = img; sw = img.naturalWidth || img.width; sh = img.naturalHeight || img.height;
-  }
-
-  let w = sw, h = sh;
-  if (w >= h && w > maxDim) { h = Math.round((h * maxDim) / w); w = maxDim; }
-  else if (h > maxDim) { w = Math.round((w * maxDim) / h); h = maxDim; }
-
-  try {
-    const canvas = document.createElement("canvas");
-    canvas.width = w; canvas.height = h;
-    canvas.getContext("2d")!.drawImage(source, 0, 0, w, h);
-    const blob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b ?? file), "image/jpeg", quality));
-    canvas.width = 0; canvas.height = 0;   // free the backing store immediately (iOS is tight)
-    return blob;
-  } finally {
-    if (bmp) bmp.close();
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
-  }
-}
+const fileExt = (file: File) => {
+  const m = /\.([a-z0-9]+)$/i.exec(file.name || "");
+  if (m) return m[1].toLowerCase();
+  const t = (file.type || "").split("/")[1];
+  return t ? t.replace("jpeg", "jpg") : "jpg";
+};
 
 export interface ChecklistItem {
   id: string;
@@ -128,9 +104,10 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
     if (!task) return;
     setUploading(item.id);
     try {
-      const blob = await compressImage(file);
-      const path = `${task.id}/${item.id}.jpg`;
-      const { error: upErr } = await supabase.storage.from("clean-photos").upload(path, blob, { upsert: true, contentType: "image/jpeg" });
+      // Upload the original file — no in-browser decode (see note at top of file).
+      const path = `${task.id}/${item.id}.${fileExt(file)}`;
+      const { error: upErr } = await supabase.storage.from("clean-photos")
+        .upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
       if (upErr) throw upErr;
       const url = `${supabase.storage.from("clean-photos").getPublicUrl(path).data.publicUrl}?t=${Date.now()}`;
       const now = new Date().toISOString();
