@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Properties from "./pages/Properties";
+import PropertyMatrix from "./pages/PropertyMatrix";
 import PropertyDetail from "./pages/PropertyDetail";
 import Owners from "./pages/Owners";
 import Reservations from "./pages/Reservations";
@@ -95,6 +96,7 @@ const App = () => (
             <Route path="/pacing" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><RevenuePacing /></ProtectedRoute>} />
             <Route path="/forecast" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><RevenueForecaster /></ProtectedRoute>} />
             <Route path="/properties" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><Properties /></ProtectedRoute>} />
+            <Route path="/properties/matrix" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PropertyMatrix /></ProtectedRoute>} />
             <Route path="/properties/:id" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PropertyDetail /></ProtectedRoute>} />
             <Route path="/owners" element={<ProtectedRoute requiredRoles={["super", "senior"]}><Owners /></ProtectedRoute>} />
             

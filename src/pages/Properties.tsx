@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Search, Plus, ArrowRight, Brush, Pencil, LayoutGrid, List } from "lucide-react";
+import { Search, Plus, ArrowRight, Brush, Pencil, LayoutGrid, List, Table2 } from "lucide-react";
 import { PropertyForm } from "@/components/properties/PropertyForm";
 import { PropertyFeatures } from "@/components/properties/PropertyFeatures";
 import { PropertiesListView } from "@/components/properties/PropertiesListView";
@@ -110,6 +110,9 @@ export default function Properties() {
             <span className="text-sm text-muted-foreground font-medium">
               {isLoading ? "…" : `${filtered?.length ?? 0} Properties`}
             </span>
+            <Button asChild size="sm" variant="outline">
+              <Link to="/properties/matrix"><Table2 className="h-4 w-4 mr-1.5" /> Matrix</Link>
+            </Button>
             <Button onClick={() => setShowAdd(true)} size="sm">
               <Plus className="h-4 w-4 mr-1.5" /> Add Property
             </Button>
