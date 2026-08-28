@@ -260,8 +260,13 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
                       </span>
                       <span className={`text-sm flex-1 ${i.photo_url ? "text-muted-foreground" : "text-foreground"}`}>{i.label}</span>
                       {i.photo_url ? (
-                        <div className="flex items-center gap-2">
-                          <img src={i.photo_url} alt={i.label} className="h-9 w-9 rounded object-cover border border-border/40" />
+                        <div className="flex items-center gap-3">
+                          {/* No inline <img>: decoding the full-size photo for a
+                              thumbnail spikes memory and, stacked, makes the next
+                              capture fail with iOS "low memory". View opens it on
+                              demand instead. */}
+                          <a href={i.photo_url} target="_blank" rel="noopener noreferrer"
+                            className="text-[11px] font-medium text-emerald-600">View</a>
                           <label className="text-[11px] text-primary cursor-pointer">
                             Retake
                             <input type="file" accept="image/*" capture="environment" className="hidden"
