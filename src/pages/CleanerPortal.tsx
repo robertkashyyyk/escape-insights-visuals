@@ -2,9 +2,10 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag, Sunrise, Play, X, Undo2, ListChecks, StickyNote } from "lucide-react";
+import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag, Sunrise, Play, X, Undo2, ListChecks, StickyNote, ShoppingCart } from "lucide-react";
 import { parseCustomFields, cleanerAccess, type AccessItem } from "@/lib/customFields";
 import { CleanChecklistSheet } from "@/components/cleaning/CleanChecklistSheet";
+import { ShoppingListSheet } from "@/components/cleaning/ShoppingListSheet";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, addDays, startOfWeek, endOfWeek, parseISO } from "date-fns";
@@ -18,6 +19,19 @@ import {
 import { RequestIcon } from "@/lib/requestIcon";
 
 interface BookingRequest { name: string; icon: string | null; quantity: number; }
+
+// Cleaner-facing priority bands. Driven by the scheduler's priority_level
+// (0 = P0 highest, 1 = P1 same-day turnaround, 2+ = P2 standard).
+type Band = "p0" | "p1" | "p2";
+const bandOf = (t: { priority_level: number | null }): Band => {
+  const p = t.priority_level ?? 2;
+  return p <= 0 ? "p0" : p === 1 ? "p1" : "p2";
+};
+const BAND: Record<Band, { label: string; blurb: string; chip: string; accent: string; order: number }> = {
+  p0: { label: "P0", blurb: "Do first", chip: "bg-red-500/15 text-red-600 border-red-500/30", accent: "border-l-red-500", order: 0 },
+  p1: { label: "P1", blurb: "Same-day turnaround", chip: "bg-amber-500/15 text-amber-600 border-amber-500/30", accent: "border-l-amber-500", order: 1 },
+  p2: { label: "P2", blurb: "Standard checkout", chip: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30", accent: "border-l-emerald-500", order: 2 },
+};
 
 interface CleanTask {
   id: string;
@@ -92,6 +106,7 @@ export default function CleanerPortal() {
   const [accessByTask, setAccessByTask] = useState<Record<string, AccessItem[]>>({});
   const [reminderTask, setReminderTask] = useState<CleanTask | null>(null);
   const [checklistTask, setChecklistTask] = useState<CleanTask | null>(null);
+  const [shoppingOpen, setShoppingOpen] = useState(false);
   const [checklistByTask, setChecklistByTask] = useState<Record<string, { done: number; total: number }>>({});
   const [activePeriod, setActivePeriod] = useState<PeriodKey>("today");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -446,6 +461,8 @@ export default function CleanerPortal() {
       toast.error("Failed to start job. Please try again.");
     } else {
       toast.success(`Started — ${task.property_name}`);
+      // Show the (now editable) checklist immediately on start.
+      setChecklistTask({ ...task, status: "in_progress", started_at: startedAt });
     }
     setStartingId(null);
   };
@@ -532,12 +549,22 @@ export default function CleanerPortal() {
   const showDayPicker = isWeekPeriod && !selectedDay;
 
   const periodTasks = tasks.filter((t) => isInPeriod(t.scheduled_date, activePeriod));
-  const visibleTasks = selectedDay
+  const visibleTasksRaw = selectedDay
     ? periodTasks.filter((t) => t.scheduled_date === selectedDay)
     : isWeekPeriod
       ? []
       : periodTasks;
+  // Today: order by priority band (P0 → P1 → P2); stable within each band.
+  const visibleTasks = activePeriod === "today"
+    ? [...visibleTasksRaw].sort((a, b) => BAND[bandOf(a)].order - BAND[bandOf(b)].order)
+    : visibleTasksRaw;
   const isReadOnlyPeriod = activePeriod !== "today" && (!selectedDay || selectedDay !== todayStr);
+
+  // Every job assigned for today — drives the day's Shopping List (packed in the morning).
+  const todayListingIds = useMemo(
+    () => tasks.filter((t) => t.scheduled_date === todayStr).map((t) => t.listing_id),
+    [tasks, todayStr],
+  );
 
   // Build day buckets for the day-picker view
   const dayBuckets: { date: string; total: number; sto: number }[] = (() => {
@@ -688,6 +715,18 @@ export default function CleanerPortal() {
           </div>
         </div>
 
+        {/* Day's shopping list — what to pack, no need to start a job */}
+        {activePeriod === "today" && todayListingIds.length > 0 && (
+          <div className="px-4 mt-3">
+            <button
+              onClick={() => setShoppingOpen(true)}
+              className="w-full min-h-[48px] rounded-xl border border-primary/40 bg-primary/5 text-primary font-semibold text-sm flex items-center justify-center gap-2 hover:bg-primary/10 transition-colors"
+            >
+              <ShoppingCart className="h-4 w-4" /> Today's Shopping List
+            </button>
+          </div>
+        )}
+
         {selectedDay && isWeekPeriod && (
           <div className="px-4 mt-3">
             <button
@@ -771,10 +810,6 @@ export default function CleanerPortal() {
                   const canStart = task.status === "scheduled" || task.status === "unassigned";
                   const isConfirming = confirmingId === task.id;
                   const prev = idx > 0 ? visibleTasks[idx - 1] : null;
-                  const sameDayAsPrev = prev && prev.scheduled_date === task.scheduled_date;
-                  const km = sameDayAsPrev ? distanceKm(prev!.latitude, prev!.longitude, task.latitude, task.longitude) : null;
-                  const mins = sameDayAsPrev ? travelMinutes(prev!.latitude, prev!.longitude, task.latitude, task.longitude) : null;
-                  const proposed = proposedCleanTime(task);
                   const showDateHeader = activePeriod !== "today" && (!prev || prev.scheduled_date !== task.scheduled_date);
                   const taskDate = parseISO(task.scheduled_date);
 
@@ -791,26 +826,16 @@ export default function CleanerPortal() {
                           </div>
                         </div>
                       )}
-                      {idx === 0 && cleaner && activePeriod === "today" && (
-                        <div className="flex items-center justify-center py-2">
-                          <span className="text-xs text-muted-foreground">
-                            🏠 ~{travelMinutes(cleaner.home_latitude, cleaner.home_longitude, task.latitude, task.longitude)} min from home
+                      {/* Priority band header (Today only) — jobs grouped P0 / P1 / P2. */}
+                      {activePeriod === "today" && (!prev || bandOf(prev) !== bandOf(task)) && (
+                        <div className="flex items-center gap-2 mt-3 mb-1.5 first:mt-0">
+                          <span className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${BAND[bandOf(task)].chip}`}>
+                            {BAND[bandOf(task)].label}
                           </span>
+                          <span className="text-[11px] text-muted-foreground">{BAND[bandOf(task)].blurb}</span>
+                          <div className="h-px flex-1 bg-border/40" />
                         </div>
                       )}
-                      {idx > 0 && sameDayAsPrev && (
-                        <div className="flex flex-col items-center justify-center py-2 gap-0.5">
-                          <span className="text-xs text-muted-foreground">
-                            🚗 ~{task.travel_time_from_previous_minutes ?? mins} min travel
-                          </span>
-                          {isPreviewMode && km !== null && (
-                            <span className="text-[10px] text-primary/70 font-mono">
-                              [{km.toFixed(2)}km · {mins} min haversine]
-                            </span>
-                          )}
-                        </div>
-                      )}
-
 
                       <motion.div
                         layout
@@ -818,8 +843,10 @@ export default function CleanerPortal() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.3, ease: "easeOut" }}
                         className={`glass-card p-4 mb-1 transition-all duration-300 ${
-                          isComplete ? "border-l-2 border-l-success opacity-60" : ""
-                        } ${isInProgress ? "border-2 border-primary/60 animate-pulse-slow" : ""}`}
+                          isComplete ? "border-l-2 border-l-success opacity-60"
+                            : isInProgress ? "border-2 border-primary/60 animate-pulse-slow"
+                            : `border-l-4 ${BAND[bandOf(task)].accent}`
+                        }`}
                       >
                         {task.priority_level === 0 && (
                           <span
@@ -895,9 +922,6 @@ export default function CleanerPortal() {
                                 deliberately NOT shown to the cleaner. Only requests (above). */}
 
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2.5 text-[14px] text-muted-foreground">
-                              {proposed && (
-                                <span title="Proposed Clean Time">🕐 Proposed {formatTime(proposed)}</span>
-                              )}
                               <span>⏱ {task.cleaning_duration_minutes}m</span>
                               {task.checkout_time && (
                                 <span>📋 CO {formatTime(task.checkout_time)}</span>
@@ -916,12 +940,12 @@ export default function CleanerPortal() {
                               </div>
                             ) : (
                               <>
-                                {/* Open the job checklist (requests + consumables + equipment) */}
+                                {/* Job checklist — view-only until the job is started. */}
                                 <button
                                   onClick={() => setChecklistTask(task)}
                                   className="w-full mt-4 min-h-[48px] rounded-lg font-semibold text-sm flex items-center justify-center gap-2 border border-primary/40 text-primary hover:bg-primary/10 transition-colors"
                                 >
-                                  <ListChecks className="h-4 w-4" /> Open Checklist
+                                  <ListChecks className="h-4 w-4" /> {isInProgress ? "Open Checklist" : "View Checklist"}
                                 </button>
 
                                 {/* Start Job */}
@@ -1059,9 +1083,17 @@ export default function CleanerPortal() {
         task={checklistTask ? { id: checklistTask.id, listing_id: checklistTask.listing_id, property_name: checklistTask.property_name } : null}
         requestLabels={checklistTask ? requestsForTask(checklistTask).map((r) => r.name) : []}
         userId={user?.id ?? null}
+        // Editable only once the job is started; view-only before that. Read the
+        // live task so starting the job flips it editable while the sheet is open.
+        readOnly={(() => {
+          const live = tasks.find((t) => t.id === checklistTask?.id);
+          return (live?.status ?? checklistTask?.status) !== "in_progress";
+        })()}
         onClose={() => { const id = checklistTask?.id; setChecklistTask(null); if (id) loadChecklistProgress([id]); }}
         onComplete={() => { const t = checklistTask; setChecklistTask(null); if (t) handleMarkComplete(t); }}
       />
+
+      <ShoppingListSheet open={shoppingOpen} listingIds={todayListingIds} onClose={() => setShoppingOpen(false)} />
 
       {/* Requests reminder — shown before the standard "Yes, confirm" when the booking has requests */}
       <AlertDialog open={!!reminderTask} onOpenChange={(o) => !o && setReminderTask(null)}>

@@ -39,12 +39,13 @@ interface Props {
   onClose: () => void;
   onChanged?: () => void;
   onComplete?: () => void;   // fired from the sheet's "Complete Job" button (only when 100%)
+  readOnly?: boolean;        // before the job is started: viewable, not tickable
 }
 
 const roomTitle = (type: string, index: number, count: number) =>
   count > 1 ? `${type === "kitchen" ? "Kitchen" : "Bathroom"} ${index}` : (type === "kitchen" ? "Kitchen" : "Bathroom");
 
-export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onChanged, onComplete }: Props) {
+export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onChanged, onComplete, readOnly = false }: Props) {
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -91,6 +92,7 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
   }, [task?.id]);
 
   const toggle = async (item: ChecklistItem) => {
+    if (readOnly) return;
     const next = !item.checked;
     const now = new Date().toISOString();
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, checked: next, checked_at: next ? now : null, check_all: false } : i)));
@@ -102,7 +104,7 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
   };
 
   const handlePhoto = async (item: ChecklistItem, file: File) => {
-    if (!task) return;
+    if (!task || readOnly) return;
     setUploading(item.id);
     try {
       // Upload the original file — no in-browser decode (see note at top of file).
@@ -123,6 +125,7 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
   };
 
   const checkAll = async (groupItems: ChecklistItem[]) => {
+    if (readOnly) return;
     const ids = groupItems.filter((i) => !i.checked).map((i) => i.id);
     if (!ids.length) return;
     const now = new Date().toISOString();
@@ -177,8 +180,8 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
 
   const Row = ({ item }: { item: ChecklistItem }) => (
     <button
-      onClick={() => toggle(item)} disabled={busy === item.id}
-      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${item.checked ? "bg-emerald-500/10" : "hover:bg-secondary/40"}`}
+      onClick={() => toggle(item)} disabled={busy === item.id || readOnly}
+      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${item.checked ? "bg-emerald-500/10" : readOnly ? "" : "hover:bg-secondary/40"}`}
     >
       <span className={`h-5 w-5 rounded-md border flex items-center justify-center shrink-0 ${item.checked ? "bg-emerald-500 border-emerald-500 text-white" : "border-border"}`}>
         {item.checked && <Check className="h-3.5 w-3.5" />}
@@ -215,6 +218,12 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
           )}
         </SheetHeader>
 
+        {readOnly && !loading && total > 0 && (
+          <div className="mx-4 mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[13px] text-amber-700 dark:text-amber-400">
+            View only — <span className="font-semibold">Start the job</span> to tick items and take photos.
+          </div>
+        )}
+
         {loading ? (
           <div className="py-16 text-center text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto" /></div>
         ) : total === 0 ? (
@@ -238,10 +247,12 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
                       <div key={g.key} className="rounded-lg border border-border/40 overflow-hidden">
                         <div className="flex items-center justify-between px-3 py-2 bg-secondary/30">
                           <span className="text-xs font-semibold">{roomTitle(g.type, g.index, g.type === "kitchen" ? kitchenCount : bathCount)}</span>
-                          <button onClick={() => checkAll(g.items)} disabled={allDone}
-                            className="text-[11px] font-medium text-primary disabled:text-muted-foreground disabled:opacity-60">
-                            {allDone ? "All done" : "Check all"}
-                          </button>
+                          {!readOnly && (
+                            <button onClick={() => checkAll(g.items)} disabled={allDone}
+                              className="text-[11px] font-medium text-primary disabled:text-muted-foreground disabled:opacity-60">
+                              {allDone ? "All done" : "Check all"}
+                            </button>
+                          )}
                         </div>
                         <div className="divide-y divide-border/20">{g.items.map((i) => <Row key={i.id} item={i} />)}</div>
                       </div>
@@ -272,12 +283,16 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
                                 demand instead. */}
                             <a href={i.photo_url} target="_blank" rel="noopener noreferrer"
                               className="text-[11px] font-medium text-emerald-600">View</a>
-                            <label className="text-[11px] text-primary cursor-pointer">
-                              Retake
-                              <input type="file" accept="image/*" capture="environment" className="hidden"
-                                onChange={(e) => e.target.files?.[0] && handlePhoto(i, e.target.files[0])} />
-                            </label>
+                            {!readOnly && (
+                              <label className="text-[11px] text-primary cursor-pointer">
+                                Retake
+                                <input type="file" accept="image/*" capture="environment" className="hidden"
+                                  onChange={(e) => e.target.files?.[0] && handlePhoto(i, e.target.files[0])} />
+                              </label>
+                            )}
                           </div>
+                        ) : readOnly ? (
+                          <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1"><Camera className="h-3.5 w-3.5" /> Photo needed</span>
                         ) : (
                           <label className={`text-xs font-medium px-2.5 py-1.5 rounded-md border inline-flex items-center gap-1.5 cursor-pointer ${uploading === i.id ? "opacity-60" : "border-primary/40 text-primary hover:bg-primary/10"}`}>
                             {uploading === i.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />} Photo
@@ -295,7 +310,7 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
           </div>
         )}
 
-        {onComplete && !loading && total > 0 && (
+        {onComplete && !loading && total > 0 && !readOnly && (
           <div className="sticky bottom-0 bg-background/95 backdrop-blur border-t border-border/30 p-4">
             <button
               onClick={handleComplete}
