@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag, Sunrise, Play, X, Undo2, ListChecks } from "lucide-react";
+import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag, Sunrise, Play, X, Undo2, ListChecks, StickyNote } from "lucide-react";
 import { parseCustomFields, cleanerAccess, type AccessItem } from "@/lib/customFields";
 import { CleanChecklistSheet } from "@/components/cleaning/CleanChecklistSheet";
 import { toast } from "sonner";
@@ -39,6 +39,7 @@ interface CleanTask {
   latitude: number | null;
   longitude: number | null;
   started_at: string | null;
+  notes: string | null;
 }
 
 interface CleanerProfile {
@@ -160,7 +161,7 @@ export default function CleanerPortal() {
       .select(`
         id, status, scheduled_date, route_order, estimated_start_time,
         travel_time_from_previous_minutes, is_same_day_turnaround, priority_level,
-        checkout_time, checkin_time, cleaning_duration_minutes,
+        checkout_time, checkin_time, cleaning_duration_minutes, notes,
         listing_id, reservation_id, started_at,
         listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms, latitude, longitude)
       `)
@@ -205,6 +206,7 @@ export default function CleanerPortal() {
       latitude: t.listings?.latitude ?? null,
       longitude: t.listings?.longitude ?? null,
       started_at: t.started_at ?? null,
+      notes: t.notes ?? null,
     }));
 
   const fetchData = async () => {
@@ -229,7 +231,7 @@ export default function CleanerPortal() {
       .select(`
         id, status, scheduled_date, route_order, estimated_start_time,
         travel_time_from_previous_minutes, is_same_day_turnaround, priority_level,
-        checkout_time, checkin_time, cleaning_duration_minutes,
+        checkout_time, checkin_time, cleaning_duration_minutes, notes,
         listing_id, reservation_id, started_at, created_at,
         listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms, latitude, longitude)
       `)
@@ -875,6 +877,17 @@ export default function CleanerPortal() {
                                     {r.name}{r.quantity > 1 ? ` ×${r.quantity}` : ""}
                                   </span>
                                 ))}
+                              </div>
+                            )}
+
+                            {/* Manager note for this specific clean (set in the schedule task panel). */}
+                            {task.notes && task.notes.trim() && (
+                              <div className="mt-2 flex items-start gap-2 rounded-lg border border-primary/25 bg-primary/5 px-3 py-2">
+                                <StickyNote className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-wide text-primary font-semibold mb-0.5">Note from manager</p>
+                                  <p className="text-[13px] text-foreground/90 whitespace-pre-wrap">{task.notes}</p>
+                                </div>
                               </div>
                             )}
 
