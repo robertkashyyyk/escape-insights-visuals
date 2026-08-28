@@ -34,6 +34,7 @@ import CleaningSchedule from "./pages/CleaningSchedule";
 import CleaningNumbers from "./pages/CleaningNumbers";
 import CleaningAudit from "./pages/CleaningAudit";
 import Update260826 from "./pages/Update260826";
+import Update280826 from "./pages/Update280826";
 import CleanerPortal from "./pages/CleanerPortal";
 import OwnerPortfolio from "./pages/owner/OwnerPortfolio";
 import OwnerCalendar from "./pages/owner/OwnerCalendar";
@@ -79,6 +80,7 @@ const App = () => (
             <Route path="/stay/:slug" element={<GuestPortal />} />
             <Route path="/cleaner" element={<CleanerPortal />} />
             <Route path="/260826Update" element={<Update260826 />} />
+            <Route path="/280826Update" element={<Update280826 />} />
             <Route path="/owner" element={<ProtectedRoute requiredRoles={["client", "super", "senior"]}><OwnerPreviewProvider><OwnerPortfolio /></OwnerPreviewProvider></ProtectedRoute>} />
             <Route path="/owner/calendar" element={<ProtectedRoute requiredRoles={["client", "super", "senior"]}><OwnerPreviewProvider><OwnerCalendar /></OwnerPreviewProvider></ProtectedRoute>} />
             <Route path="/owner/reservations" element={<ProtectedRoute requiredRoles={["client", "super", "senior"]}><OwnerPreviewProvider><OwnerReservations /></OwnerPreviewProvider></ProtectedRoute>} />
