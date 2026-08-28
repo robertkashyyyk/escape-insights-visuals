@@ -560,11 +560,10 @@ export default function CleanerPortal() {
     : visibleTasksRaw;
   const isReadOnlyPeriod = activePeriod !== "today" && (!selectedDay || selectedDay !== todayStr);
 
-  // Every job assigned for today — drives the day's Shopping List (packed in the morning).
-  const todayListingIds = useMemo(
-    () => tasks.filter((t) => t.scheduled_date === todayStr).map((t) => t.listing_id),
-    [tasks, todayStr],
-  );
+  // Every job assigned for today — drives the day's Shopping List (packed in the
+  // morning). Plain const (NOT useMemo): this sits after the early returns above,
+  // and a hook here would break the Rules of Hooks (blank screen on data load).
+  const todayListingIds = tasks.filter((t) => t.scheduled_date === todayStr).map((t) => t.listing_id);
 
   // Build day buckets for the day-picker view
   const dayBuckets: { date: string; total: number; sto: number }[] = (() => {
