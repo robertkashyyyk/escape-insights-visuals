@@ -12,7 +12,8 @@ import { useLocationGroups } from "@/hooks/useLocationGroups";
 import { PropertyBedsEditor } from "@/components/properties/PropertyBedsEditor";
 import { displayName } from "@/lib/listingName";
 import { PROPERTY_TYPES } from "@/lib/propertyTypes";
-import { Search, Save, BedDouble, Loader2 } from "lucide-react";
+import { Search, Save, BedDouble, Loader2, LayoutGrid } from "lucide-react";
+import { Link } from "react-router-dom";
 
 // ── Column config — add a variable here and it appears in the grid. ────────────
 type ColType = "text" | "number" | "select" | "bool";
@@ -182,6 +183,9 @@ export default function PropertyMatrix() {
             <h1 className="text-2xl md:text-3xl font-display font-bold tracking-tight">Property Matrix</h1>
             <p className="text-sm text-muted-foreground mt-1">Bulk-edit every property. Paste from a spreadsheet, or ⌘/Ctrl+D to fill a column down.</p>
           </div>
+          <Button asChild size="sm" variant="outline">
+            <Link to="/properties"><LayoutGrid className="h-4 w-4 mr-1.5" /> Board</Link>
+          </Button>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">

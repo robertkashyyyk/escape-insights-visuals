@@ -29,6 +29,7 @@ export interface ChecklistItem {
   check_all: boolean;
   photo_url: string | null;
   flagged: boolean;
+  requires_photo: boolean;
 }
 
 interface Props {
@@ -65,7 +66,7 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
       const [listingRes, consRes, equipRes] = await Promise.all([
         supabase.from("listings").select("kitchens, bathrooms").eq("id", task.listing_id).single(),
         (supabase.from as any)("consumables").select("id, name, room_type, display_order").is("listing_id", null).eq("active", true).order("display_order"),
-        (supabase.from as any)("property_equipment").select("id, name").eq("listing_id", task.listing_id).eq("active", true).order("name"),
+        (supabase.from as any)("property_equipment").select("id, name, requires_photo").eq("listing_id", task.listing_id).eq("active", true).order("name"),
       ]);
       if (cancelled) return;
       const kitchens = Math.max(1, (listingRes.data as any)?.kitchens ?? 1);
@@ -78,7 +79,7 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
       for (const label of requestLabels) rows.push({ clean_task_id: task.id, category: "request", label });
       for (let k = 1; k <= kitchens; k++) for (const c of kitchenItems) rows.push({ clean_task_id: task.id, category: "consumable", room_type: "kitchen", room_index: k, label: c.name, ref_id: c.id });
       for (let b = 1; b <= bathrooms; b++) for (const c of bathItems) rows.push({ clean_task_id: task.id, category: "consumable", room_type: "bathroom", room_index: b, label: c.name, ref_id: c.id });
-      for (const e of (equipRes.data ?? []) as any[]) rows.push({ clean_task_id: task.id, category: "equipment", label: e.name, ref_id: e.id });
+      for (const e of (equipRes.data ?? []) as any[]) rows.push({ clean_task_id: task.id, category: "equipment", label: e.name, ref_id: e.id, requires_photo: e.requires_photo ?? true });
 
       if (rows.length) await supabase.from("clean_checklist_items").insert(rows);
       const { data } = await supabase.from("clean_checklist_items").select("*").eq("clean_task_id", task.id);
@@ -253,37 +254,42 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
             {equipment.length > 0 && (
               <Section icon={Wrench} title="Equipment">
                 <div className="rounded-lg border border-border/40 divide-y divide-border/20 overflow-hidden">
-                  {equipment.map((i) => (
-                    <div key={i.id} className="flex items-center gap-3 px-3 py-2.5">
-                      <span className={`h-5 w-5 rounded-md border flex items-center justify-center shrink-0 ${i.photo_url ? "bg-emerald-500 border-emerald-500 text-white" : "border-border"}`}>
-                        {i.photo_url && <Check className="h-3.5 w-3.5" />}
-                      </span>
-                      <span className={`text-sm flex-1 ${i.photo_url ? "text-muted-foreground" : "text-foreground"}`}>{i.label}</span>
-                      {i.photo_url ? (
-                        <div className="flex items-center gap-3">
-                          {/* No inline <img>: decoding the full-size photo for a
-                              thumbnail spikes memory and, stacked, makes the next
-                              capture fail with iOS "low memory". View opens it on
-                              demand instead. */}
-                          <a href={i.photo_url} target="_blank" rel="noopener noreferrer"
-                            className="text-[11px] font-medium text-emerald-600">View</a>
-                          <label className="text-[11px] text-primary cursor-pointer">
-                            Retake
-                            <input type="file" accept="image/*" capture="environment" className="hidden"
+                  {equipment.map((i) =>
+                    // Tick-only equipment (e.g. Coffee Machine) — no photo, just a tick.
+                    i.requires_photo === false ? (
+                      <Row key={i.id} item={i} />
+                    ) : (
+                      <div key={i.id} className="flex items-center gap-3 px-3 py-2.5">
+                        <span className={`h-5 w-5 rounded-md border flex items-center justify-center shrink-0 ${i.photo_url ? "bg-emerald-500 border-emerald-500 text-white" : "border-border"}`}>
+                          {i.photo_url && <Check className="h-3.5 w-3.5" />}
+                        </span>
+                        <span className={`text-sm flex-1 ${i.photo_url ? "text-muted-foreground" : "text-foreground"}`}>{i.label}</span>
+                        {i.photo_url ? (
+                          <div className="flex items-center gap-3">
+                            {/* No inline <img>: decoding the full-size photo for a
+                                thumbnail spikes memory and, stacked, makes the next
+                                capture fail with iOS "low memory". View opens it on
+                                demand instead. */}
+                            <a href={i.photo_url} target="_blank" rel="noopener noreferrer"
+                              className="text-[11px] font-medium text-emerald-600">View</a>
+                            <label className="text-[11px] text-primary cursor-pointer">
+                              Retake
+                              <input type="file" accept="image/*" capture="environment" className="hidden"
+                                onChange={(e) => e.target.files?.[0] && handlePhoto(i, e.target.files[0])} />
+                            </label>
+                          </div>
+                        ) : (
+                          <label className={`text-xs font-medium px-2.5 py-1.5 rounded-md border inline-flex items-center gap-1.5 cursor-pointer ${uploading === i.id ? "opacity-60" : "border-primary/40 text-primary hover:bg-primary/10"}`}>
+                            {uploading === i.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />} Photo
+                            <input type="file" accept="image/*" capture="environment" className="hidden" disabled={uploading === i.id}
                               onChange={(e) => e.target.files?.[0] && handlePhoto(i, e.target.files[0])} />
                           </label>
-                        </div>
-                      ) : (
-                        <label className={`text-xs font-medium px-2.5 py-1.5 rounded-md border inline-flex items-center gap-1.5 cursor-pointer ${uploading === i.id ? "opacity-60" : "border-primary/40 text-primary hover:bg-primary/10"}`}>
-                          {uploading === i.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />} Photo
-                          <input type="file" accept="image/*" capture="environment" className="hidden" disabled={uploading === i.id}
-                            onChange={(e) => e.target.files?.[0] && handlePhoto(i, e.target.files[0])} />
-                        </label>
-                      )}
-                    </div>
-                  ))}
+                        )}
+                      </div>
+                    )
+                  )}
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-1.5">Each item must be photographed in approved condition.</p>
+                <p className="text-[11px] text-muted-foreground mt-1.5">Camera items must be photographed in approved condition; the rest are a tick.</p>
               </Section>
             )}
           </div>
