@@ -4,7 +4,7 @@ import { useTodayData } from "@/hooks/useTodayData";
 import { useTodayCleans } from "@/hooks/useTodayCleans";
 import { useTodayCleaningProgress } from "@/hooks/useTodayCleaningProgress";
 import { useCleaningAttention, type DayState } from "@/hooks/useCleaningAttention";
-import { LogOut, LogIn, PoundSterling, CalendarCheck, BarChart3, Loader2, SprayCan, CheckCircle2, Gauge, CalendarDays, Building2, ClipboardList, ArrowRight, Sparkles } from "lucide-react";
+import { LogOut, LogIn, PoundSterling, CalendarCheck, BarChart3, Loader2, SprayCan, CheckCircle2, Gauge, CalendarDays, Building2, ClipboardList, ArrowRight, Sparkles, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 import { OpenIssuesSection } from "@/components/today/OpenIssuesSection";
