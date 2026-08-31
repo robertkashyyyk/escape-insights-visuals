@@ -83,7 +83,10 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
       for (let b = 1; b <= bathrooms; b++) for (const c of bathItems) rows.push({ clean_task_id: task.id, category: "consumable", room_type: "bathroom", room_index: b, label: c.name, ref_id: c.id });
       for (const e of (equipRes.data ?? []) as any[]) rows.push({ clean_task_id: task.id, category: "equipment", label: e.name, ref_id: e.id, requires_photo: e.requires_photo ?? true });
 
-      if (rows.length) await supabase.from("clean_checklist_items").insert(rows);
+      if (rows.length) {
+        const { error: insErr } = await supabase.from("clean_checklist_items").insert(rows);
+        if (insErr) toast.error(`Checklist couldn't be set up: ${insErr.message}`);
+      }
       const { data } = await supabase.from("clean_checklist_items").select("*").eq("clean_task_id", task.id);
       if (cancelled) return;
       setItems((data ?? []) as any);
