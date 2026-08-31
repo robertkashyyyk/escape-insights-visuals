@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { format, addDays, startOfWeek, isSameDay } from "date-fns";
+import { format, addDays, startOfWeek, isSameDay, parseISO } from "date-fns";
+import { useSearchParams } from "react-router-dom";
 import {
   ChevronLeft, ChevronRight, RefreshCw, Calendar, CheckCircle2,
   Clock, MapPin, AlertTriangle, ChevronDown, User, Loader2,
@@ -35,13 +36,24 @@ export default function CleaningSchedule() {
     buildDaySchedule,
   } = useCleaningSchedule();
 
-  // Default managers to Matrix view on first load
+  // A ?date=YYYY-MM-DD deep-link (e.g. from Cleaning Traffic) opens that day.
+  const [searchParams] = useSearchParams();
+  const deepDate = searchParams.get("date");
+
+  // Default managers to Matrix view on first load — unless a ?date deep-link asks
+  // for the Day view of a specific date.
   const [defaulted, setDefaulted] = useState(false);
   useEffect(() => {
     if (defaulted) return;
-    if (isManager) setViewMode("matrix" as any);
+    if (deepDate) {
+      const d = parseISO(deepDate);
+      if (!isNaN(d.getTime())) { setSelectedDate(d); setMatrixWeekAnchor(d); setViewMode("day" as any); }
+    } else if (isManager) {
+      setViewMode("matrix" as any);
+    }
     setDefaulted(true);
-  }, [isManager, defaulted, setViewMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isManager, defaulted]);
 
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
   const [matrixSummary, setMatrixSummary] = useState<{ total: number; unassigned: number } | null>(null);

@@ -82,6 +82,7 @@ const sections: NavSection[] = [
     collapsible: true,
     items: [
       { title: "Cleaning Schedule", url: "/operations/schedule", icon: CalendarDays, roles: allRoles },
+      { title: "Cleaning Traffic", url: "/operations/traffic", icon: Gauge, roles: allRoles },
       { title: "Maintenance", url: "/operations/maintenance", icon: Wrench, roles: allRoles },
       { title: "Cleaning Numbers", url: "/operations/numbers", icon: PoundSterling, roles: managementRoles },
       { title: "Cleaning Audit", url: "/operations/audit", icon: ClipboardList, roles: ["super", "senior", "admin"] },
