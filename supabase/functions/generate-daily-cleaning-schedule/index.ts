@@ -184,6 +184,13 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     .lt("reset_at", nextDateIso(targetDate));
   const manuallyCleanedToday = new Set((cleanResetsRaw || []).map((r: any) => String(r.listing_id)));
 
+  // Day-off overrides: cleaners who work THIS date despite a recurring day-off.
+  const { data: workExceptions } = await supabase
+    .from("cleaner_working_exceptions")
+    .select("cleaner_id")
+    .eq("work_date", targetDate);
+  const worksByExceptionToday = new Set((workExceptions || []).map((e: any) => String(e.cleaner_id)));
+
   // 0. P0 PROMOTION: only on the actual current day. Future week regeneration
   // must keep cleans on checkout day; the early-morning refresh promotes them
   // to P0 only if they are still incomplete on arrival day.
@@ -212,7 +219,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     const onHolidayToday = new Set((todayHolidays || []).map((h: any) => String(h.cleaner_id)));
     const availableToday = new Set(
       (availCleaners || [])
-        .filter((c: any) => !(c.non_working_days || []).includes(targetDayOfWeek) && !onHolidayToday.has(String(c.id)))
+        .filter((c: any) => (!(c.non_working_days || []).includes(targetDayOfWeek) || worksByExceptionToday.has(String(c.id))) && !onHolidayToday.has(String(c.id)))
         .map((c: any) => String(c.id))
     );
 
@@ -675,7 +682,8 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
 
   function isEligibleBase(c: CleanerInfo, task: TaskInfo): boolean {
     if (!c.location_groups.includes(task.location_group)) return false;
-    if (c.non_working_days.includes(targetDayOfWeek)) return false;
+    // Recurring day-off — unless a single-date override says they work today.
+    if (c.non_working_days.includes(targetDayOfWeek) && !worksByExceptionToday.has(c.id)) return false;
     // Holiday filter — any holiday range covering targetDate disqualifies
     for (const h of c.holidays) {
       if (targetDate >= h.start_date && targetDate <= h.end_date) return false;

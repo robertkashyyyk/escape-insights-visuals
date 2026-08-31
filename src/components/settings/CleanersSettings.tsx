@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, SprayCan, AlertTriangle, Loader2, UserCheck, KeyRound, X } from "lucide-react";
 import { CLEANER_COLOR_SWATCHES, getCleanerColor } from "@/lib/cleanerColors";
 import { CleanerHolidaysSection } from "./CleanerHolidaysSection";
+import { CleanerWorkingExceptionsSection } from "./CleanerWorkingExceptionsSection";
 import { useLocationGroups } from "@/hooks/useLocationGroups";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -671,9 +672,12 @@ export function CleanersSettings() {
                 ))}
             </div>
 
-            {/* Holidays / Leave — only when editing an existing cleaner */}
+            {/* Holidays / Leave + day-off overrides — only when editing an existing cleaner */}
             {editing && (
-              <CleanerHolidaysSection cleanerId={editing.id} cleanerName={editing.name} />
+              <>
+                <CleanerHolidaysSection cleanerId={editing.id} cleanerName={editing.name} />
+                <CleanerWorkingExceptionsSection cleanerId={editing.id} cleanerName={editing.name} />
+              </>
             )}
             </div>
             <div className="flex items-center gap-2">
