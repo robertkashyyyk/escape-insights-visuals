@@ -66,6 +66,9 @@ const STYLES = `
 .eg-manual .btn { font-family: "IBM Plex Mono", monospace; font-size: .86em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 7px; white-space: nowrap; font-weight: 500; }
 .eg-manual .note { margin-top: 14px; background: var(--amber-soft); border: 1px solid var(--amber); border-radius: 12px; padding: 12px 15px; font-size: 14px; color: var(--ink); }
 .eg-manual .note b { color: var(--amber); }
+.eg-manual figure.shot { margin: 16px 0 0; }
+.eg-manual figure.shot img { width: 100%; max-width: 340px; border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow); display: block; }
+.eg-manual figure.shot figcaption { font-size: 12px; color: var(--faint); margin-top: 7px; }
 .eg-manual footer { margin-top: 50px; padding-top: 22px; border-top: 1px solid var(--border); color: var(--faint); font-size: 13px; }
 .eg-manual footer .mono { font-family: "IBM Plex Mono", monospace; }
 `;
@@ -115,6 +118,7 @@ const BODY = `
       <li>Your choice is remembered on that phone. If someone else takes the phone to do a job, tap <span class="btn">You are: … · Switch</span> at the top and pick the right name.</li>
     </ol>
     <div class="note">You can't <b>Start</b> or <b>Complete</b> a job until you've told the app who you are — if you try, it'll pop the name list up first. If you're a <b>solo cleaner</b>, you'll never see this; skip straight to the next section.</div>
+    <figure class="shot"><img src="/images/manual/team.png" alt="Who are you today" onerror="this.closest('figure').style.display='none'"><figcaption>The “Who are you today?” screen for shared-login teams.</figcaption></figure>
   </section>
 
   <section id="today">
@@ -126,6 +130,7 @@ const BODY = `
       <li><span class="pill p2">P2</span> &nbsp;<b>Standard checkout</b> — no rush beyond the normal window.</li>
     </ul>
     <p class="intro">Each job card shows the <b>property</b>, its <b>area</b>, the <b>checkout</b> (📋 CO) and <b>check-in</b> (🔑 CI) times, and roughly <b>how long</b> the clean should take (⏱).</p>
+    <figure class="shot"><img src="/images/manual/today.png" alt="Today view" onerror="this.closest('figure').style.display='none'"><figcaption>Your Today list, grouped P0 → P1 → P2.</figcaption></figure>
   </section>
 
   <section id="shopping">
@@ -136,6 +141,7 @@ const BODY = `
       <li><b>Consumables</b> — how many toilet rolls, dishwasher tablets, tea towels, etc.</li>
       <li><b>Equipment to service</b> — how many hot tubs, coffee machines, BBQs you'll deal with.</li>
     </ul>
+    <figure class="shot"><img src="/images/manual/shopping.png" alt="Shopping List" onerror="this.closest('figure').style.display='none'"><figcaption>The day's Shopping List — linens, consumables and equipment totalled.</figcaption></figure>
   </section>
 
   <section id="view">
@@ -162,6 +168,7 @@ const BODY = `
       <li><b>Equipment</b> — items like Hot Tub or BBQ need a <b>photo</b> (see next section). Others, like a Coffee Machine, are just a tick.</li>
     </ul>
     <div class="note">Tick <b>honestly, as you actually do each thing</b>. Hitting “Check all” the instant you open a room gets flagged as “without due attention” and your manager sees it.</div>
+    <figure class="shot"><img src="/images/manual/checklist.png" alt="Job checklist" onerror="this.closest('figure').style.display='none'"><figcaption>A job's checklist — Requests, Consumables per room, Equipment.</figcaption></figure>
   </section>
 
   <section id="photos">
