@@ -13,6 +13,7 @@ import { Plus, Pencil, Trash2, SprayCan, AlertTriangle, Loader2, UserCheck, KeyR
 import { CLEANER_COLOR_SWATCHES, getCleanerColor } from "@/lib/cleanerColors";
 import { CleanerHolidaysSection } from "./CleanerHolidaysSection";
 import { CleanerWorkingExceptionsSection } from "./CleanerWorkingExceptionsSection";
+import { CleanerTeamSection } from "./CleanerTeamSection";
 import { useLocationGroups } from "@/hooks/useLocationGroups";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -675,6 +676,7 @@ export function CleanersSettings() {
             {/* Holidays / Leave + day-off overrides — only when editing an existing cleaner */}
             {editing && (
               <>
+                <CleanerTeamSection cleanerId={editing.id} cleanerName={editing.name} />
                 <CleanerHolidaysSection cleanerId={editing.id} cleanerName={editing.name} />
                 <CleanerWorkingExceptionsSection cleanerId={editing.id} cleanerName={editing.name} />
               </>

@@ -40,12 +40,13 @@ interface Props {
   onChanged?: () => void;
   onComplete?: () => void;   // fired from the sheet's "Complete Job" button (only when 100%)
   readOnly?: boolean;        // before the job is started: viewable, not tickable
+  memberName?: string | null; // team cleaner: which member is ticking (attribution)
 }
 
 const roomTitle = (type: string, index: number, count: number) =>
   count > 1 ? `${type === "kitchen" ? "Kitchen" : "Bathroom"} ${index}` : (type === "kitchen" ? "Kitchen" : "Bathroom");
 
-export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onChanged, onComplete, readOnly = false }: Props) {
+export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onChanged, onComplete, readOnly = false, memberName = null }: Props) {
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -98,7 +99,7 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, checked: next, checked_at: next ? now : null, check_all: false } : i)));
     setBusy(item.id);
     await supabase.from("clean_checklist_items")
-      .update({ checked: next, checked_at: next ? now : null, checked_by: userId, check_all: false }).eq("id", item.id);
+      .update({ checked: next, checked_at: next ? now : null, checked_by: userId, checked_by_member: next ? memberName : null, check_all: false }).eq("id", item.id);
     setBusy(null);
     onChanged?.();
   };
@@ -114,7 +115,7 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
       if (upErr) throw upErr;
       const url = `${supabase.storage.from("clean-photos").getPublicUrl(path).data.publicUrl}?t=${Date.now()}`;
       const now = new Date().toISOString();
-      await supabase.from("clean_checklist_items").update({ photo_url: url, checked: true, checked_at: now, checked_by: userId }).eq("id", item.id);
+      await supabase.from("clean_checklist_items").update({ photo_url: url, checked: true, checked_at: now, checked_by: userId, checked_by_member: memberName }).eq("id", item.id);
       setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, photo_url: url, checked: true, checked_at: now } : i)));
       onChanged?.();
     } catch (e: any) {
@@ -131,7 +132,7 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
     const now = new Date().toISOString();
     setItems((prev) => prev.map((i) => (ids.includes(i.id) ? { ...i, checked: true, checked_at: now, check_all: true } : i)));
     await supabase.from("clean_checklist_items")
-      .update({ checked: true, checked_at: now, checked_by: userId, check_all: true }).in("id", ids);
+      .update({ checked: true, checked_at: now, checked_by: userId, checked_by_member: memberName, check_all: true }).in("id", ids);
     onChanged?.();
   };
 

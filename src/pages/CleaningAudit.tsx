@@ -40,7 +40,7 @@ export default function CleaningAudit() {
       const [tasks, listings, cleaners] = await Promise.all([
         fetchAllRows(() =>
           supabase.from("clean_tasks")
-            .select("id, listing_id, assigned_cleaner_id, scheduled_date, completed_at, status")
+            .select("id, listing_id, assigned_cleaner_id, scheduled_date, completed_at, status, completed_by_member")
             .in("status", COMPLETED)
             .gte("completed_at", `${startStr}T00:00:00`)
             .lt("completed_at", `${endNextStr}T00:00:00`)),
@@ -77,7 +77,7 @@ export default function CleaningAudit() {
             scheduled_date: t.scheduled_date,
             completed_at: t.completed_at,
             property: displayName(listingMap.get(t.listing_id)) || "Unknown",
-            cleaner: cleanerMap.get(t.assigned_cleaner_id) ?? "Unassigned",
+            cleaner: (cleanerMap.get(t.assigned_cleaner_id) ?? "Unassigned") + (t.completed_by_member ? ` · ${t.completed_by_member}` : ""),
             ...a,
           };
         })

@@ -15,6 +15,7 @@ interface AuditItem {
   check_all: boolean;
   photo_url: string | null;
   flagged: boolean;
+  checked_by_member: string | null;
 }
 
 interface Props {
@@ -70,6 +71,7 @@ export function CleanAuditPanel({ cleanTaskId, propertyName, cleanerName, comple
       {i.photo_url && <img src={i.photo_url} alt={i.label} className="h-8 w-8 rounded object-cover border border-border/40" />}
       {i.check_all && <span className="text-[9px] uppercase tracking-wide text-muted-foreground inline-flex items-center gap-0.5"><Zap className="h-3 w-3" />all</span>}
       {i.flagged && <Flag className="h-3.5 w-3.5 text-amber-500" />}
+      {i.checked_by_member && <span className="text-[10px] font-medium text-primary shrink-0">{i.checked_by_member}</span>}
       <span className="text-[11px] text-muted-foreground tabular-nums w-[112px] text-right shrink-0">{when(i.checked_at)}</span>
     </div>
   );

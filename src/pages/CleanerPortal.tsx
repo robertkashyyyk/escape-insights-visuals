@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag, Sunrise, Play, X, Undo2, ListChecks, StickyNote, ShoppingCart } from "lucide-react";
+import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag, Sunrise, Play, X, Undo2, ListChecks, StickyNote, ShoppingCart, Users } from "lucide-react";
 import { parseCustomFields, cleanerAccess, type AccessItem } from "@/lib/customFields";
 import { CleanChecklistSheet } from "@/components/cleaning/CleanChecklistSheet";
 import { ShoppingListSheet } from "@/components/cleaning/ShoppingListSheet";
@@ -62,6 +62,7 @@ interface CleanerProfile {
   daily_working_hours: number;
   home_latitude: number | null;
   home_longitude: number | null;
+  is_team?: boolean;
 }
 
 type PeriodKey = "today" | "tomorrow" | "rest_week" | "next_week";
@@ -107,6 +108,10 @@ export default function CleanerPortal() {
   const [reminderTask, setReminderTask] = useState<CleanTask | null>(null);
   const [checklistTask, setChecklistTask] = useState<CleanTask | null>(null);
   const [shoppingOpen, setShoppingOpen] = useState(false);
+  // Team cleaners: several people share one login and pick who they are.
+  const [teamMembers, setTeamMembers] = useState<{ id: string; name: string }[]>([]);
+  const [activeMember, setActiveMember] = useState<string | null>(null);
+  const [showMemberPicker, setShowMemberPicker] = useState(false);
   const [checklistByTask, setChecklistByTask] = useState<Record<string, { done: number; total: number }>>({});
   const [activePeriod, setActivePeriod] = useState<PeriodKey>("today");
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -134,7 +139,7 @@ export default function CleanerPortal() {
     const fetchCleaners = async () => {
       const { data } = await supabase
         .from("cleaners")
-        .select("id, name, daily_working_hours, home_latitude, home_longitude")
+        .select("id, name, daily_working_hours, home_latitude, home_longitude, is_team")
         .eq("active", true)
         .order("name");
       if (data && data.length > 0) {
@@ -195,6 +200,7 @@ export default function CleanerPortal() {
     const selected = allCleaners.find(c => c.id === cleanerId);
     if (!selected) { setLoading(false); return; }
     setCleaner(selected);
+    await loadTeam(selected as any);
     const taskData = await fetchTasksFor(cleanerId);
     setTasks(mapTaskData(taskData));
     setLoading(false);
@@ -229,14 +235,34 @@ export default function CleanerPortal() {
     setLoading(true);
     const { data: cleanerData } = await supabase
       .from("cleaners")
-      .select("id, name, daily_working_hours, home_latitude, home_longitude")
+      .select("id, name, daily_working_hours, home_latitude, home_longitude, is_team")
       .eq("user_id", user.id)
       .single();
     if (!cleanerData) { setLoading(false); return; }
     setCleaner(cleanerData as any as CleanerProfile);
+    await loadTeam(cleanerData as any);
     const taskData = await fetchTasksFor(cleanerData.id);
     setTasks(mapTaskData(taskData));
     setLoading(false);
+  };
+
+  // Load a team's named members and restore (or prompt for) who's using the app.
+  const loadTeam = async (c: { id: string; is_team?: boolean }) => {
+    if (!c.is_team) { setTeamMembers([]); setActiveMember(null); setShowMemberPicker(false); return; }
+    const { data } = await (supabase.from("cleaner_members" as any) as any)
+      .select("id, name").eq("cleaner_id", c.id).eq("active", true).order("sort_order");
+    const members = ((data || []) as { id: string; name: string }[]);
+    setTeamMembers(members);
+    let stored: string | null = null;
+    try { stored = localStorage.getItem(`eg-cleaner-member-${c.id}`); } catch { /* private mode */ }
+    if (stored && members.some((m) => m.name === stored)) { setActiveMember(stored); setShowMemberPicker(false); }
+    else { setActiveMember(null); setShowMemberPicker(members.length > 0 && !isPreviewMode); }
+  };
+
+  const pickMember = (name: string) => {
+    setActiveMember(name);
+    if (cleaner) { try { localStorage.setItem(`eg-cleaner-member-${cleaner.id}`, name); } catch { /* private mode */ } }
+    setShowMemberPicker(false);
   };
 
   const pollNewTasks = async () => {
@@ -304,7 +330,7 @@ export default function CleanerPortal() {
     const [taskRes, listingRes] = await Promise.all([
       supabase
         .from("clean_tasks")
-        .update({ status: "completed", completed_at: new Date().toISOString() })
+        .update({ status: "completed", completed_at: new Date().toISOString(), completed_by_member: activeMember })
         .eq("id", task.id),
       supabase.from("listings").update({ is_clean: true }).eq("id", task.listing_id),
     ]);
@@ -429,6 +455,7 @@ export default function CleanerPortal() {
   // booking has requests, show the reminder; otherwise the standard confirm step.
   const handleCompleteClick = (task: CleanTask) => {
     if (isPreviewMode) { toast.info("Preview mode — actions are disabled"); return; }
+    if (cleaner?.is_team && !activeMember) { setShowMemberPicker(true); toast.info("Tap who you are first"); return; }
     const prog = checklistByTask[task.id];
     if (!prog || prog.total === 0 || prog.done < prog.total) {
       setChecklistTask(task);
@@ -446,13 +473,14 @@ export default function CleanerPortal() {
       toast.info("Preview mode — actions are disabled");
       return;
     }
+    if (cleaner?.is_team && !activeMember) { setShowMemberPicker(true); toast.info("Tap who you are first"); return; }
     setStartingId(task.id);
     const startedAt = new Date().toISOString();
     setTasks((prev) =>
       prev.map((t) => (t.id === task.id ? { ...t, status: "in_progress", started_at: startedAt } : t))
     );
     const { error } = await (supabase.from("clean_tasks") as any)
-      .update({ status: "in_progress", started_at: startedAt })
+      .update({ status: "in_progress", started_at: startedAt, started_by_member: activeMember })
       .eq("id", task.id);
     if (error) {
       setTasks((prev) =>
@@ -668,6 +696,11 @@ export default function CleanerPortal() {
                   {firstName}
                 </h1>
                 <p className="text-xs text-muted-foreground mt-0.5">{todayFormatted}</p>
+                {cleaner?.is_team && (
+                  <button onClick={() => setShowMemberPicker(true)} className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80">
+                    <Users className="h-3 w-3" /> You are: {activeMember ?? "tap to choose"} · Switch
+                  </button>
+                )}
               </div>
             </div>
             <div
@@ -1088,11 +1121,37 @@ export default function CleanerPortal() {
           const live = tasks.find((t) => t.id === checklistTask?.id);
           return (live?.status ?? checklistTask?.status) !== "in_progress";
         })()}
+        memberName={activeMember}
         onClose={() => { const id = checklistTask?.id; setChecklistTask(null); if (id) loadChecklistProgress([id]); }}
         onComplete={() => { const t = checklistTask; setChecklistTask(null); if (t) handleMarkComplete(t); }}
       />
 
       <ShoppingListSheet open={shoppingOpen} listingIds={todayListingIds} onClose={() => setShoppingOpen(false)} />
+
+      {/* Team member picker — who's using the app right now (attribution). */}
+      {showMemberPicker && teamMembers.length > 0 && (
+        <div className="fixed inset-0 z-[60] bg-background/95 backdrop-blur-md flex flex-col items-center justify-center px-6">
+          <Users className="h-8 w-8 text-primary mb-3" />
+          <h2 className="text-xl font-display font-bold text-foreground">Who are you today?</h2>
+          <p className="text-sm text-muted-foreground mt-1 mb-6 text-center">{cleaner?.name} team — tap your name so your work is logged to you.</p>
+          <div className="w-full max-w-xs space-y-2">
+            {teamMembers.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => pickMember(m.name)}
+                className={`w-full min-h-[52px] rounded-xl font-semibold text-base border transition-colors ${
+                  activeMember === m.name ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border/50 hover:border-primary/50 hover:bg-primary/5"
+                }`}
+              >
+                {m.name}
+              </button>
+            ))}
+          </div>
+          {activeMember && (
+            <button onClick={() => setShowMemberPicker(false)} className="mt-6 text-sm text-muted-foreground hover:text-foreground">Cancel</button>
+          )}
+        </div>
+      )}
 
       {/* Requests reminder — shown before the standard "Yes, confirm" when the booking has requests */}
       <AlertDialog open={!!reminderTask} onOpenChange={(o) => !o && setReminderTask(null)}>
