@@ -77,10 +77,13 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
       const kitchenItems = cons.filter((c) => c.room_type === "kitchen");
       const bathItems = cons.filter((c) => c.room_type === "bathroom");
 
+      // NB: set requires_photo on EVERY row. In a mixed-array insert, PostgREST
+      // inserts NULL (not the column default) for rows that omit a key another row
+      // has — which breaks the not-null constraint. Non-equipment items = false.
       const rows: any[] = [];
-      for (const label of requestLabels) rows.push({ clean_task_id: task.id, category: "request", label });
-      for (let k = 1; k <= kitchens; k++) for (const c of kitchenItems) rows.push({ clean_task_id: task.id, category: "consumable", room_type: "kitchen", room_index: k, label: c.name, ref_id: c.id });
-      for (let b = 1; b <= bathrooms; b++) for (const c of bathItems) rows.push({ clean_task_id: task.id, category: "consumable", room_type: "bathroom", room_index: b, label: c.name, ref_id: c.id });
+      for (const label of requestLabels) rows.push({ clean_task_id: task.id, category: "request", label, requires_photo: false });
+      for (let k = 1; k <= kitchens; k++) for (const c of kitchenItems) rows.push({ clean_task_id: task.id, category: "consumable", room_type: "kitchen", room_index: k, label: c.name, ref_id: c.id, requires_photo: false });
+      for (let b = 1; b <= bathrooms; b++) for (const c of bathItems) rows.push({ clean_task_id: task.id, category: "consumable", room_type: "bathroom", room_index: b, label: c.name, ref_id: c.id, requires_photo: false });
       for (const e of (equipRes.data ?? []) as any[]) rows.push({ clean_task_id: task.id, category: "equipment", label: e.name, ref_id: e.id, requires_photo: e.requires_photo ?? true });
 
       if (rows.length) {
