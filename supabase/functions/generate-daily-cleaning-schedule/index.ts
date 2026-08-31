@@ -425,12 +425,16 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
   // Expand bundles → component listing IDs
   const bundleMap = new Map<string, string[]>(); // bundle listing id → component listing ids
   const componentIdsFromBundles: string[] = [];
+  const bundleListingIds = new Set<string>();    // every bundle listing, components configured or not
   for (const l of rawListings || []) {
-    if (l.is_bundle && l.bundle_components) {
-      const components = (l.bundle_components as any[]) || [];
-      const compIds = components.map((c: any) => c.listing_id).filter(Boolean);
-      bundleMap.set(l.id, compIds);
-      componentIdsFromBundles.push(...compIds);
+    if (l.is_bundle) {
+      bundleListingIds.add(l.id);
+      if (l.bundle_components) {
+        const components = (l.bundle_components as any[]) || [];
+        const compIds = components.map((c: any) => c.listing_id).filter(Boolean);
+        bundleMap.set(l.id, compIds);
+        componentIdsFromBundles.push(...compIds);
+      }
     }
   }
 
@@ -581,6 +585,27 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
       .filter((t: any) => t.reservation_id)
       .map((t: any) => `${t.reservation_id}_${t.scheduled_date}`)
   );
+
+  // 4b. "Not required" suppressions — a manager marked this clean as not needed
+  // (owner checking in, guest no-show, etc.). These are stored cancelled + not_required=true,
+  // so the dedupe query above skips them. Honour them here so regenerate never rebuilds the
+  // clean. Suppress by BOTH reservation and listing+date so it holds even if Hostaway
+  // re-issues the reservation id for the same stay.
+  const { data: suppressedTasks } = await supabase
+    .from("clean_tasks")
+    .select("listing_id, reservation_id, scheduled_date")
+    .eq("scheduled_date", targetDate)
+    .eq("not_required", true);
+  const suppressedByReservation = new Set<string>();
+  for (const t of suppressedTasks || []) {
+    existingByListing.add(`${t.listing_id}_${t.scheduled_date}`);
+    if (t.reservation_id) {
+      const k = `${t.reservation_id}_${t.scheduled_date}`;
+      existingByReservation.add(k);
+      suppressedByReservation.add(k);
+    }
+  }
+
   // Keep the historical name available for downstream code that referenced it.
   const existingSet = existingByReservation;
 
@@ -1117,6 +1142,12 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     const seenRes = new Set<string>();
     const rows = toInsert
       .filter((t) => {
+        // Never create a clean on a bundle listing itself — it has no matrix row,
+        // so the clean would be invisible (a phantom "unassigned" count). If a bundle
+        // has no components configured, its booking simply produces no clean until it does.
+        if (bundleListingIds.has(t.listing_id)) return false;
+        // Honour "not required" suppressions from any creation path (incl. carryover).
+        if (t.reservation_id && suppressedByReservation.has(`${t.reservation_id}_${t.scheduled_date}`)) return false;
         const rid = t.reservation_id ? String(t.reservation_id) : null;
         if (!rid) return true;                    // no reservation → not constrained
         if (existingLive.has(rid) || seenRes.has(rid)) return false; // already covered

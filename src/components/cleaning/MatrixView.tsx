@@ -65,7 +65,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
   const {
     days, groupedListings, listings,
     cleaners, tasks, reservations, reservationGuestMap, holidays, isLoading, autoGenerating,
-    reassignTask, completeTask, undoComplete, removeTask, updateNotes, addManualClean,
+    reassignTask, completeTask, undoComplete, removeTask, markNotRequired, updateNotes, addManualClean,
   } = useMatrixSchedule(weekAnchor);
 
   // Index tasks by listing+date
@@ -678,6 +678,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
         onComplete={completeTask}
         onUndoComplete={undoComplete}
         onRemove={removeTask}
+        onNotRequired={markNotRequired}
         onSaveNotes={updateNotes}
       />
 

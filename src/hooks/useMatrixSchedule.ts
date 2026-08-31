@@ -357,6 +357,30 @@ export function useMatrixSchedule(weekAnchor: Date) {
     return true;
   }, [qc, toast, tasks, weekStartStr, weekEndStr]);
 
+  // Mark a clean as "not required" — a persistent suppression that survives
+  // regeneration (owner checking in, guest no-show, etc.). Stored as cancelled +
+  // not_required=true; the scheduler honours the flag and never rebuilds it.
+  const markNotRequired = useCallback(async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    const listingId = task?.listing_id;
+    const { error } = await (supabase.from("clean_tasks" as any) as any)
+      .update({ status: "cancelled", not_required: true, assigned_cleaner_id: null })
+      .eq("id", taskId);
+    if (error) {
+      toast({ title: "Failed", description: error.message, variant: "destructive" });
+      return false;
+    }
+    if (listingId) {
+      await supabase.from("listings").update({ is_clean: false } as any).eq("id", listingId);
+    }
+    qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
+    toast({
+      title: "Marked not required",
+      description: "Removed from the schedule. It won't come back on regenerate.",
+    });
+    return true;
+  }, [qc, toast, tasks, weekStartStr, weekEndStr]);
+
   const updateNotes = useCallback(async (taskId: string, notes: string) => {
     const { error } = await (supabase.from("clean_tasks" as any) as any)
       .update({ notes })
@@ -424,6 +448,6 @@ export function useMatrixSchedule(weekAnchor: Date) {
     cleaners, tasks, reservations, reservationGuestMap, holidays,
     isLoading: listingsLoading || tasksLoading,
     autoGenerating,
-    reassignTask, completeTask, undoComplete, removeTask, updateNotes, addManualClean,
+    reassignTask, completeTask, undoComplete, removeTask, markNotRequired, updateNotes, addManualClean,
   };
 }

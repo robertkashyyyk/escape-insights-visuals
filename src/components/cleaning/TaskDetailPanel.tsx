@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { CheckCircle2, Clock, Trash2, Save, Undo2, X, Loader2, Check } from "lucide-react";
+import { CheckCircle2, Clock, Trash2, Save, Undo2, X, Loader2, Check, Ban } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { getCleanerColor } from "@/lib/cleanerColors";
 import type { MatrixCleaner, MatrixListing, MatrixReservation, MatrixTask, CleanerHolidayRow } from "@/hooks/useMatrixSchedule";
@@ -24,6 +24,7 @@ interface Props {
   onComplete: (taskId: string, listingId: string) => Promise<boolean>;
   onUndoComplete: (taskId: string, listingId: string) => Promise<boolean>;
   onRemove: (taskId: string) => Promise<boolean>;
+  onNotRequired: (taskId: string) => Promise<boolean>;
   onSaveNotes: (taskId: string, notes: string) => Promise<boolean>;
 }
 
@@ -42,12 +43,13 @@ function timeDiffMinutes(start: string, end: string): number | null {
 
 export function TaskDetailPanel({
   open, onOpenChange, task, listing, cleaners, reservations, holidays = [],
-  onReassign, onComplete, onUndoComplete, onRemove, onSaveNotes,
+  onReassign, onComplete, onUndoComplete, onRemove, onNotRequired, onSaveNotes,
 }: Props) {
   const [notes, setNotes] = useState("");
   const [pendingCleanerId, setPendingCleanerId] = useState<string | null>(null);
   const [pendingUnavailReason, setPendingUnavailReason] = useState<string | null>(null);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [showNotRequiredConfirm, setShowNotRequiredConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [confirmComplete, setConfirmComplete] = useState(false);
@@ -140,6 +142,14 @@ export function TaskDetailPanel({
     const ok = await onRemove(task.id);
     setBusy(false);
     setShowRemoveConfirm(false);
+    if (ok) onOpenChange(false);
+  };
+
+  const handleNotRequired = async () => {
+    setBusy(true);
+    const ok = await onNotRequired(task.id);
+    setBusy(false);
+    setShowNotRequiredConfirm(false);
     if (ok) onOpenChange(false);
   };
 
@@ -297,13 +307,23 @@ export function TaskDetailPanel({
             {/* Actions — completion lives up in the header (small, deliberate) so it
                 can't be hit by accident when reassigning. This is just removal. */}
             <div className="flex flex-col gap-2 pt-2 border-t border-border/30">
+              {task.status !== "completed" && (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowNotRequiredConfirm(true)}
+                  disabled={busy}
+                  className="w-full border-amber-500/30 text-amber-500 hover:bg-amber-500/10 hover:text-amber-500"
+                >
+                  <Ban className="h-4 w-4 mr-1.5" /> Not required — remove for good
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => setShowRemoveConfirm(true)}
                 disabled={busy}
                 className="w-full border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
               >
-                <Trash2 className="h-4 w-4 mr-1.5" /> Remove this clean
+                <Trash2 className="h-4 w-4 mr-1.5" /> Remove & regenerate
               </Button>
             </div>
           </div>
@@ -326,6 +346,26 @@ export function TaskDetailPanel({
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleRemove} disabled={busy} className="bg-destructive hover:bg-destructive/90">
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showNotRequiredConfirm} onOpenChange={setShowNotRequiredConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark this clean as not required?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Use this when the property genuinely doesn't need cleaning for this
+              turnover — e.g. an owner checking in, or a guest who has told you they
+              aren't coming (no-show). It's removed from the schedule and <b>will not
+              come back when you regenerate</b>. The booking itself is untouched.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleNotRequired} disabled={busy} className="bg-amber-600 hover:bg-amber-600/90">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Yes, not required"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
