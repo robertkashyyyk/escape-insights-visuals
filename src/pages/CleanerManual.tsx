@@ -118,7 +118,7 @@ const BODY = `
       <li>Your choice is remembered on that phone. If someone else takes the phone to do a job, tap <span class="btn">You are: … · Switch</span> at the top and pick the right name.</li>
     </ol>
     <div class="note">You can't <b>Start</b> or <b>Complete</b> a job until you've told the app who you are — if you try, it'll pop the name list up first. If you're a <b>solo cleaner</b>, you'll never see this; skip straight to the next section.</div>
-    <figure class="shot"><img src="/images/manual/team.png" alt="Who are you today" onerror="this.closest('figure').style.display='none'"><figcaption>The “Who are you today?” screen for shared-login teams.</figcaption></figure>
+    <figure class="shot"><img src="/images/manual/team.svg" alt="Who are you today" onerror="this.closest('figure').style.display='none'"><figcaption>The “Who are you today?” screen for shared-login teams.</figcaption></figure>
   </section>
 
   <section id="today">
