@@ -878,7 +878,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     task.status = "scheduled";
     if (overload) {
       task.overloaded = true;
-      task.warning_reason = "Only eligible cleaner for nearby cluster — workload exceeds soft cap";
+      task.warning_reason = "Over the day's capacity — assigned by fair-share; rebalance if needed";
     } else {
       task.overloaded = false;
       task.warning_reason = null;
@@ -920,17 +920,21 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         if (pick && capable.length > 0) {
           for (const t of cluster) assignTaskTo(pick, t);
         } else {
-          // Fall back: assign each task individually by deficit + capacity
+          // Nobody has spare capacity — still assign by fair-share (capacity is a
+          // FLAG, not a blocker), and mark the task overloaded so it's visible.
           for (const t of cluster) {
             const elig = baseEligible.filter((c) => hasCapacity(c, t.cleaning_duration_minutes));
-            assignTaskTo(pickByDeficit(elig.length > 0 ? elig : baseEligible, group), t);
+            const pool = elig.length > 0 ? elig : baseEligible;
+            assignTaskTo(pickByDeficit(pool, group), t, elig.length === 0);
           }
         }
       } else {
-        // 4+ → split: assign each task to the current largest-deficit cleaner with capacity
+        // 4+ → split: assign each task to the largest-deficit cleaner; if none have
+        // capacity, still assign by fair-share and flag the overload.
         for (const t of cluster) {
           const elig = baseEligible.filter((c) => hasCapacity(c, t.cleaning_duration_minutes));
-          assignTaskTo(pickByDeficit(elig.length > 0 ? elig : baseEligible, group), t);
+          const pool = elig.length > 0 ? elig : baseEligible;
+          assignTaskTo(pickByDeficit(pool, group), t, elig.length === 0);
         }
       }
     }
