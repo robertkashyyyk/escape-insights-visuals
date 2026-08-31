@@ -104,6 +104,7 @@ const BODY = `
     <ol class="steps">
       <li>Open <b>escapegrids.com</b> in your phone's browser (Safari or Chrome). Tip: add it to your home screen so it opens like an app.</li>
       <li>Enter your <b>email</b> and <b>password</b> and tap <span class="btn">Sign In</span>.</li>
+      <li><b>No password, or forgotten it?</b> Tap <span class="btn">Magic Link</span> instead, enter your email, and we'll email you a one-tap sign-in link — nothing to remember.</li>
       <li>You'll land straight on <b>Today</b> — your jobs for the day.</li>
     </ol>
     <div class="note">Trouble getting in? Don't keep retrying — message your manager and they'll sort your login.</div>

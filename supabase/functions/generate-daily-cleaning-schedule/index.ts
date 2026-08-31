@@ -565,10 +565,14 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
   // because Hostaway often returns multiple sibling reservations sharing the same checkout date
   // for the same listing (split stays, channel re-imports, modified bookings). One clean per
   // property per day is the operational truth.
+  // Exclude cancelled tasks from the dedupe: a cancelled clean (e.g. tied to a
+  // cancelled sibling reservation after a Hostaway modification) must NOT block a
+  // fresh clean for the confirmed checkout on the same property+date.
   const { data: existingTasks } = await supabase
     .from("clean_tasks")
     .select("listing_id, reservation_id, scheduled_date")
-    .eq("scheduled_date", targetDate);
+    .eq("scheduled_date", targetDate)
+    .not("status", "in", "(cancelled,canceled)");
   const existingByListing = new Set(
     (existingTasks || []).map((t: any) => `${t.listing_id}_${t.scheduled_date}`)
   );
