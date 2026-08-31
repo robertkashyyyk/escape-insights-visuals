@@ -43,7 +43,7 @@ export default function PropertyMatrix() {
     queryKey: ["matrix_listings"],
     queryFn: async () => {
       const cols = "id, name, internal_name, owner_id, location_group, property_type, status, is_bundle, bedrooms, bathrooms, kitchens, max_guests, cleaning_fee, cleaning_duration_minutes, nightly_rate, min_rate, base_rate, has_hot_tub, has_ev_charger, pet_friendly, self_check_in, tags";
-      const { data } = await supabase.from("listings").select(cols).order("name");
+      const { data } = await supabase.from("listings").select(cols).eq("is_archived", false).order("name");
       return (data ?? []) as any[];
     },
   });

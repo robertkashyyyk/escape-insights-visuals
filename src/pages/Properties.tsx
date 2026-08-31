@@ -20,6 +20,7 @@ export default function Properties() {
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
   const [cleanFilter, setCleanFilter] = useState("all");
+  const [showArchived, setShowArchived] = useState(false);
   const [view, setView] = useState<"cards" | "list">("cards");
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -51,7 +52,8 @@ export default function Properties() {
     const matchesOwner = ownerFilter === "all" || (l.property_owners as any)?.name === ownerFilter;
     const isClean = (l as any).is_clean ?? true;
     const matchesClean = cleanFilter === "all" || (cleanFilter === "clean" && isClean) || (cleanFilter === "dirty" && !isClean);
-    return matchesSearch && matchesLocation && matchesOwner && matchesClean;
+    const matchesArchive = showArchived ? true : !((l as any).is_archived ?? false);
+    return matchesSearch && matchesLocation && matchesOwner && matchesClean && matchesArchive;
   });
 
   return (
@@ -110,6 +112,10 @@ export default function Properties() {
             <span className="text-sm text-muted-foreground font-medium">
               {isLoading ? "…" : `${filtered?.length ?? 0} Properties`}
             </span>
+            <button onClick={() => setShowArchived((v) => !v)}
+              className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline">
+              {showArchived ? "Hide archived" : "Show archived"}
+            </button>
             <Button asChild size="sm" variant="outline">
               <Link to="/properties/matrix"><Table2 className="h-4 w-4 mr-1.5" /> Matrix</Link>
             </Button>
@@ -151,6 +157,12 @@ export default function Properties() {
                   <div>
                     <h3 className="font-display font-bold text-foreground text-base truncate">{displayName(l)}</h3>
                     {ownerName && <p className="text-xs text-muted-foreground mt-0.5 truncate">{ownerName}</p>}
+                    {((l as any).is_suspended || (l as any).is_archived) && (
+                      <div className="flex gap-1 mt-1">
+                        {(l as any).is_suspended && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full border border-amber-500/40 text-amber-600 bg-amber-500/10">Suspended</span>}
+                        {(l as any).is_archived && <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full border border-border/50 text-muted-foreground bg-muted/40">Archived</span>}
+                      </div>
+                    )}
                   </div>
 
                   {l.location_group && (

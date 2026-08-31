@@ -15,6 +15,7 @@ import { useCommunalGroups } from "@/hooks/useCommunalGroups";
 import { AlertTriangle } from "lucide-react";
 import { PropertyBedsEditor } from "@/components/properties/PropertyBedsEditor";
 import { PropertyEquipmentEditor } from "@/components/properties/PropertyEquipmentEditor";
+import { PropertyLifecycleSection } from "@/components/properties/PropertyLifecycleSection";
 import { displayName } from "@/lib/listingName";
 import { PROPERTY_TYPES } from "@/lib/propertyTypes";
 
@@ -301,6 +302,12 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
             <>
               <PropertyBedsEditor listingId={listing!.id} />
               <PropertyEquipmentEditor listingId={listing!.id} />
+              <PropertyLifecycleSection
+                listingId={listing!.id}
+                suspended={(listing as any).is_suspended ?? false}
+                archived={(listing as any).is_archived ?? false}
+                onChanged={() => { onOpenChange(false); onSuccess(); }}
+              />
             </>
           ) : (
             <div className="border border-dashed border-border/40 rounded-lg p-4 text-[11px] text-muted-foreground">
