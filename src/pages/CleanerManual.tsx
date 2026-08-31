@@ -35,7 +35,7 @@ const STYLES = `
 }
 
 .eg-manual * { box-sizing: border-box; }
-.eg-manual .wrap { max-width: 720px; margin: 0 auto; padding: clamp(28px, 6vw, 60px) clamp(18px, 5vw, 32px) 80px; }
+.eg-manual .wrap { max-width: 720px; margin: 0 auto; padding: clamp(28px, 6vw, 60px) clamp(18px, 5vw, 32px) 80px; counter-reset: sec; }
 .eg-manual .eyebrow { font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: 0 0 14px; }
 .eg-manual h1 { font-family: "Bricolage Grotesque", sans-serif; font-weight: 700; font-size: clamp(30px, 6vw, 44px); line-height: 1.05; letter-spacing: -.02em; text-wrap: balance; margin: 0 0 12px; }
 .eg-manual .lede { font-size: 17px; color: var(--muted); margin: 0; max-width: 60ch; }
@@ -47,9 +47,10 @@ const STYLES = `
 .eg-manual .toc a:hover { color: var(--accent); }
 .eg-manual .toc a::before { content: counter(t, decimal-leading-zero); font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--accent); }
 .eg-manual .rule { height: 1px; background: var(--border); border: 0; margin: 34px 0; }
-.eg-manual section { margin: 0 0 34px; scroll-margin-top: 20px; }
+.eg-manual section { margin: 0 0 34px; scroll-margin-top: 20px; counter-increment: sec; }
 .eg-manual h2 { font-family: "Bricolage Grotesque", sans-serif; font-weight: 600; font-size: clamp(20px, 3.6vw, 25px); line-height: 1.15; letter-spacing: -.015em; margin: 0 0 4px; display: flex; align-items: baseline; gap: 10px; text-wrap: balance; }
 .eg-manual h2 .n { font-family: "IBM Plex Mono", monospace; font-size: 14px; color: var(--accent); font-weight: 500; }
+.eg-manual h2 .n::before { content: counter(sec, decimal-leading-zero); }
 .eg-manual p.intro { color: var(--muted); margin: 6px 0 0; }
 .eg-manual ol.steps { margin: 14px 0 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 10px; }
 .eg-manual ol.steps li { position: relative; padding-left: 30px; counter-increment: s; }
@@ -79,6 +80,7 @@ const BODY = `
     <p>Contents</p>
     <ol>
       <li><a href="#signin">Signing in</a></li>
+      <li><a href="#team">If you're part of a team</a></li>
       <li><a href="#today">Your day (Today)</a></li>
       <li><a href="#shopping">Today's Shopping List</a></li>
       <li><a href="#view">Looking at a job first</a></li>
@@ -95,7 +97,7 @@ const BODY = `
   <hr class="rule">
 
   <section id="signin">
-    <h2><span class="n">01</span> Signing in</h2>
+    <h2><span class="n"></span> Signing in</h2>
     <ol class="steps">
       <li>Open <b>escapegrids.com</b> in your phone's browser (Safari or Chrome). Tip: add it to your home screen so it opens like an app.</li>
       <li>Enter your <b>email</b> and <b>password</b> and tap <span class="btn">Sign In</span>.</li>
@@ -104,8 +106,19 @@ const BODY = `
     <div class="note">Trouble getting in? Don't keep retrying — message your manager and they'll sort your login.</div>
   </section>
 
+  <section id="team">
+    <h2><span class="n"></span> If you're part of a team</h2>
+    <p class="intro">Some teams share <b>one login</b> between several people (for example, a group who travel and clean together). If that's you, the app needs to know <b>which person is using it</b> so your work is logged to you — not just the team.</p>
+    <ol class="steps">
+      <li>When you open the app, you'll see <b>“Who are you today?”</b> — tap <b>your name</b> in the list.</li>
+      <li>That's it — from now on every job you <b>start</b>, <b>finish</b> and every item you <b>tick</b> or <b>photograph</b> is recorded under your name.</li>
+      <li>Your choice is remembered on that phone. If someone else takes the phone to do a job, tap <span class="btn">You are: … · Switch</span> at the top and pick the right name.</li>
+    </ol>
+    <div class="note">You can't <b>Start</b> or <b>Complete</b> a job until you've told the app who you are — if you try, it'll pop the name list up first. If you're a <b>solo cleaner</b>, you'll never see this; skip straight to the next section.</div>
+  </section>
+
   <section id="today">
-    <h2><span class="n">02</span> Your day (Today)</h2>
+    <h2><span class="n"></span> Your day (Today)</h2>
     <p class="intro">Your jobs are grouped by priority, most important at the top:</p>
     <ul class="plain">
       <li><span class="pill p0">P0</span> &nbsp;<b>Do first</b> — highest priority, get to these before anything else.</li>
@@ -116,7 +129,7 @@ const BODY = `
   </section>
 
   <section id="shopping">
-    <h2><span class="n">03</span> Today's Shopping List</h2>
+    <h2><span class="n"></span> Today's Shopping List</h2>
     <p class="intro">Before you set off, tap <span class="btn">Today's Shopping List</span> at the top of Today. It totals <b>everything you'll need for the whole day</b> across all your jobs — you don't need to start anything to see it.</p>
     <ul class="plain">
       <li><b>Linens</b> — how many of each bed type to load (e.g. “5× Super King bedding, 3× King”).</li>
@@ -126,12 +139,12 @@ const BODY = `
   </section>
 
   <section id="view">
-    <h2><span class="n">04</span> Looking at a job first</h2>
+    <h2><span class="n"></span> Looking at a job first</h2>
     <p class="intro">Tap <span class="btn">View Checklist</span> on any job to see what it involves — guest requests, the consumables for each room, and any equipment — <b>before</b> you start. It's read-only at this point; you can look but not tick.</p>
   </section>
 
   <section id="start">
-    <h2><span class="n">05</span> Starting a job</h2>
+    <h2><span class="n"></span> Starting a job</h2>
     <ol class="steps">
       <li>When you arrive and begin, tap <span class="btn">Start Job</span>.</li>
       <li>The checklist opens automatically and is now <b>tickable</b>.</li>
@@ -141,7 +154,7 @@ const BODY = `
   </section>
 
   <section id="checklist">
-    <h2><span class="n">06</span> Working the checklist</h2>
+    <h2><span class="n"></span> Working the checklist</h2>
     <p class="intro">There are up to three sections. Tick things off as you go:</p>
     <ul class="plain">
       <li><b>Guest Requests</b> — things the guest asked for (High Chair, Travel Cot…). Tick once you've set them up.</li>
@@ -152,7 +165,7 @@ const BODY = `
   </section>
 
   <section id="photos">
-    <h2><span class="n">07</span> Equipment photos</h2>
+    <h2><span class="n"></span> Equipment photos</h2>
     <ol class="steps">
       <li>On an equipment item that needs one, tap <span class="btn">Photo</span> — your camera opens.</li>
       <li>Take a clear shot of the item in <b>good, approved condition</b>, then confirm.</li>
@@ -161,23 +174,23 @@ const BODY = `
   </section>
 
   <section id="complete">
-    <h2><span class="n">08</span> Finishing a job</h2>
+    <h2><span class="n"></span> Finishing a job</h2>
     <p class="intro">Once <b>everything</b> is ticked and every equipment photo is taken, the green <span class="btn">Complete Job</span> button unlocks. Tap it to finish — the job drops off your list.</p>
     <p class="intro">If Complete is greyed out, something's still outstanding. The checklist shows <b>how many are left</b> (e.g. “10/12 done”) — finish those and it'll turn green.</p>
   </section>
 
   <section id="notes">
-    <h2><span class="n">09</span> Notes from your manager</h2>
+    <h2><span class="n"></span> Notes from your manager</h2>
     <p class="intro">If your manager left a note for a specific job, it shows on the card as a highlighted <b>“Note from manager”</b> (e.g. “bins out Thursday”, “key in the lockbox”). Always read it before you start.</p>
   </section>
 
   <section id="flag">
-    <h2><span class="n">10</span> Flagging a problem</h2>
+    <h2><span class="n"></span> Flagging a problem</h2>
     <p class="intro">Something wrong — damage, a missing key, something that needs the manager's attention? Tap <span class="btn">Flag an Issue</span> on the job, describe it, and send. Your manager gets it straight away.</p>
   </section>
 
   <section id="week">
-    <h2><span class="n">11</span> Other days</h2>
+    <h2><span class="n"></span> Other days</h2>
     <p class="intro">Use <span class="btn">Tomorrow</span>, <span class="btn">Rest of Week</span> and <span class="btn">Next Week</span> at the top to see what's coming up. Future days are view-only — you can look ahead and plan, but you start and complete jobs on the day itself.</p>
   </section>
 
