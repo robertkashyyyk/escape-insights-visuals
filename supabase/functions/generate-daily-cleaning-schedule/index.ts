@@ -390,12 +390,16 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     (r: any) => !manuallyCleanedToday.has(String(r.listing_id))
   );
 
-  // 1b. Get any pre-existing unassigned tasks for this date — these need re-assignment too
+  // 1b. Get any pre-existing tasks for this date that have NO cleaner — these need
+  // re-assignment. Match on assigned_cleaner_id IS NULL (not status text): a task can
+  // sit with status 'scheduled' but a null cleaner (e.g. dragged off a cleaner), and
+  // filtering by status='unassigned' alone silently skipped those forever.
   const { data: orphanUnassigned } = await supabase
     .from("clean_tasks")
     .select("id, listing_id, reservation_id, scheduled_date, priority, priority_level, cleaning_duration_minutes, checkout_time, checkin_time, is_same_day_turnaround, source, warning_reason")
     .eq("scheduled_date", targetDate)
-      .eq("status", "unassigned");
+    .is("assigned_cleaner_id", null)
+    .not("status", "in", "(cancelled,canceled,completed,done)");
 
   const activeOrphanUnassigned = (orphanUnassigned || []).filter(
     (t: any) => !manuallyCleanedToday.has(String(t.listing_id))
