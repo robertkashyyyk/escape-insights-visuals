@@ -10,6 +10,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, SprayCan, AlertTriangle, Loader2, UserCheck, KeyRound, X } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { CLEANER_COLOR_SWATCHES, getCleanerColor } from "@/lib/cleanerColors";
 import { CleanerHolidaysSection } from "./CleanerHolidaysSection";
 import { CleanerWorkingExceptionsSection } from "./CleanerWorkingExceptionsSection";
@@ -113,6 +117,8 @@ export function CleanersSettings() {
   const [enablingLogin, setEnablingLogin] = useState<string | null>(null);
   const [emailNotifEnabled, setEmailNotifEnabled] = useState<boolean>(false);
   const [emailNotifLoading, setEmailNotifLoading] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string; cleanCount: number } | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [pendingRegen, setPendingRegen] = useState<
     { cleanerId: string; cleanerName: string; ids: string[]; startStr: string; days: number } | null
   >(null);
@@ -304,9 +310,28 @@ export function CleanersSettings() {
     fetchCleaners();
   };
 
-  const handleDelete = async (id: string) => {
-    await (supabase.from("cleaners" as any) as any).delete().eq("id", id);
-    toast({ title: "Cleaner removed" });
+  const askDelete = async (c: Cleaner) => {
+    const { count } = await (supabase.from("clean_tasks" as any) as any)
+      .select("*", { count: "exact", head: true })
+      .eq("assigned_cleaner_id", c.id)
+      .not("status", "in", "(cancelled,canceled,completed,done)");
+    setPendingDelete({ id: c.id, name: c.name, cleanCount: count ?? 0 });
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    const { error } = await (supabase.from("cleaners" as any) as any).delete().eq("id", pendingDelete.id);
+    setDeleting(false);
+    if (error) { toast({ title: "Could not remove", description: error.message, variant: "destructive" }); return; }
+    const n = pendingDelete.cleanCount;
+    toast({
+      title: "Cleaner removed",
+      description: n > 0
+        ? `${n} scheduled clean${n === 1 ? "" : "s"} moved to Unassigned — regenerate the schedule to reassign them.`
+        : undefined,
+    });
+    setPendingDelete(null);
     fetchCleaners();
   };
 
@@ -444,7 +469,7 @@ export function CleanersSettings() {
                       </Button>
                     )}
                     <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(c)}><Pencil className="h-3 w-3" /></Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDelete(c.id)}><Trash2 className="h-3 w-3" /></Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => askDelete(c)}><Trash2 className="h-3 w-3" /></Button>
                   </div>
                 </div>
                 <div className="text-xs text-muted-foreground space-y-0.5">
@@ -780,6 +805,26 @@ export function CleanersSettings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!pendingDelete} onOpenChange={(o) => { if (!o) setPendingDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {pendingDelete?.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete && pendingDelete.cleanCount > 0
+                ? `This cleaner has ${pendingDelete.cleanCount} scheduled clean${pendingDelete.cleanCount === 1 ? "" : "s"}. They'll be moved to Unassigned — regenerate the schedule (or drag them in the matrix) to reassign. Completed cleans keep their history. This can't be undone.`
+                : "This cleaner has no scheduled cleans. This can't be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); confirmDelete(); }} disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {deleting ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Removing…</> : "Remove cleaner"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
