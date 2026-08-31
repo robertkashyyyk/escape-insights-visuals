@@ -1137,8 +1137,22 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
       }));
     if (rows.length > 0) {
       const { error: insertErr } = await supabase.from("clean_tasks").insert(rows);
-      if (insertErr) throw insertErr;
-      createdCount = rows.length;
+      if (insertErr && (insertErr as any).code === "23505") {
+        // A live clean already exists for one of these reservations (the one-live-
+        // clean-per-reservation index). Retry row-by-row and skip the conflicting
+        // ones rather than failing the whole run.
+        let ok = 0;
+        for (const row of rows) {
+          const { error: e } = await supabase.from("clean_tasks").insert(row);
+          if (e && (e as any).code !== "23505") throw e;
+          if (!e) ok++;
+        }
+        createdCount = ok;
+      } else if (insertErr) {
+        throw insertErr;
+      } else {
+        createdCount = rows.length;
+      }
     }
   }
 
@@ -1158,7 +1172,8 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         warning_reason: t.warning_reason ?? null,
       })
       .eq("id", t.existing_task_id!);
-    if (updErr) throw updErr;
+    // 23505 → another live clean already covers this reservation; skip, don't crash.
+    if (updErr && (updErr as any).code !== "23505") throw updErr;
   }
 
   // 11. Set is_clean = false for component listings (not bundles)
