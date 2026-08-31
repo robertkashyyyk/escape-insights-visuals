@@ -115,7 +115,7 @@ export default function CleaningTraffic() {
         {isLoading ? (
           <div className="py-20 text-center"><Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" /></div>
         ) : (
-          <div className="border border-border/50 rounded-lg overflow-x-auto">
+          <div className="border border-border/50 rounded-lg overflow-auto max-h-[calc(100vh-190px)]">
             <table className="border-collapse text-xs">
               <thead className="sticky top-0 z-10">
                 <tr className="bg-card">

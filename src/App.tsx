@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { OwnerPreviewProvider } from "@/contexts/OwnerPreviewContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
 import Properties from "./pages/Properties";
 import PropertyMatrix from "./pages/PropertyMatrix";
@@ -73,6 +74,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <ErrorBoundary>
           <Routes>
             {/* Public marketing site removed — Escape Grids is an internal Escape
                 Ordinary product. Root goes straight to sign-in (which forwards an
@@ -133,6 +135,7 @@ const App = () => (
             <Route path="/leads" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><ComingSoon title="Leads & Enquiries" /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </ErrorBoundary>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
