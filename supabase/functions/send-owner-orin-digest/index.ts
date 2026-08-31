@@ -50,6 +50,23 @@ Deno.serve(async (req) => {
     const pct = (c: number, p: number) => (p > 0 ? Math.round(((c - p) / p) * 100) : (c > 0 ? 100 : 0));
     const adr = (a: { revenue: number; nights: number }) => (a.nights ? a.revenue / a.nights : 0);
 
+    // Rolling 12 months (trailing 365d ending this period) vs the PRIOR 12 months —
+    // seasonality-neutral, so it isn't skewed by which month we're in. Plus the
+    // forward book (next 365d) as a leading indicator. All presented relatively.
+    const addDaysStr = (iso: string, n: number) => { const x = toD(iso); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+    const r12aStart = addDaysStr(curEnd, -364), r12aEnd = curEnd;              // last 12 months
+    const r12bStart = addDaysStr(curEnd, -729), r12bEnd = addDaysStr(curEnd, -365); // the 12 months before that
+    const todayStr = now.toISOString().slice(0, 10);
+    const fwdEnd = addDaysStr(todayStr, 365);
+    const [r12aRes, r12bRes, fwdRes] = await Promise.all([
+      fetchRes(r12aStart, r12aEnd), fetchRes(r12bStart, r12bEnd), fetchRes(todayStr, fwdEnd),
+    ]);
+    const r12a = aggregate(r12aRes, r12aStart, r12aEnd, props);
+    const r12b = aggregate(r12bRes, r12bStart, r12bEnd, props);
+    const fwd = aggregate(fwdRes, todayStr, fwdEnd, props);
+    const occ365 = (a: { nights: number }) => (props.length ? Math.round((a.nights / (props.length * 365)) * 100) : 0);
+    const hasPriorR12 = r12b.revenue > 0 || r12b.nights > 0; // enough history for a fair prior-12m comparison?
+
     const html = orinEmail(label, period, owner?.name ?? "there", {
       revPctYoY: pct(cur.revenue, prevYear.revenue),
       revPctPrior: pct(cur.revenue, prior.revenue),
@@ -58,6 +75,8 @@ Deno.serve(async (req) => {
       bookings: cur.bookings, prevBookings: prevYear.bookings,
       adrPctYoY: pct(adr(cur), adr(prevYear)),
       topRevenueName: cur.topRevenueName, byProperty: cur.byProperty,
+      r12RevPct: pct(r12a.revenue, r12b.revenue), r12OccCur: occ365(r12a), r12OccPrior: occ365(r12b),
+      r12NudgeUp: pct(cur.revenue, prevYear.revenue) >= 0, fwdOcc: occ365(fwd), hasPriorR12,
     });
 
     const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
@@ -149,6 +168,7 @@ function orinEmail(
     nights: number; prevNights: number; bookings: number; prevBookings: number;
     adrPctYoY: number;
     topRevenueName: string; byProperty: { name: string; nights: number; revenue: number }[];
+    r12RevPct: number; r12OccCur: number; r12OccPrior: number; r12NudgeUp: boolean; fwdOcc: number; hasPriorR12: boolean;
   },
 ) {
   const pw = period === "weekly" ? "week" : "month";       // "this week" / "this month"
@@ -176,6 +196,18 @@ function orinEmail(
     insights.push(`Nights by property — ${breakdown}.`);
   }
 
+  // The seasonality-neutral anchor — the number owners should actually watch.
+  const r12Rev = d.hasPriorR12
+    ? `Your rolling 12-month revenue is <b>${arrow(d.r12RevPct)}</b> on the previous 12 months — the fairest read, since it isn't skewed by which season we're in. `
+    : `Your rolling 12-month revenue is building a full-year baseline now — we'll compare it year-on-year once there are two full years on the books. `;
+  const r12Occ = `Occupancy across the last 12 months sits at <b>${d.r12OccCur}%</b>${d.hasPriorR12 ? ` (vs ${d.r12OccPrior}% the year before)` : ""}. `;
+  const r12Nudge = `It ${d.r12NudgeUp ? "nudged up again" : "eased back a touch"} this ${pw} — you ${d.r12NudgeUp ? "beat" : "came in just under"} the same ${pw} a year ago. `;
+  const r12Fwd = d.fwdOcc > 0 ? `Looking ahead, the next 12 months are already <b>${d.fwdOcc}%</b> booked.` : "";
+  const r12Box = `<div style="margin:0 0 18px;padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
+      <p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#0f172a;letter-spacing:.05em">THE 12-MONTH PICTURE <span style="color:#94a3b8;font-weight:500">· seasonality stripped out</span></p>
+      <p style="margin:0;font-size:14px;color:#334155;line-height:1.55">${r12Rev}${r12Occ}${r12Nudge}${r12Fwd}</p>
+    </div>`;
+
   const lis = insights.map((t) => `<li style="margin:0 0 10px;color:#334155;font-size:14px;line-height:1.5">${t}</li>`).join("");
   return `<!doctype html><html><body style="margin:0;background:#f1f5f9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
   <div style="max-width:600px;margin:24px auto;background:#fff;border-radius:14px;overflow:hidden;border:1px solid #e2e8f0">
@@ -185,6 +217,8 @@ function orinEmail(
       <p style="margin:0 0 4px;font-size:13px;color:#94a3b8">${label} · portfolio update</p>
       <h1 style="margin:0 0 16px;font-size:21px;color:#0f172a;line-height:1.3">${headline}</h1>
       <p style="margin:0 0 14px;font-size:14px;color:#475569">Hi ${name.split(/\s+/)[0]}, here's how your properties performed last ${label.includes("week") ? "week" : "month"}.</p>
+      ${r12Box}
+      <p style="margin:0 0 10px;font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:.03em">THIS ${pw.toUpperCase()} IN DETAIL</p>
       <ul style="margin:0;padding-left:18px">${lis}</ul>
       <p style="margin:22px 0 0;font-size:12px;color:#94a3b8">— Orin · Escape Grids' revenue analyst. Figures are relative to keep things simple; full numbers are always in your portal. Manage these updates under Settings.</p>
     </div>
