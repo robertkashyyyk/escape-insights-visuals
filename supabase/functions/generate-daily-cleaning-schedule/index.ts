@@ -1075,30 +1075,54 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
   let createdCount = 0;
 
   if (toInsert.length > 0) {
-    const rows = toInsert.map((t) => ({
-      listing_id: t.listing_id,
-      reservation_id: t.reservation_id,
-      scheduled_date: t.scheduled_date,
-      assigned_cleaner_id: t.assigned_cleaner_id,
-      status: t.status,
-      priority: t.priority,
-      priority_level: t.priority_level,
-      estimated_start_time: t.estimated_start_time,
-      cleaning_duration_minutes: t.cleaning_duration_minutes,
-      travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
-      checkout_time: t.checkout_time,
-      checkin_time: t.checkin_time,
-      is_same_day_turnaround: t.is_same_day_turnaround,
-      notes: t.notes ?? null,
-      overloaded: t.overloaded ?? false,
-      override_assignment: t.override_assignment ?? false,
-      warning_reason: t.warning_reason ?? null,
-      source: t.source ?? "hostaway",
-
-    }));
-    const { error: insertErr } = await supabase.from("clean_tasks").insert(rows);
-    if (insertErr) throw insertErr;
-    createdCount = rows.length;
+    // Guard the "one live auto clean per reservation" unique index: never insert a
+    // second live clean for a reservation that already has one (in the DB or twice
+    // within this batch), or the whole batch insert fails with a duplicate-key error.
+    const resIds = Array.from(new Set(toInsert.map((t) => t.reservation_id).filter(Boolean).map(String)));
+    const existingLive = new Set<string>();
+    if (resIds.length) {
+      const { data: liveRows } = await supabase
+        .from("clean_tasks")
+        .select("reservation_id")
+        .in("reservation_id", resIds)
+        .neq("source", "manual")
+        .not("status", "in", "(cancelled,completed,done)");
+      for (const r of liveRows || []) if (r.reservation_id) existingLive.add(String(r.reservation_id));
+    }
+    const seenRes = new Set<string>();
+    const rows = toInsert
+      .filter((t) => {
+        const rid = t.reservation_id ? String(t.reservation_id) : null;
+        if (!rid) return true;                    // no reservation → not constrained
+        if (existingLive.has(rid) || seenRes.has(rid)) return false; // already covered
+        seenRes.add(rid);
+        return true;
+      })
+      .map((t) => ({
+        listing_id: t.listing_id,
+        reservation_id: t.reservation_id,
+        scheduled_date: t.scheduled_date,
+        assigned_cleaner_id: t.assigned_cleaner_id,
+        status: t.status,
+        priority: t.priority,
+        priority_level: t.priority_level,
+        estimated_start_time: t.estimated_start_time,
+        cleaning_duration_minutes: t.cleaning_duration_minutes,
+        travel_time_from_previous_minutes: t.travel_time_from_previous_minutes,
+        checkout_time: t.checkout_time,
+        checkin_time: t.checkin_time,
+        is_same_day_turnaround: t.is_same_day_turnaround,
+        notes: t.notes ?? null,
+        overloaded: t.overloaded ?? false,
+        override_assignment: t.override_assignment ?? false,
+        warning_reason: t.warning_reason ?? null,
+        source: t.source ?? "hostaway",
+      }));
+    if (rows.length > 0) {
+      const { error: insertErr } = await supabase.from("clean_tasks").insert(rows);
+      if (insertErr) throw insertErr;
+      createdCount = rows.length;
+    }
   }
 
   for (const t of toUpdate) {
