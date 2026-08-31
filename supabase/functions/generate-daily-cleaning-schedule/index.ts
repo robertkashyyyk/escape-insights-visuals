@@ -79,6 +79,9 @@ interface CleanerInfo {
   home_longitude: number | null;
   /** [{start_date, end_date}] in yyyy-MM-dd */
   holidays: Array<{ start_date: string; end_date: string; reason: string }>;
+  /** Effective capacity multiplier: a team of N people clears ~N× the clean-minutes
+   *  in a day (they work a property in parallel). 1 for a solo cleaner. */
+  capacity_units: number;
 }
 
 const CLUSTER_RADIUS_KM = 8; // ~5 miles
@@ -581,6 +584,15 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
 
   // 5b. Load holidays overlapping the target date for these cleaners
   const cleanerIds = (cleanersRaw || []).map((c: any) => c.id);
+
+  // Team member counts — a team's daily capacity scales with how many people it has.
+  const { data: membersRaw } = await supabase
+    .from("cleaner_members")
+    .select("cleaner_id")
+    .eq("active", true)
+    .in("cleaner_id", cleanerIds.length ? cleanerIds : ["00000000-0000-0000-0000-000000000000"]);
+  const memberCount: Record<string, number> = {};
+  for (const m of membersRaw || []) memberCount[String(m.cleaner_id)] = (memberCount[String(m.cleaner_id)] || 0) + 1;
   const { data: holidaysRaw } = await supabase
     .from("cleaner_holidays")
     .select("cleaner_id, start_date, end_date, reason")
@@ -604,6 +616,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     home_latitude: c.home_latitude ?? null,
     home_longitude: c.home_longitude ?? null,
     holidays: holidaysByCleaner[c.id] || [],
+    capacity_units: c.is_team ? Math.max(1, memberCount[String(c.id)] || 1) : 1,
   }));
 
   // 6. Get already-scheduled tasks for today (for capacity calculation)
@@ -693,7 +706,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
 
   function hasCapacity(c: CleanerInfo, addMins: number): boolean {
     const projected = cleanerScheduledMinutes[c.id] + addMins + 15;
-    return projected <= c.daily_working_hours * 60;
+    return projected <= c.daily_working_hours * 60 * c.capacity_units;
   }
 
   function pickByDeficit(pool: CleanerInfo[], group: string): CleanerInfo | null {
