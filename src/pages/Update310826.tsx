@@ -84,10 +84,10 @@ const BODY = `
 <div class="wrap">
   <p class="eyebrow">Escape Grids · Release Notes</p>
   <h1>What shipped on 31 August</h1>
-  <p class="lede">A big one — team cleaners, a look-ahead capacity view, a proper command centre, plus a run of scheduling reliability fixes so regenerate behaves and cleans stop slipping through. A few items need a bit of setup; those are flagged.</p>
+  <p class="lede">A big one — team cleaners, a look-ahead capacity view, a proper command centre, a way to remove cleans that genuinely aren't needed, plus a run of scheduling reliability fixes so regenerate behaves and cleans stop slipping through. A few items need a bit of setup; those are flagged.</p>
 
   <div class="stats">
-    <div class="stat"><div class="n">9</div><div class="l">areas changed</div></div>
+    <div class="stat"><div class="n">10</div><div class="l">areas changed</div></div>
     <div class="stat"><div class="n amber">3</div><div class="l">need setup from you</div></div>
     <div class="stat"><div class="n emerald">Live</div><div class="l">deployed to escapegrids.com</div></div>
   </div>
@@ -148,7 +148,7 @@ const BODY = `
 
   <section class="change">
     <div class="head"><span class="idx">06</span><h2>Cleaner user manual</h2><span class="tag new">New</span></div>
-    <p class="body-text">A full how-to for cleaners at <span class="path">escapegrids.com/cleaner/manual</span> — signing in, the priority bands, the Shopping List, working the checklist, photos, completing, flagging issues, and (for teams) picking who you are. Bookmark-able, and a good hand-out for a new starter.</p>
+    <p class="body-text">A full how-to for cleaners at <span class="path">escapegrids.com/cleaner/manual</span> — signing in (incl. the <b>Magic Link</b> option, so no password to remember), the priority bands, the Shopping List, working the checklist, photos, completing, flagging issues, and (for teams) picking who you are. Bookmark-able, and a good hand-out for a new starter.</p>
     <span class="noaction">No action — screenshots being added</span>
   </section>
 
@@ -159,6 +159,8 @@ const BODY = `
       <li><b>Regenerate no longer crashes</b> — a duplicate-clean conflict (and a long-run request timeout) used to fail the whole run with a "non-2xx". Both handled; it now completes and reports properly.</li>
       <li><b>Capacity is a flag, not a blocker</b> — cleans are always assigned by fair-share; if a cleaner goes over the ideal cap it's <b>flagged</b> for you to rebalance, rather than left unassigned.</li>
       <li><b>No more orphan cleans</b> — a clean left with no cleaner (e.g. after a cleaner was deleted) now gets picked back up on regenerate, whatever its status. And deleting a cleaner cleanly unassigns their cleans (with a warning first).</li>
+      <li><b>Modified bookings can't blank out a clean</b> — when Hostaway modifies a booking it leaves a cancelled "twin"; that twin was making the system think the day was covered and skip the real checkout's clean ("nothing to generate"). Cancelled cleans are now ignored when deciding if a property still needs one.</li>
+      <li><b>No more phantom "unassigned"</b> — a stray clean stuck on a bundle listing was being counted in the header but had no row to appear in (so you couldn't see or filter to it). The counter now only counts cleans you can actually action, and the scheduler never parks — or drags forward — a clean on a bundle.</li>
     </ul>
     <div class="action single">
       <div class="atitle">Action required — the last unassigned</div>
@@ -167,7 +169,20 @@ const BODY = `
   </section>
 
   <section class="change">
-    <div class="head"><span class="idx">08</span><h2>Checklists &amp; Shopping List — fixed</h2><span class="tag fix">Fix</span></div>
+    <div class="head"><span class="idx">08</span><h2>Mark a clean "Not required" — and it stays gone</h2><span class="tag new">New</span></div>
+    <p class="body-text">When a turnover genuinely doesn't need cleaning — an <b>owner checking in</b>, or a <b>guest no-show</b> who's kept the booking — you can now take the clean off for good. Open the clean and you'll see two options:</p>
+    <ul class="feat">
+      <li><b>Remove &amp; regenerate</b> — for accidental removals; it rebuilds from the booking (as before).</li>
+      <li><b>Not required — remove for good</b> — takes it off the schedule and it <b>won't come back on regenerate</b>. The booking itself is left completely untouched.</li>
+    </ul>
+    <div class="action single">
+      <div class="atitle">How to use it</div>
+      <p>Open the clean → <b>Not required — remove for good</b> → confirm. Use it for owner stays, no-shows, or any turnover that doesn't need a clean.</p>
+    </div>
+  </section>
+
+  <section class="change">
+    <div class="head"><span class="idx">09</span><h2>Checklists &amp; Shopping List — fixed</h2><span class="tag fix">Fix</span></div>
     <p class="body-text">Two data-permission bugs that made cleaners' screens look empty:</p>
     <ul class="feat">
       <li><b>Checklists were coming up "no items"</b> — a database column mismatch was rejecting the whole checklist for any property with equipment. Fixed; checklists populate correctly.</li>
@@ -177,7 +192,7 @@ const BODY = `
   </section>
 
   <section class="change">
-    <div class="head"><span class="idx">09</span><h2>App polish &amp; safety net</h2><span class="tag fix">Fix</span></div>
+    <div class="head"><span class="idx">10</span><h2>App polish &amp; safety net</h2><span class="tag fix">Fix</span></div>
     <p class="body-text">The <span class="path">Today</span> page had a crash and a scrolling <b>jitter</b> (the glass-card blur re-drawing every frame) — both fixed, and scrolling is smoother across the app. We also added an <b>app-wide error catch</b>, so a page that ever hits a problem shows the actual error instead of a blank screen.</p>
     <span class="noaction">No action</span>
   </section>
