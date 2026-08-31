@@ -179,7 +179,10 @@
 
 @layer utilities {
   .glass-card {
-    @apply bg-card/60 backdrop-blur-xl border border-border/50 rounded-xl;
+    /* No backdrop-blur: it re-composites every scroll frame and caused visible
+       jitter on card-heavy pages (e.g. /today). A near-opaque card over the solid
+       ground looks the same and scrolls smoothly. */
+    @apply bg-card/95 border border-border/50 rounded-xl;
     box-shadow:
       0 0 0 1px hsl(var(--glass-border) / 0.3),
       0 4px 24px -4px hsl(222 25% 4% / 0.5),
