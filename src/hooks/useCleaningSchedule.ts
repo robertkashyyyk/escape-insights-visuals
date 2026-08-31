@@ -531,47 +531,69 @@ export function useCleaningSchedule() {
   // starting at the supplied date, or selectedDate by default.
   const regenerateRange = useCallback(async (days: number = 1, startOverride?: Date) => {
     setIsRegenerating(true);
+    const refresh = () => {
+      for (const key of ["clean-tasks", "matrix-tasks", "reservations-checkouts", "reservations-checkins", "cleaners-schedule", "listings-schedule"]) {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      }
+    };
+    const report = (created: number, unassigned: number, rangeLabel: string) => {
+      if (created === 0 && unassigned === 0) {
+        toast({ title: "Nothing to generate", description: days > 1
+          ? `No checkouts found for ${rangeLabel}. Nothing to generate.`
+          : `No checkouts found for ${rangeLabel}. If you just removed a manual clean, it cannot be auto-regenerated — add it again from the matrix.` });
+      } else if (created === 0 && unassigned > 0) {
+        toast({ title: "Tasks remain unassigned", variant: "destructive",
+          description: `${unassigned} task${unassigned === 1 ? "" : "s"} for ${rangeLabel} could not be assigned — no cleaner covers that location group. Add the location to a cleaner in Settings → Cleaners, or drag manually in the matrix.` });
+      } else {
+        toast({ title: "Schedule generated",
+          description: `${created} task${created === 1 ? "" : "s"} created across ${rangeLabel}${unassigned > 0 ? `, ${unassigned} still unassigned (no eligible cleaner)` : ""}.` });
+      }
+    };
     try {
       const anchorDate = startOverride ?? selectedDate;
       const startDate = days > 1 ? startOfWeek(anchorDate, { weekStartsOn: 1 }) : anchorDate;
       const startStr = format(startDate, "yyyy-MM-dd");
-      const endStr = format(addDays(startDate, Math.max(0, days - 1)), "yyyy-MM-dd");
       const rangeLabel = days > 1
         ? `the week of ${format(startDate, "d MMM")} – ${format(addDays(startDate, days - 1), "d MMM")}`
         : startStr;
 
-      const { data, error } = await supabase.functions.invoke("generate-daily-cleaning-schedule", {
-        body: days > 1 ? { date: startStr, days_ahead: days } : { date: startStr },
-      });
-      if (error) throw error;
-      const created = data?.tasks_created ?? 0;
-      const unassigned = data?.tasks_unassigned ?? 0;
-      if (created === 0 && unassigned === 0) {
-        toast({
-          title: "Nothing to generate",
-          description: days > 1
-            ? `No checkouts found for ${rangeLabel}. Nothing to generate.`
-            : `No checkouts found for ${rangeLabel}. If you just removed a manual clean, it cannot be auto-regenerated — add it again from the matrix.`,
+      // Baseline so we can detect the run finishing even if the HTTP request times
+      // out (a full week can outlast the gateway timeout while still completing).
+      const { data: baseRows } = await supabase.from("automation_logs")
+        .select("run_at").order("run_at", { ascending: false }).limit(1);
+      const baselineRunAt = (baseRows?.[0] as any)?.run_at ?? "1970-01-01T00:00:00Z";
+
+      let data: any = null, invokeError: any = null;
+      try {
+        const res = await supabase.functions.invoke("generate-daily-cleaning-schedule", {
+          body: days > 1 ? { date: startStr, days_ahead: days } : { date: startStr },
         });
-      } else if (created === 0 && unassigned > 0) {
-        toast({
-          title: "Tasks remain unassigned",
-          description: `${unassigned} task${unassigned === 1 ? "" : "s"} for ${rangeLabel} could not be assigned — no cleaner covers that location group, or all eligible cleaners are at capacity. Add the location to a cleaner in Settings → Cleaners, or drag manually in the matrix.`,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Schedule generated",
-          description: `${created} task${created === 1 ? "" : "s"} created across ${rangeLabel}${unassigned > 0 ? `, ${unassigned} still unassigned (no eligible cleaner)` : ""}.`,
-        });
+        data = res.data; invokeError = res.error;
+      } catch (e) { invokeError = e; }
+
+      if (invokeError) {
+        // Poll automation_logs for the run this triggered, up to ~2 min.
+        let outcome: any = null;
+        for (let i = 0; i < 24 && !outcome; i++) {
+          await new Promise((r) => setTimeout(r, 5000));
+          const { data: rows } = await supabase.from("automation_logs")
+            .select("status, error_message, tasks_created, tasks_unassigned, run_at")
+            .gt("run_at", baselineRunAt).order("run_at", { ascending: false }).limit(1);
+          if (rows && rows.length) outcome = rows[0];
+        }
+        if (!outcome) {
+          toast({ title: "Still regenerating", description: "The full week is taking a while — it's running in the background. Give it a moment and refresh." });
+          refresh();
+          return;
+        }
+        if (outcome.status === "error") throw new Error(outcome.error_message || "Generation failed");
+        report(outcome.tasks_created ?? 0, outcome.tasks_unassigned ?? 0, rangeLabel);
+        refresh();
+        return;
       }
-      // Refresh all queries
-      queryClient.invalidateQueries({ queryKey: ["clean-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["matrix-tasks"] });
-      queryClient.invalidateQueries({ queryKey: ["reservations-checkouts"] });
-      queryClient.invalidateQueries({ queryKey: ["reservations-checkins"] });
-      queryClient.invalidateQueries({ queryKey: ["cleaners-schedule"] });
-      queryClient.invalidateQueries({ queryKey: ["listings-schedule"] });
+
+      report(data?.tasks_created ?? 0, data?.tasks_unassigned ?? 0, rangeLabel);
+      refresh();
     } catch (err: any) {
       toast({ title: "Generation failed", description: err.message, variant: "destructive" });
     } finally {
