@@ -82,7 +82,7 @@ export default function CleaningTraffic() {
       onClick={() => cell.total > 0 && openDay(d)}
       disabled={cell.total === 0}
       className={`h-11 w-full rounded-md flex flex-col items-center justify-center text-[11px] font-semibold leading-none transition-colors ${CELL[cell.state]} ${cell.total === 0 ? "cursor-default" : "cursor-pointer"}`}
-      title={cell.total === 0 ? "No cleans" : `${cell.total} clean${cell.total === 1 ? "" : "s"}${cell.unassigned ? ` · ${cell.unassigned} unassigned` : ""}${cell.over ? ` · ${cell.over} over capacity` : ""}`}
+      title={cell.total === 0 ? "No cleans" : `${cell.total} clean${cell.total === 1 ? "" : "s"}${cell.unassigned ? ` · ${cell.unassigned} unassigned` : ""}${cell.over ? ` · ${cell.over} on a cleaner over their daily hours` : ""}`}
     >
       {cell.total > 0 && (
         <>
@@ -101,6 +101,7 @@ export default function CleaningTraffic() {
           <div>
             <h1 className="text-xl font-bold flex items-center gap-2"><TrafficCone className="h-5 w-5 text-primary" /> Cleaning Traffic</h1>
             <p className="text-sm text-muted-foreground">Capacity per region, looking ahead. Tap a cell to open that day in the schedule.</p>
+            <p className="text-xs text-muted-foreground/80 mt-1">Big number = cleans that day. <span className="text-red-600 dark:text-red-300 font-medium">N&nbsp;un</span> = unassigned; <span className="text-amber-600 dark:text-amber-300 font-medium">N&nbsp;over</span> = on a cleaner past their daily hours. Adjust clean durations, cleaner hours or regions, then Regenerate to refresh.</p>
           </div>
           <div className="flex items-center gap-3">
             <Legend />
