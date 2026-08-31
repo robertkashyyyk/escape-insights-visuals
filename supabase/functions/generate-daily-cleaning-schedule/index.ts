@@ -240,6 +240,16 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     if ((priorOpen || []).length > 0) {
       const priorListingIds = Array.from(new Set((priorOpen || []).map((t: any) => String(t.listing_id))));
 
+      // A clean should never live on a bundle listing (bundles have no schedule row,
+      // so it can never be completed and the carryover would drag it forward forever).
+      // Retire any such stragglers instead of rolling them on.
+      const { data: priorBundleRows } = await supabase
+        .from("listings")
+        .select("id")
+        .eq("is_bundle", true)
+        .in("id", priorListingIds.length ? priorListingIds : ["00000000-0000-0000-0000-000000000000"]);
+      const priorBundleIds = new Set((priorBundleRows || []).map((r: any) => String(r.id)));
+
       // Don't roll into a listing that already has a clean scheduled for today.
       const { data: existingToday } = await supabase
         .from("clean_tasks")
@@ -271,6 +281,12 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
 
       for (const t of priorOpen || []) {
         const lid = String(t.listing_id);
+        // Retire any clean that ended up on a bundle listing — it has no row and can
+        // never be completed, so never drag it forward.
+        if (priorBundleIds.has(lid)) {
+          await supabase.from("clean_tasks").update({ status: "cancelled" }).eq("id", t.id);
+          continue;
+        }
         // Skip + retire cleans the property was already re-let (and turned over) for.
         const srcCheckout = t.reservation_id ? checkoutByRes.get(String(t.reservation_id)) : t.scheduled_date;
         if (srcCheckout && (checkinsByListing[lid] || []).some((ci) => ci > srcCheckout && ci <= targetDate)) {
