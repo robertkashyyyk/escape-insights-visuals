@@ -222,25 +222,37 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
     return groups;
   }, [groupedListings, filterGroups, cleanerFilterActive, listingsWithVisibleTask, sortMode, taskGrid, todayStr, tasks, isTaskVisible, cleaners]);
 
+  // Only count tasks that actually have a row to render in. A clean sitting on
+  // a bundle / suspended / archived listing has no matrix row, so counting it
+  // would show a phantom "N unassigned" the user can never see or filter to.
+  const rowListingIds = useMemo(
+    () => new Set(listings.map(l => l.id)),
+    [listings]
+  );
+  const countableTasks = useMemo(
+    () => tasks.filter(t => rowListingIds.has(t.listing_id)),
+    [tasks, rowListingIds]
+  );
+
   // Summary — always reflect raw week totals, independent of active filters
   const summary = useMemo(() => {
-    const total = tasks.length;
+    const total = countableTasks.length;
     let unassigned = 0;
-    for (const t of tasks) {
+    for (const t of countableTasks) {
       if (!t.assigned_cleaner_id || t.status === "unassigned") unassigned++;
     }
     return { total, unassigned };
-  }, [tasks]);
+  }, [countableTasks]);
 
   const tasksByCleaner = useMemo(() => {
     const byCleaner: Record<string, number> = {};
-    for (const t of tasks) {
+    for (const t of countableTasks) {
       if (t.assigned_cleaner_id && t.status !== "unassigned") {
         byCleaner[t.assigned_cleaner_id] = (byCleaner[t.assigned_cleaner_id] || 0) + 1;
       }
     }
     return byCleaner;
-  }, [tasks]);
+  }, [countableTasks]);
 
   useEffect(() => {
     onSummaryChange?.({ total: summary.total, unassigned: summary.unassigned });
