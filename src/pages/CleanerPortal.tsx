@@ -4,6 +4,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, LogOut, Check, Eye, Sun, Moon, Flag, Sunrise, Play, X, Undo2, ListChecks, StickyNote, ShoppingCart, Users } from "lucide-react";
 import { parseCustomFields, cleanerAccess, type AccessItem } from "@/lib/customFields";
+import { displayName } from "@/lib/listingName";
 import { CleanChecklistSheet } from "@/components/cleaning/CleanChecklistSheet";
 import { ShoppingListSheet } from "@/components/cleaning/ShoppingListSheet";
 import { toast } from "sonner";
@@ -183,7 +184,7 @@ export default function CleanerPortal() {
         travel_time_from_previous_minutes, is_same_day_turnaround, priority_level,
         checkout_time, checkin_time, cleaning_duration_minutes, notes,
         listing_id, reservation_id, started_at,
-        listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms, latitude, longitude)
+        listings!clean_tasks_listing_id_fkey (name, internal_name, location_group, bedrooms, latitude, longitude)
       `)
       .eq("assigned_cleaner_id", cleanerId)
       .gte("scheduled_date", todayStr)
@@ -221,7 +222,7 @@ export default function CleanerPortal() {
       cleaning_duration_minutes: t.cleaning_duration_minutes,
       listing_id: t.listing_id,
       reservation_id: t.reservation_id ?? null,
-      property_name: t.listings?.name ?? "Unknown",
+      property_name: displayName(t.listings) || "Unknown",
       location_group: t.listings?.location_group ?? null,
       bedrooms: t.listings?.bedrooms ?? null,
       latitude: t.listings?.latitude ?? null,
@@ -274,7 +275,7 @@ export default function CleanerPortal() {
         travel_time_from_previous_minutes, is_same_day_turnaround, priority_level,
         checkout_time, checkin_time, cleaning_duration_minutes, notes,
         listing_id, reservation_id, started_at, created_at,
-        listings!clean_tasks_listing_id_fkey (name, location_group, bedrooms, latitude, longitude)
+        listings!clean_tasks_listing_id_fkey (name, internal_name, location_group, bedrooms, latitude, longitude)
       `)
       .eq("assigned_cleaner_id", cleaner.id)
       .gte("scheduled_date", todayStr)
