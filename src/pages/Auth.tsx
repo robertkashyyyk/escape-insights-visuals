@@ -35,7 +35,10 @@ export default function Auth() {
     setShowTransition(true);
     redirectTimerRef.current = setTimeout(() => {
       const latestRole = roleRef.current;
-      const dest = latestRole === "client" ? "/owner" : latestRole === "cleaner" ? "/cleaner" : "/today";
+      const dest = latestRole === "client" ? "/owner"
+        : latestRole === "cleaner" ? "/cleaner"
+        : latestRole === "maintenance" ? "/operations/maintenance"
+        : "/today";
       navigate(dest, { replace });
     }, 2700);
   }, [navigate]);
