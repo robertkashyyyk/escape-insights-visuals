@@ -4,7 +4,7 @@ import {
   Gauge, Target, Sparkles, Home, ChevronRight, Brush, BookOpen,
   FileText, Link, UserSearch, Mail, Send, Megaphone, ClipboardList,
   Eye, Sun, Moon, MapPin, Wrench, Receipt, UploadCloud, Banknote,
-  LucideIcon,
+  Activity, LucideIcon,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -63,6 +63,7 @@ const sections: NavSection[] = [
     label: "Performance",
     items: [
       { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, roles: allRoles },
+      { title: "On The Daily", url: "/on-the-daily", icon: Activity, roles: allRoles },
       { title: "YoY Performance", url: "/yoy", icon: TrendingUp, roles: allRoles },
       { title: "Occupancy Heatmap", url: "/heatmap", icon: Grid3X3, roles: allRoles },
       { title: "Pricing Strategy", url: "/pricing", icon: PoundSterling, roles: allRoles },

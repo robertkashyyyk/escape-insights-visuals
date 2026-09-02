@@ -35,6 +35,7 @@ import CleaningSchedule from "./pages/CleaningSchedule";
 import CleaningNumbers from "./pages/CleaningNumbers";
 import CleaningAudit from "./pages/CleaningAudit";
 import CleaningTraffic from "./pages/CleaningTraffic";
+import OnTheDaily from "./pages/OnTheDaily";
 import Update260826 from "./pages/Update260826";
 import Update280826 from "./pages/Update280826";
 import Update310826 from "./pages/Update310826";
@@ -123,6 +124,7 @@ const App = () => (
             <Route path="/operations/numbers" element={<ProtectedRoute requiredRoles={["super", "senior"]}><CleaningNumbers /></ProtectedRoute>} />
             <Route path="/operations/audit" element={<ProtectedRoute requiredRoles={["super", "senior", "admin"]}><CleaningAudit /></ProtectedRoute>} />
             <Route path="/operations/traffic" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><CleaningTraffic /></ProtectedRoute>} />
+            <Route path="/on-the-daily" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><OnTheDaily /></ProtectedRoute>} />
             <Route path="/property-knowledge" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PropertyKnowledge /></ProtectedRoute>} />
             <Route path="/property-knowledge/:listingId" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><PropertyKnowledgeDetail /></ProtectedRoute>} />
             <Route path="/amenities" element={<ProtectedRoute requiredRoles={["super", "senior", "admin"]}><Amenities /></ProtectedRoute>} />
