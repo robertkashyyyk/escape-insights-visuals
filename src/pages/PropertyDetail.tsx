@@ -45,7 +45,7 @@ export default function PropertyDetail() {
         (supabase.from as any)("property_beds").select("bedroom_label, bed_type_id, quantity, sort_order").eq("listing_id", id).order("sort_order"),
         (supabase.from as any)("bed_types").select("id, name, laundry_cost"),
       ]);
-      const tmap = new Map((typesRes.data ?? []).map((t: any) => [t.id, t]));
+      const tmap = new Map<string, any>((typesRes.data ?? []).map((t: any) => [t.id as string, t]));
       return (rowsRes.data ?? []).map((b: any) => ({
         ...b,
         type: tmap.get(b.bed_type_id)?.name ?? "Bed",
