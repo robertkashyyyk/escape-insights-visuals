@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
     if (action === "update_role") {
       const { user_id, role } = body;
       if (!user_id || !role) return json({ error: "user_id and role required" }, 400);
-      const valid = ["super", "senior", "admin", "client", "cleaner"];
+      const valid = ["super", "senior", "admin", "maintenance", "client", "cleaner"];
       if (!valid.includes(role)) return json({ error: "Invalid role" }, 400);
       if (user_id === callerId && role !== "super") {
         return json({ error: "You cannot demote yourself" }, 400);
@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
     if (action === "create") {
       const { email, name, role, linkTable, linkId, credential_mode, password } = body;
       if (!email || !role) return json({ error: "email and role are required" }, 400);
-      const valid = ["super", "senior", "admin", "client", "cleaner"];
+      const valid = ["super", "senior", "admin", "maintenance", "client", "cleaner"];
       if (!valid.includes(role)) return json({ error: "Invalid role" }, 400);
       const validLinkTables = ["cleaners", "property_owners"];
       if (linkTable && !validLinkTables.includes(linkTable)) {

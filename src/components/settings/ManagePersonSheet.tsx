@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { CleanerProfileFields, type CleanerProfileValue } from "@/components/settings/CleanerProfileFields";
 import { Loader2, Mail, KeyRound, Trash2, Copy, SprayCan, Save } from "lucide-react";
 
-type AppRole = "super" | "senior" | "admin" | "client" | "cleaner";
+type AppRole = "super" | "senior" | "admin" | "client" | "cleaner" | "maintenance";
 
 export interface ManageUser {
   id: string;
@@ -32,6 +32,7 @@ const ROLE_OPTIONS: { value: AppRole; label: string }[] = [
   { value: "super", label: "Super" },
   { value: "senior", label: "Senior" },
   { value: "admin", label: "Admin" },
+  { value: "maintenance", label: "Maintenance" },
   { value: "client", label: "Client / Owner" },
   { value: "cleaner", label: "Cleaner" },
 ];

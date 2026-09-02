@@ -46,7 +46,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { formatDistanceToNow } from "date-fns";
 
-type AppRole = "super" | "senior" | "admin" | "client" | "cleaner";
+type AppRole = "super" | "senior" | "admin" | "client" | "cleaner" | "maintenance";
 
 interface ManagedUser {
   id: string;
@@ -64,6 +64,7 @@ const ROLE_BADGE: Record<AppRole, { label: string; className: string }> = {
   super: { label: "Super", className: "bg-primary/15 text-primary border-primary/30" },
   senior: { label: "Senior", className: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
   admin: { label: "Admin", className: "bg-purple-500/15 text-purple-400 border-purple-500/30" },
+  maintenance: { label: "Maintenance", className: "bg-orange-500/15 text-orange-400 border-orange-500/30" },
   client: { label: "Owner", className: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
   cleaner: { label: "Cleaner", className: "bg-amber-500/15 text-amber-400 border-amber-500/30" },
 };
@@ -226,6 +227,7 @@ export default function TeamManagement() {
                       <SelectItem value="super">Super</SelectItem>
                       <SelectItem value="senior">Senior</SelectItem>
                       <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="maintenance">Maintenance</SelectItem>
                       <SelectItem value="client">Owner</SelectItem>
                       <SelectItem value="cleaner">Cleaner</SelectItem>
                     </SelectContent>
@@ -296,6 +298,7 @@ export default function TeamManagement() {
                                       <SelectItem value="super">Super</SelectItem>
                                       <SelectItem value="senior">Senior</SelectItem>
                                       <SelectItem value="admin">Admin</SelectItem>
+                                      <SelectItem value="maintenance">Maintenance</SelectItem>
                                       <SelectItem value="client">Owner</SelectItem>
                                       <SelectItem value="cleaner">Cleaner</SelectItem>
                                     </SelectContent>

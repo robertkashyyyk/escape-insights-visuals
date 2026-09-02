@@ -4,7 +4,7 @@ import {
   Gauge, Target, Sparkles, Home, ChevronRight, Brush, BookOpen,
   FileText, Link, UserSearch, Mail, Send, Megaphone, ClipboardList,
   Eye, Sun, Moon, MapPin, Wrench, Receipt, UploadCloud, Banknote,
-  Activity, LucideIcon,
+  Activity, ShieldCheck, LucideIcon,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -13,6 +13,8 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { ThemePicker } from "@/components/ThemePicker";
 import { Badge } from "@/components/ui/badge";
 import { useState, useCallback } from "react";
+import { usePermissions } from "@/hooks/usePermissions";
+import { areaForPath } from "@/lib/permissions";
 
 import {
   Sidebar,
@@ -26,7 +28,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-type AppRole = "super" | "senior" | "admin" | "client" | "cleaner";
+type AppRole = "super" | "senior" | "admin" | "client" | "cleaner" | "maintenance";
 
 interface NavChild {
   title: string;
@@ -185,10 +187,18 @@ export function AppSidebar() {
     setExpandedItems((prev) => ({ ...prev, [title]: !prev[title] }));
   };
 
+  const perm = usePermissions();
+  // Visibility is driven by effective permission (per-user override, else role
+  // default). For items that map to a known area we hide anything at level "none";
+  // items with no area fall back to the legacy role list.
   const filteredSections = sections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => !role || item.roles.includes(role)),
+      items: section.items.filter((item) => {
+        const area = areaForPath(item.url);
+        if (area) return perm.level(area.key) !== "none";
+        return !role || item.roles.includes(role);
+      }),
     }))
     .filter((section) => section.items.length > 0);
 
@@ -367,6 +377,25 @@ export function AppSidebar() {
                       >
                         <Users className={`h-[18px] w-[18px] shrink-0 ${location.pathname === "/settings/team" ? "text-primary" : ""}`} />
                         {!collapsed && <span>Team & Users</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+                {(!role || role === "super") && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to="/settings/permissions"
+                        end
+                        className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                          location.pathname === "/settings/permissions"
+                            ? "bg-primary/10 text-primary"
+                            : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                        }`}
+                        activeClassName=""
+                      >
+                        <ShieldCheck className={`h-[18px] w-[18px] shrink-0 ${location.pathname === "/settings/permissions" ? "text-primary" : ""}`} />
+                        {!collapsed && <span>Permissions</span>}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

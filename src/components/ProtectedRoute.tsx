@@ -1,8 +1,10 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth, useRole } from "@/contexts/AuthContext";
+import { usePermissions } from "@/hooks/usePermissions";
+import { areaForPath } from "@/lib/permissions";
 import { Loader2 } from "lucide-react";
 
-type AppRole = "super" | "senior" | "admin" | "client" | "cleaner";
+type AppRole = "super" | "senior" | "admin" | "client" | "cleaner" | "maintenance";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -10,9 +12,18 @@ interface ProtectedRouteProps {
   excludeRoles?: AppRole[];
 }
 
+const homeFor = (role: AppRole | null): string => {
+  if (role === "client") return "/owner";
+  if (role === "cleaner") return "/cleaner";
+  if (role === "maintenance") return "/operations/maintenance";
+  return "/today";
+};
+
 export function ProtectedRoute({ children, requiredRoles, excludeRoles }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   const { role } = useRole();
+  const perm = usePermissions();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -27,16 +38,20 @@ export function ProtectedRoute({ children, requiredRoles, excludeRoles }: Protec
   }
 
   if (requiredRoles && role && !requiredRoles.includes(role)) {
-    // Redirect to appropriate home based on role
-    if (role === "client") return <Navigate to="/owner" replace />;
-    if (role === "cleaner") return <Navigate to="/cleaner" replace />;
-    return <Navigate to="/today" replace />;
+    return <Navigate to={homeFor(role)} replace />;
   }
 
   if (excludeRoles && role && excludeRoles.includes(role)) {
-    if (role === "client") return <Navigate to="/owner" replace />;
-    if (role === "cleaner") return <Navigate to="/cleaner" replace />;
-    return <Navigate to="/today" replace />;
+    return <Navigate to={homeFor(role)} replace />;
+  }
+
+  // Per-area permission gating (phase 1: block only level "none"). No per-route
+  // wiring needed — the area is resolved from the path. The pathname guard stops a
+  // redirect loop if a user's own home area were ever set to "none".
+  const area = areaForPath(location.pathname);
+  const home = homeFor(role);
+  if (area && !perm.loading && perm.level(area.key) === "none" && location.pathname !== home) {
+    return <Navigate to={home} replace />;
   }
 
   return <>{children}</>;

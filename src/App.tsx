@@ -36,6 +36,7 @@ import CleaningNumbers from "./pages/CleaningNumbers";
 import CleaningAudit from "./pages/CleaningAudit";
 import CleaningTraffic from "./pages/CleaningTraffic";
 import OnTheDaily from "./pages/OnTheDaily";
+import PermissionsMatrix from "./pages/PermissionsMatrix";
 import Update260826 from "./pages/Update260826";
 import Update280826 from "./pages/Update280826";
 import Update310826 from "./pages/Update310826";
@@ -113,6 +114,7 @@ const App = () => (
             <Route path="/management" element={<ProtectedRoute requiredRoles={["super", "senior"]}><ManagementRevenue /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute requiredRoles={["super"]}><SettingsPage /></ProtectedRoute>} />
             <Route path="/settings/team" element={<ProtectedRoute requiredRoles={["super"]}><TeamManagement /></ProtectedRoute>} />
+            <Route path="/settings/permissions" element={<ProtectedRoute requiredRoles={["super"]}><PermissionsMatrix /></ProtectedRoute>} />
             <Route path="/settings/clean-reset" element={<ProtectedRoute requiredRoles={["super", "senior", "admin"]}><CleanReset /></ProtectedRoute>} />
             <Route path="/sync-health" element={<ProtectedRoute requiredRoles={["super", "senior"]}><SyncHealth /></ProtectedRoute>} />
             <Route path="/operations/schedule" element={<ProtectedRoute excludeRoles={["client", "cleaner"]}><CleaningSchedule /></ProtectedRoute>} />
