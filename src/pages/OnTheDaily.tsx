@@ -6,7 +6,7 @@ import { displayName } from "@/lib/listingName";
 import { format, addDays, startOfDay, parseISO, isToday } from "date-fns";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Activity, Loader2, CircleDashed, Timer, CheckCircle2 } from "lucide-react";
+import { Activity, Loader2, CircleDashed, Timer, CheckCircle2, Clock } from "lucide-react";
 
 type Col = "dirty" | "in_progress" | "clean";
 
@@ -18,7 +18,22 @@ interface Card {
   time: string | null;      // checkout time
   date: string;             // scheduled_date
   state: Col;
+  eta: string | null;       // expected ready time / duration hint
 }
+
+// "HH:MM" + minutes → "HH:MM"
+const hhmmPlus = (hhmm: string, addMin: number): string | null => {
+  const m = hhmm.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const total = Number(m[1]) * 60 + Number(m[2]) + addMin;
+  const h = Math.floor((total % 1440) / 60), mi = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}`;
+};
+// started_at (ISO) + minutes → local "HH:MM"
+const finishFromStarted = (iso: string, addMin: number): string => {
+  const d = new Date(new Date(iso).getTime() + addMin * 60000);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
 
 const stateOf = (t: any): Col => {
   const s = (t.status || "").toLowerCase();
@@ -65,7 +80,7 @@ export default function OnTheDaily() {
     queryKey: ["daily-tasks", startStr, endStr],
     queryFn: async () => fetchAllRows<any>(() =>
       supabase.from("clean_tasks")
-        .select("id, scheduled_date, status, started_at, assigned_cleaner_id, checkout_time, listing_id, listings!clean_tasks_listing_id_fkey(name, internal_name, location_group, is_bundle)")
+        .select("id, scheduled_date, status, started_at, estimated_start_time, cleaning_duration_minutes, assigned_cleaner_id, checkout_time, listing_id, listings!clean_tasks_listing_id_fkey(name, internal_name, location_group, is_bundle)")
         .gte("scheduled_date", startStr).lte("scheduled_date", endStr)
         .not("status", "in", "(cancelled,canceled)")),
   });
@@ -78,6 +93,17 @@ export default function OnTheDaily() {
     for (const t of tasks) {
       if (t.listings?.is_bundle) continue; // bundles have no physical state
       const state = stateOf(t);
+      const isTodayRow = t.scheduled_date === todayStr;
+      const dur: number | null = t.cleaning_duration_minutes ?? null;
+      // Expected ready time: in-progress = start + duration; today's dirty = estimated
+      // start + duration (or just the duration if we don't have a start estimate).
+      let eta: string | null = null;
+      if (state === "in_progress" && t.started_at && dur) {
+        eta = `ready ~${finishFromStarted(t.started_at, dur)}`;
+      } else if (state === "dirty" && isTodayRow && dur) {
+        const finish = t.estimated_start_time ? hhmmPlus(t.estimated_start_time, dur) : null;
+        eta = finish ? `ready ~${finish}` : `~${dur}m`;
+      }
       const card: Card = {
         id: t.id,
         name: displayName(t.listings) || "Unknown",
@@ -86,6 +112,7 @@ export default function OnTheDaily() {
         time: fmtTime(t.checkout_time),
         date: t.scheduled_date,
         state,
+        eta,
       };
       if (t.scheduled_date === todayStr) {
         // one card per property in the Today band (keep the most "active" state)
@@ -115,7 +142,16 @@ export default function OnTheDaily() {
       onClick={() => navigate(`/operations/schedule?date=${c.date}`)}
       className="w-full text-left rounded-lg border border-border/50 bg-card px-3 py-2 hover:border-primary/40 transition-colors"
     >
-      <div className="text-sm font-semibold leading-tight truncate" title={c.name}>{c.name}</div>
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-sm font-semibold leading-tight truncate" title={c.name}>{c.name}</div>
+        {c.eta && (
+          <span className={`shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+            c.state === "in_progress" ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" : "bg-secondary text-muted-foreground"
+          }`}>
+            <Clock className="h-3 w-3" />{c.eta}
+          </span>
+        )}
+      </div>
       <div className="mt-1 flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
         {c.region && <span className="rounded bg-secondary px-1.5 py-0.5">{c.region}</span>}
         {c.time && <span>CO {c.time}</span>}

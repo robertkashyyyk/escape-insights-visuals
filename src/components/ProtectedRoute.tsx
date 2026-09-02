@@ -46,9 +46,12 @@ export function ProtectedRoute({ children, requiredRoles, excludeRoles }: Protec
   }
 
   // Per-area permission gating (phase 1: block only level "none"). No per-route
-  // wiring needed — the area is resolved from the path. The pathname guard stops a
+  // wiring needed — the area is resolved from the path. Applies to staff/maintenance
+  // only; client & cleaner live in their own portals (e.g. /owner, /owner/calendar)
+  // and are governed by role gating, not this matrix. The pathname guard also stops a
   // redirect loop if a user's own home area were ever set to "none".
-  const area = areaForPath(location.pathname);
+  const matrixRole = role === "super" || role === "senior" || role === "admin" || role === "maintenance";
+  const area = matrixRole ? areaForPath(location.pathname) : null;
   const home = homeFor(role);
   if (area && !perm.loading && perm.level(area.key) === "none" && location.pathname !== home) {
     return <Navigate to={home} replace />;
