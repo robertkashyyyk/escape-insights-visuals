@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { CheckCircle2, Clock, Trash2, Save, Undo2, X, Loader2, Check, Ban, PackageCheck } from "lucide-react";
+import { CheckCircle2, Clock, Trash2, Save, Undo2, X, Loader2, Check, Ban, PackageCheck, Flag } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { getCleanerColor } from "@/lib/cleanerColors";
 import type { MatrixCleaner, MatrixListing, MatrixReservation, MatrixTask, CleanerHolidayRow } from "@/hooks/useMatrixSchedule";
@@ -95,6 +95,23 @@ export function TaskDetailPanel({
     })();
     return () => { cancelled = true; };
   }, [open, task?.id, reservations]);
+
+  // Open (unresolved) issues flagged on THIS clean.
+  const [issues, setIssues] = useState<{ id: string; issue_type: string; description: string; urgency: string; created_at: string; photo_paths: string[] | null }[]>([]);
+  useEffect(() => {
+    if (!open || !task) { setIssues([]); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("clean_issues")
+        .select("id, issue_type, description, urgency, status, maintenance_stage, created_at, photo_paths")
+        .eq("clean_task_id", task.id)
+        .order("created_at", { ascending: false });
+      if (cancelled) return;
+      setIssues(((data ?? []) as any[]).filter((i) => i.status !== "resolved" && i.maintenance_stage !== "complete"));
+    })();
+    return () => { cancelled = true; };
+  }, [open, task?.id]);
 
   if (!task || !listing) return null;
 
@@ -267,6 +284,30 @@ export function TaskDetailPanel({
                 </Badge>
               )}
             </div>
+
+            {/* Open issues flagged on this clean. */}
+            {issues.length > 0 && (
+              <div className="rounded-lg border border-red-500/40 bg-red-500/5 p-3 space-y-2">
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-red-600 dark:text-red-300 font-semibold">
+                  <Flag className="h-3.5 w-3.5" /> {issues.length} issue{issues.length === 1 ? "" : "s"} flagged
+                </div>
+                {issues.map((iss) => (
+                  <div key={iss.id} className="rounded-md bg-background/40 border border-red-500/20 p-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-semibold text-foreground">{iss.issue_type}</span>
+                      {iss.urgency === "urgent" && (
+                        <Badge variant="outline" className="bg-red-600/15 text-red-400 border-red-600/40 text-[9px]">URGENT</Badge>
+                      )}
+                      <span className="text-[10px] text-muted-foreground ml-auto">{format(parseISO(iss.created_at), "d MMM, HH:mm")}</span>
+                    </div>
+                    <p className="text-[13px] text-foreground/90 mt-1 whitespace-pre-wrap">{iss.description}</p>
+                    {iss.photo_paths && iss.photo_paths.length > 0 && (
+                      <p className="text-[10px] text-muted-foreground mt-1">📷 {iss.photo_paths.length} photo{iss.photo_paths.length === 1 ? "" : "s"} — see Maintenance</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Guest requests for the ARRIVING guest — must be left in the property
                 on this clean, before they check in. */}

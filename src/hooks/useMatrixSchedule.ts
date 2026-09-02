@@ -145,6 +145,27 @@ export function useMatrixSchedule(weekAnchor: Date) {
     },
   });
 
+  // Open (unresolved) issues flagged on this week's cleans → task_id -> {count, urgent}
+  const { data: openIssues = new Map<string, { count: number; urgent: boolean }>() } = useQuery({
+    queryKey: ["matrix-issues", weekStartStr, weekEndStr],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("clean_issues" as any)
+        .select("clean_task_id, urgency, status, maintenance_stage, clean_tasks!inner(scheduled_date)")
+        .gte("clean_tasks.scheduled_date", weekStartStr)
+        .lte("clean_tasks.scheduled_date", weekEndStr);
+      const map = new Map<string, { count: number; urgent: boolean }>();
+      for (const r of (data || []) as any[]) {
+        if (r.status === "resolved" || r.maintenance_stage === "complete") continue;
+        const cur = map.get(r.clean_task_id) ?? { count: 0, urgent: false };
+        cur.count++;
+        if (r.urgency === "urgent") cur.urgent = true;
+        map.set(r.clean_task_id, cur);
+      }
+      return map;
+    },
+  });
+
   // Reservations covering the week (for guest names + times)
   const { data: reservations = [] } = useQuery({
     queryKey: ["matrix-reservations", weekStartStr, weekEndStr],
@@ -448,6 +469,7 @@ export function useMatrixSchedule(weekAnchor: Date) {
     cleaners, tasks, reservations, reservationGuestMap, holidays,
     isLoading: listingsLoading || tasksLoading,
     autoGenerating,
+    openIssues,
     reassignTask, completeTask, undoComplete, removeTask, markNotRequired, updateNotes, addManualClean,
   };
 }

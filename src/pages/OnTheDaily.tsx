@@ -6,7 +6,7 @@ import { displayName } from "@/lib/listingName";
 import { format, addDays, startOfDay, parseISO, isToday } from "date-fns";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Activity, Loader2, CircleDashed, Timer, CheckCircle2, Clock } from "lucide-react";
+import { Activity, Loader2, CircleDashed, Timer, CheckCircle2, Clock, Flag } from "lucide-react";
 
 type Col = "dirty" | "in_progress" | "clean";
 
@@ -20,6 +20,7 @@ interface Card {
   state: Col;
   eta: string | null;       // expected ready time / duration hint
   overran: boolean;         // completed later than expected (Clean column)
+  issue: { count: number; urgent: boolean } | null;
 }
 
 // local "HH:MM" from an ISO timestamp
@@ -96,6 +97,26 @@ export default function OnTheDaily() {
         .not("status", "in", "(cancelled,canceled)")),
   });
 
+  // Open (unresolved) issues flagged on cleans in this window → task_id -> {count, urgent}
+  const { data: issueMap = new Map<string, { count: number; urgent: boolean }>() } = useQuery({
+    queryKey: ["daily-issues", startStr, endStr],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("clean_issues")
+        .select("clean_task_id, urgency, status, maintenance_stage, clean_tasks!inner(scheduled_date)")
+        .gte("clean_tasks.scheduled_date", startStr).lte("clean_tasks.scheduled_date", endStr);
+      const m = new Map<string, { count: number; urgent: boolean }>();
+      for (const r of (data || []) as any[]) {
+        if (r.status === "resolved" || r.maintenance_stage === "complete") continue;
+        const cur = m.get(r.clean_task_id) ?? { count: 0, urgent: false };
+        cur.count++;
+        if (r.urgency === "urgent") cur.urgent = true;
+        m.set(r.clean_task_id, cur);
+      }
+      return m;
+    },
+  });
+
   const { todayBoard, otherBoard, counts } = useMemo(() => {
     const blank = () => ({ dirty: [] as Card[], in_progress: [] as Card[], clean: [] as Card[] });
     const tb = blank();
@@ -143,6 +164,7 @@ export default function OnTheDaily() {
         state,
         eta,
         overran,
+        issue: issueMap.get(t.id) ?? null,
       };
       if (t.scheduled_date === todayStr) {
         // one card per property in the Today band (keep the most "active" state)
@@ -165,7 +187,7 @@ export default function OnTheDaily() {
       other: { dirty: ob.dirty.length, in_progress: ob.in_progress.length, clean: ob.clean.length },
     };
     return { todayBoard: tb, otherBoard: ob, counts };
-  }, [tasks, todayStr, cleanerName]);
+  }, [tasks, todayStr, cleanerName, issueMap]);
 
   const CardBox = ({ c, showDate }: { c: Card; showDate?: boolean }) => (
     <button
@@ -173,7 +195,17 @@ export default function OnTheDaily() {
       className="w-full text-left rounded-lg border border-border/50 bg-card px-3 py-2 hover:border-primary/40 transition-colors"
     >
       <div className="flex items-start justify-between gap-2">
-        <div className="text-sm font-semibold leading-tight truncate" title={c.name}>{c.name}</div>
+        <div className="text-sm font-semibold leading-tight truncate flex items-center gap-1.5" title={c.name}>
+          {c.issue && (
+            <span
+              className={`shrink-0 inline-flex items-center justify-center h-4 min-w-4 px-0.5 rounded text-white ${c.issue.urgent ? "bg-red-600" : "bg-orange-500"}`}
+              title={`${c.issue.count} open issue${c.issue.count === 1 ? "" : "s"}${c.issue.urgent ? " (urgent)" : ""}`}
+            >
+              <Flag className="h-2.5 w-2.5" />
+            </span>
+          )}
+          <span className="truncate">{c.name}</span>
+        </div>
         {c.eta && (
           <span className={`shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
             c.state === "in_progress" || (c.state === "clean" && c.overran)

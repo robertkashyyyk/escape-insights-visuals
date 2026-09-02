@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Loader2, ArrowUpDown, Sunrise } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, AlertTriangle, Loader2, ArrowUpDown, Sunrise, Flag } from "lucide-react";
 import { useMatrixSchedule, type MatrixListing, type MatrixTask } from "@/hooks/useMatrixSchedule";
 import {
   getCleanerColor,
@@ -65,6 +65,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
   const {
     days, groupedListings, listings,
     cleaners, tasks, reservations, reservationGuestMap, holidays, isLoading, autoGenerating,
+    openIssues,
     reassignTask, completeTask, undoComplete, removeTask, markNotRequired, updateNotes, addManualClean,
   } = useMatrixSchedule(weekAnchor);
 
@@ -636,6 +637,7 @@ export function MatrixView({ initialDate, weekAnchor: weekAnchorProp, onWeekAnch
                               isOrphanGap={isOrphan}
                               minStayNights={listing.min_stay_nights ?? 2}
                               guestName={task?.reservation_id ? reservationGuestMap.get(task.reservation_id) : undefined}
+                              issue={task ? openIssues.get(task.id) : undefined}
                               onTaskClick={(id) => setSelectedTaskId(id)}
                               onAddClick={() => setAddCleanCell({ listing, date: d })}
                             />
@@ -744,7 +746,7 @@ function CleanerDropTarget({
 
 /* ── Single matrix cell ── */
 function MatrixCell({
-  date, listing, task, cleaners, isToday, isPast, dimmed, isOrphanGap, minStayNights, guestName, onTaskClick, onAddClick,
+  date, listing, task, cleaners, isToday, isPast, dimmed, isOrphanGap, minStayNights, guestName, issue, onTaskClick, onAddClick,
 }: {
   date: Date;
   listing: MatrixListing;
@@ -756,6 +758,7 @@ function MatrixCell({
   isOrphanGap?: boolean;
   minStayNights?: number;
   guestName?: string;
+  issue?: { count: number; urgent: boolean };
   onTaskClick: (id: string) => void;
   onAddClick: () => void;
 }) {
@@ -818,7 +821,7 @@ function MatrixCell({
   const orphanTip = orphanGapTooltip(minStayNights ?? 2);
   const cell = (
     <div className={`relative ${baseBorder} ${todayTint} ${pastClass} ${dimClass} p-1`}>
-      <DraggableCellInner task={task} cleaners={cleaners} guestName={guestName} onClick={() => onTaskClick(task.id)} />
+      <DraggableCellInner task={task} cleaners={cleaners} guestName={guestName} issue={issue} onClick={() => onTaskClick(task.id)} />
       {isOrphanGap && (
         <TooltipProvider delayDuration={150}>
           <Tooltip>
@@ -857,11 +860,12 @@ function MatrixCell({
 }
 
 function DraggableCellInner({
-  task, cleaners, guestName, onClick,
+  task, cleaners, guestName, issue, onClick,
 }: {
   task: MatrixTask;
   cleaners: { id: string; name: string; color?: string | null }[];
   guestName?: string;
+  issue?: { count: number; urgent: boolean };
   onClick: () => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id });
@@ -940,6 +944,16 @@ function DraggableCellInner({
           )}
         </div>
         <div className="absolute top-0.5 right-0.5 flex items-center gap-1">
+          {issue && issue.count > 0 && (
+            <span
+              className={`flex items-center justify-center h-4 min-w-4 px-0.5 rounded text-white border border-white/60 ${
+                issue.urgent ? "bg-red-600" : "bg-orange-500"
+              }`}
+              title={`${issue.count} open issue${issue.count === 1 ? "" : "s"} flagged on this clean${issue.urgent ? " (urgent)" : ""}`}
+            >
+              <Flag className="h-2.5 w-2.5" />
+            </span>
+          )}
           {isP0 && (
             <span
               className="flex items-center justify-center h-4 w-4 rounded bg-amber-500 text-black border border-white/60"
