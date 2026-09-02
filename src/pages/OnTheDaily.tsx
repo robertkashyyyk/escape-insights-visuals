@@ -19,7 +19,18 @@ interface Card {
   date: string;             // scheduled_date
   state: Col;
   eta: string | null;       // expected ready time / duration hint
+  overran: boolean;         // completed later than expected (Clean column)
 }
+
+// local "HH:MM" from an ISO timestamp
+const clockOf = (iso: string): string => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
+const minsOf = (hhmm: string): number | null => {
+  const m = hhmm.match(/^(\d{1,2}):(\d{2})/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
 
 // "HH:MM" + minutes → "HH:MM"
 const hhmmPlus = (hhmm: string, addMin: number): string | null => {
@@ -80,7 +91,7 @@ export default function OnTheDaily() {
     queryKey: ["daily-tasks", startStr, endStr],
     queryFn: async () => fetchAllRows<any>(() =>
       supabase.from("clean_tasks")
-        .select("id, scheduled_date, status, started_at, estimated_start_time, cleaning_duration_minutes, assigned_cleaner_id, checkout_time, listing_id, listings!clean_tasks_listing_id_fkey(name, internal_name, location_group, is_bundle)")
+        .select("id, scheduled_date, status, started_at, completed_at, estimated_start_time, cleaning_duration_minutes, assigned_cleaner_id, checkout_time, listing_id, listings!clean_tasks_listing_id_fkey(name, internal_name, location_group, is_bundle)")
         .gte("scheduled_date", startStr).lte("scheduled_date", endStr)
         .not("status", "in", "(cancelled,canceled)")),
   });
@@ -98,11 +109,29 @@ export default function OnTheDaily() {
       // Expected ready time: in-progress = start + duration; today's dirty = estimated
       // start + duration (or just the duration if we don't have a start estimate).
       let eta: string | null = null;
+      let overran = false;
       if (state === "in_progress" && t.started_at && dur) {
         eta = `ready ~${finishFromStarted(t.started_at, dur)}`;
       } else if (state === "dirty" && isTodayRow && dur) {
         const finish = t.estimated_start_time ? hhmmPlus(t.estimated_start_time, dur) : null;
         eta = finish ? `ready ~${finish}` : `~${dur}m`;
+      } else if (state === "clean") {
+        // Expected finish (planned start + duration, else actual start + duration) vs
+        // actual finish (completed_at).
+        const expected = dur
+          ? (t.estimated_start_time ? hhmmPlus(t.estimated_start_time, dur)
+            : t.started_at ? finishFromStarted(t.started_at, dur) : null)
+          : null;
+        const actual = t.completed_at ? clockOf(t.completed_at) : null;
+        if (expected && actual) {
+          eta = `exp ~${expected} · done ${actual}`;
+          const em = minsOf(expected), am = minsOf(actual);
+          overran = em != null && am != null && am > em;
+        } else if (actual) {
+          eta = `done ${actual}`;
+        } else if (expected) {
+          eta = `exp ~${expected}`;
+        }
       }
       const card: Card = {
         id: t.id,
@@ -113,6 +142,7 @@ export default function OnTheDaily() {
         date: t.scheduled_date,
         state,
         eta,
+        overran,
       };
       if (t.scheduled_date === todayStr) {
         // one card per property in the Today band (keep the most "active" state)
@@ -146,7 +176,11 @@ export default function OnTheDaily() {
         <div className="text-sm font-semibold leading-tight truncate" title={c.name}>{c.name}</div>
         {c.eta && (
           <span className={`shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
-            c.state === "in_progress" ? "bg-amber-500/15 text-amber-700 dark:text-amber-300" : "bg-secondary text-muted-foreground"
+            c.state === "in_progress" || (c.state === "clean" && c.overran)
+              ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+              : c.state === "clean"
+              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+              : "bg-secondary text-muted-foreground"
           }`}>
             <Clock className="h-3 w-3" />{c.eta}
           </span>
