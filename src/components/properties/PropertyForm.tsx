@@ -18,6 +18,7 @@ import { PropertyEquipmentEditor } from "@/components/properties/PropertyEquipme
 import { PropertyLifecycleSection } from "@/components/properties/PropertyLifecycleSection";
 import { displayName } from "@/lib/listingName";
 import { PROPERTY_TYPES } from "@/lib/propertyTypes";
+import { propagateCleaningDuration } from "@/lib/propagateCleanDuration";
 
 interface PropertyFormProps {
   open: boolean;
@@ -199,6 +200,9 @@ export function PropertyForm({ open, onOpenChange, listing, onSuccess }: Propert
     if (error) {
       toast({ title: "Error saving property", description: error.message, variant: "destructive" });
     } else {
+      if (isEdit && payload.cleaning_duration_minutes != null) {
+        await propagateCleaningDuration(listing!.id, payload.cleaning_duration_minutes);
+      }
       toast({ title: isEdit ? "Property updated" : "Property added" });
       onOpenChange(false);
       onSuccess();

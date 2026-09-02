@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Bed, Bath, Users, MapPin, PoundSterling, Brush, Building2, Wrench, Key, ClipboardList, Clock, SprayCan, ChefHat, BedDouble, Layers, Boxes } from "lucide-react";
 import { displayName, brandedName } from "@/lib/listingName";
+import { propagateCleaningDuration } from "@/lib/propagateCleanDuration";
 import { useCommunalGroups } from "@/hooks/useCommunalGroups";
 
 const DURATION_OPTIONS = [60, 90, 120, 150, 180];
@@ -208,6 +209,7 @@ export default function PropertyDetail() {
                       if (v === "custom") return;
                       const mins = parseInt(v);
                       await (supabase.from("listings") as any).update({ cleaning_duration_minutes: mins }).eq("id", listing.id);
+                      await propagateCleaningDuration(listing.id, mins);
                       queryClient.invalidateQueries({ queryKey: ["listing", id] });
                       toast({ title: `Cleaning duration set to ${mins} min` });
                     }}
@@ -231,6 +233,7 @@ export default function PropertyDetail() {
                         onBlur={async (e) => {
                           const mins = parseInt(e.target.value) || 90;
                           await (supabase.from("listings") as any).update({ cleaning_duration_minutes: mins }).eq("id", listing.id);
+                          await propagateCleaningDuration(listing.id, mins);
                           queryClient.invalidateQueries({ queryKey: ["listing", id] });
                           toast({ title: `Cleaning duration set to ${mins} min` });
                         }}

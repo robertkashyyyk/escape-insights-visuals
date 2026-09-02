@@ -184,7 +184,7 @@ export default function CleanerPortal() {
         travel_time_from_previous_minutes, is_same_day_turnaround, priority_level,
         checkout_time, checkin_time, cleaning_duration_minutes, notes,
         listing_id, reservation_id, started_at,
-        listings!clean_tasks_listing_id_fkey (name, internal_name, location_group, bedrooms, latitude, longitude)
+        listings!clean_tasks_listing_id_fkey (name, internal_name, location_group, bedrooms, latitude, longitude, cleaning_duration_minutes)
       `)
       .eq("assigned_cleaner_id", cleanerId)
       .gte("scheduled_date", todayStr)
@@ -219,7 +219,9 @@ export default function CleanerPortal() {
       priority_level: t.priority_level ?? null,
       checkout_time: t.checkout_time,
       checkin_time: t.checkin_time,
-      cleaning_duration_minutes: t.cleaning_duration_minutes,
+      // Prefer the property's CURRENT clean time (live), falling back to the value
+      // snapshotted onto the job — so an owner's edit shows through without a re-gen.
+      cleaning_duration_minutes: t.listings?.cleaning_duration_minutes ?? t.cleaning_duration_minutes,
       listing_id: t.listing_id,
       reservation_id: t.reservation_id ?? null,
       property_name: displayName(t.listings) || "Unknown",
@@ -275,7 +277,7 @@ export default function CleanerPortal() {
         travel_time_from_previous_minutes, is_same_day_turnaround, priority_level,
         checkout_time, checkin_time, cleaning_duration_minutes, notes,
         listing_id, reservation_id, started_at, created_at,
-        listings!clean_tasks_listing_id_fkey (name, internal_name, location_group, bedrooms, latitude, longitude)
+        listings!clean_tasks_listing_id_fkey (name, internal_name, location_group, bedrooms, latitude, longitude, cleaning_duration_minutes)
       `)
       .eq("assigned_cleaner_id", cleaner.id)
       .gte("scheduled_date", todayStr)

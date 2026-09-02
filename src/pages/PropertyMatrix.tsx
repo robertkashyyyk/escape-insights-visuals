@@ -12,6 +12,7 @@ import { useLocationGroups } from "@/hooks/useLocationGroups";
 import { PropertyBedsEditor } from "@/components/properties/PropertyBedsEditor";
 import { displayName } from "@/lib/listingName";
 import { PROPERTY_TYPES } from "@/lib/propertyTypes";
+import { propagateCleaningDuration } from "@/lib/propagateCleanDuration";
 import { Search, Save, BedDouble, Loader2, LayoutGrid } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -179,7 +180,10 @@ export default function PropertyMatrix() {
     for (const [id, patch] of Object.entries(edits)) {
       if (!Object.keys(patch).length) continue;
       const { error } = await (supabase.from("listings") as any).update(patch).eq("id", id);
-      if (error) fail++; else ok++;
+      if (error) { fail++; } else {
+        ok++;
+        if (patch.cleaning_duration_minutes != null) await propagateCleaningDuration(id, patch.cleaning_duration_minutes as number);
+      }
     }
     setSaving(false);
     if (fail) toast({ title: "Some rows failed", description: `${ok} saved · ${fail} failed`, variant: "destructive" });
