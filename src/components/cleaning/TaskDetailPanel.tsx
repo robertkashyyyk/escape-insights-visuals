@@ -6,11 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { CheckCircle2, Clock, Trash2, Save, Undo2, X, Loader2, Check, Ban } from "lucide-react";
+import { CheckCircle2, Clock, Trash2, Save, Undo2, X, Loader2, Check, Ban, PackageCheck } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { getCleanerColor } from "@/lib/cleanerColors";
 import type { MatrixCleaner, MatrixListing, MatrixReservation, MatrixTask, CleanerHolidayRow } from "@/hooks/useMatrixSchedule";
 import { getUnavailabilityReason } from "@/lib/cleanerAvailability";
+import { supabase } from "@/integrations/supabase/client";
+import { parseCustomFields } from "@/lib/customFields";
+import { RequestIcon } from "@/lib/requestIcon";
 
 interface Props {
   open: boolean;
@@ -61,6 +64,37 @@ export function TaskDetailPanel({
     setConfirmComplete(false);
     setSavedFlash(false);
   }, [task?.id, task?.notes]);
+
+  // Requests (travel cot, high chair, …) for the guest ARRIVING after this clean —
+  // a manager-side double-check that a request is in and flagged on the right turnover.
+  const [requests, setRequests] = useState<{ name: string; icon: string | null; quantity: number }[]>([]);
+  useEffect(() => {
+    if (!open || !task) { setRequests([]); return; }
+    const arrival = reservations
+      .filter(r => r.listing_id === task.listing_id && r.check_in >= task.scheduled_date && r.id !== task.reservation_id)
+      .sort((a, b) => a.check_in.localeCompare(b.check_in))[0];
+    if (!arrival) { setRequests([]); return; }
+    let cancelled = false;
+    (async () => {
+      const [reqRes, cfRes] = await Promise.all([
+        supabase.from("booking_requests").select("quantity, requests(name, icon)").eq("reservation_id", arrival.id),
+        supabase.from("reservations").select("custom_fields").eq("id", arrival.id).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      const list: { name: string; icon: string | null; quantity: number }[] = [];
+      for (const row of (reqRes.data ?? []) as any[]) {
+        list.push({ name: (row.requests as any)?.name ?? "Request", icon: (row.requests as any)?.icon ?? null, quantity: row.quantity ?? 1 });
+      }
+      const parsed = parseCustomFields((cfRes.data as any)?.custom_fields);
+      for (const q of parsed.requests) {
+        if (!list.some(x => x.name.toLowerCase() === q.label.toLowerCase())) {
+          list.push({ name: q.label, icon: null, quantity: /^\d+$/.test(q.value) ? Number(q.value) : 1 });
+        }
+      }
+      setRequests(list);
+    })();
+    return () => { cancelled = true; };
+  }, [open, task?.id, reservations]);
 
   if (!task || !listing) return null;
 
@@ -233,6 +267,28 @@ export function TaskDetailPanel({
                 </Badge>
               )}
             </div>
+
+            {/* Guest requests for the ARRIVING guest — must be left in the property
+                on this clean, before they check in. */}
+            {requests.length > 0 && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-amber-600 dark:text-amber-300 font-semibold mb-2">
+                  <PackageCheck className="h-3.5 w-3.5" /> Leave for arriving guest
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {requests.map((r, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
+                      title={`${r.name} × ${r.quantity}`}
+                    >
+                      <RequestIcon icon={r.icon} className="h-3 w-3" />
+                      {r.name}{r.quantity > 1 ? ` ×${r.quantity}` : ""}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Reservation info */}
             {checkoutRes && (
