@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.4"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -134,6 +134,121 @@ export type Database = {
         }
         Relationships: []
       }
+      bank_statement_imports: {
+        Row: {
+          bank: string
+          created_at: string
+          file_name: string | null
+          id: string
+          period_end: string | null
+          period_start: string | null
+          row_count: number
+          status: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          bank?: string
+          created_at?: string
+          file_name?: string | null
+          id?: string
+          period_end?: string | null
+          period_start?: string | null
+          row_count?: number
+          status?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          bank?: string
+          created_at?: string
+          file_name?: string | null
+          id?: string
+          period_end?: string | null
+          period_start?: string | null
+          row_count?: number
+          status?: string
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
+      bank_statement_txns: {
+        Row: {
+          amount: number
+          bill_id: string | null
+          classification: string
+          created_at: string
+          description: string | null
+          details_type: string | null
+          direction: string | null
+          external_id: string | null
+          id: string
+          import_id: string | null
+          matched_owner_id: string | null
+          payee_name: string | null
+          payer_name: string | null
+          reference: string | null
+          status: string
+          txn_date: string | null
+        }
+        Insert: {
+          amount: number
+          bill_id?: string | null
+          classification?: string
+          created_at?: string
+          description?: string | null
+          details_type?: string | null
+          direction?: string | null
+          external_id?: string | null
+          id?: string
+          import_id?: string | null
+          matched_owner_id?: string | null
+          payee_name?: string | null
+          payer_name?: string | null
+          reference?: string | null
+          status?: string
+          txn_date?: string | null
+        }
+        Update: {
+          amount?: number
+          bill_id?: string | null
+          classification?: string
+          created_at?: string
+          description?: string | null
+          details_type?: string | null
+          direction?: string | null
+          external_id?: string | null
+          id?: string
+          import_id?: string | null
+          matched_owner_id?: string | null
+          payee_name?: string | null
+          payer_name?: string | null
+          reference?: string | null
+          status?: string
+          txn_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_statement_txns_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills_on_behalf"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_statement_txns_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "bank_statement_imports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_statement_txns_matched_owner_id_fkey"
+            columns: ["matched_owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bed_types: {
         Row: {
           active: boolean
@@ -163,6 +278,201 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      bill_allocations: {
+        Row: {
+          amount: number
+          bill_id: string
+          created_at: string
+          id: string
+          listing_id: string
+          ratio_pct: number | null
+        }
+        Insert: {
+          amount: number
+          bill_id: string
+          created_at?: string
+          id?: string
+          listing_id: string
+          ratio_pct?: number | null
+        }
+        Update: {
+          amount?: number
+          bill_id?: string
+          created_at?: string
+          id?: string
+          listing_id?: string
+          ratio_pct?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_allocations_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "bills_on_behalf"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_allocations_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bill_payee_rules: {
+        Row: {
+          action: string
+          cost_line_type_id: string | null
+          created_at: string
+          created_by: string | null
+          default_description: string | null
+          hit_count: number
+          id: string
+          payee_key: string
+          sample_payee: string | null
+          target_communal_group_id: string | null
+          target_listing_id: string | null
+          target_region: string | null
+          target_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          action: string
+          cost_line_type_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_description?: string | null
+          hit_count?: number
+          id?: string
+          payee_key: string
+          sample_payee?: string | null
+          target_communal_group_id?: string | null
+          target_listing_id?: string | null
+          target_region?: string | null
+          target_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action?: string
+          cost_line_type_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_description?: string | null
+          hit_count?: number
+          id?: string
+          payee_key?: string
+          sample_payee?: string | null
+          target_communal_group_id?: string | null
+          target_listing_id?: string | null
+          target_region?: string | null
+          target_type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bill_payee_rules_cost_line_type_id_fkey"
+            columns: ["cost_line_type_id"]
+            isOneToOne: false
+            referencedRelation: "cost_line_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_payee_rules_target_communal_group_id_fkey"
+            columns: ["target_communal_group_id"]
+            isOneToOne: false
+            referencedRelation: "communal_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bill_payee_rules_target_listing_id_fkey"
+            columns: ["target_listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bills_on_behalf: {
+        Row: {
+          amount: number
+          bill_date: string
+          cost_line_type_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          import_id: string | null
+          payee_name: string | null
+          receipt_url: string | null
+          target_communal_group_id: string | null
+          target_region: string | null
+          target_type: string
+          txn_id: string | null
+        }
+        Insert: {
+          amount: number
+          bill_date: string
+          cost_line_type_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          import_id?: string | null
+          payee_name?: string | null
+          receipt_url?: string | null
+          target_communal_group_id?: string | null
+          target_region?: string | null
+          target_type: string
+          txn_id?: string | null
+        }
+        Update: {
+          amount?: number
+          bill_date?: string
+          cost_line_type_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          import_id?: string | null
+          payee_name?: string | null
+          receipt_url?: string | null
+          target_communal_group_id?: string | null
+          target_region?: string | null
+          target_type?: string
+          txn_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bills_on_behalf_cost_line_type_id_fkey"
+            columns: ["cost_line_type_id"]
+            isOneToOne: false
+            referencedRelation: "cost_line_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_on_behalf_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "bank_statement_imports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_on_behalf_target_communal_group_id_fkey"
+            columns: ["target_communal_group_id"]
+            isOneToOne: false
+            referencedRelation: "communal_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bills_on_behalf_txn_id_fkey"
+            columns: ["txn_id"]
+            isOneToOne: false
+            referencedRelation: "bank_statement_txns"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       booking_requests: {
         Row: {
@@ -202,6 +512,74 @@ export type Database = {
             columns: ["reservation_id"]
             isOneToOne: false
             referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clean_checklist_items: {
+        Row: {
+          category: string
+          check_all: boolean
+          checked: boolean
+          checked_at: string | null
+          checked_by: string | null
+          checked_by_member: string | null
+          clean_task_id: string
+          created_at: string
+          flagged: boolean
+          id: string
+          label: string
+          photo_url: string | null
+          ref_id: string | null
+          requires_photo: boolean
+          room_index: number | null
+          room_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          check_all?: boolean
+          checked?: boolean
+          checked_at?: string | null
+          checked_by?: string | null
+          checked_by_member?: string | null
+          clean_task_id: string
+          created_at?: string
+          flagged?: boolean
+          id?: string
+          label: string
+          photo_url?: string | null
+          ref_id?: string | null
+          requires_photo?: boolean
+          room_index?: number | null
+          room_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          check_all?: boolean
+          checked?: boolean
+          checked_at?: string | null
+          checked_by?: string | null
+          checked_by_member?: string | null
+          clean_task_id?: string
+          created_at?: string
+          flagged?: boolean
+          id?: string
+          label?: string
+          photo_url?: string | null
+          ref_id?: string | null
+          requires_photo?: boolean
+          room_index?: number | null
+          room_type?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clean_checklist_items_clean_task_id_fkey"
+            columns: ["clean_task_id"]
+            isOneToOne: false
+            referencedRelation: "clean_tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -355,11 +733,13 @@ export type Database = {
           checkout_time: string | null
           cleaning_duration_minutes: number
           completed_at: string | null
+          completed_by_member: string | null
           created_at: string
           estimated_start_time: string | null
           id: string
           is_same_day_turnaround: boolean | null
           listing_id: string
+          not_required: boolean
           notes: string | null
           overloaded: boolean
           override_assignment: boolean
@@ -370,6 +750,7 @@ export type Database = {
           scheduled_date: string
           source: string
           started_at: string | null
+          started_by_member: string | null
           status: string
           task_type: string
           travel_time_from_previous_minutes: number | null
@@ -382,11 +763,13 @@ export type Database = {
           checkout_time?: string | null
           cleaning_duration_minutes?: number
           completed_at?: string | null
+          completed_by_member?: string | null
           created_at?: string
           estimated_start_time?: string | null
           id?: string
           is_same_day_turnaround?: boolean | null
           listing_id: string
+          not_required?: boolean
           notes?: string | null
           overloaded?: boolean
           override_assignment?: boolean
@@ -397,6 +780,7 @@ export type Database = {
           scheduled_date: string
           source?: string
           started_at?: string | null
+          started_by_member?: string | null
           status?: string
           task_type?: string
           travel_time_from_previous_minutes?: number | null
@@ -409,11 +793,13 @@ export type Database = {
           checkout_time?: string | null
           cleaning_duration_minutes?: number
           completed_at?: string | null
+          completed_by_member?: string | null
           created_at?: string
           estimated_start_time?: string | null
           id?: string
           is_same_day_turnaround?: boolean | null
           listing_id?: string
+          not_required?: boolean
           notes?: string | null
           overloaded?: boolean
           override_assignment?: boolean
@@ -424,6 +810,7 @@ export type Database = {
           scheduled_date?: string
           source?: string
           started_at?: string | null
+          started_by_member?: string | null
           status?: string
           task_type?: string
           travel_time_from_previous_minutes?: number | null
@@ -498,6 +885,70 @@ export type Database = {
           },
         ]
       }
+      cleaner_members: {
+        Row: {
+          active: boolean
+          cleaner_id: string
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          active?: boolean
+          cleaner_id: string
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          active?: boolean
+          cleaner_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cleaner_members_cleaner_id_fkey"
+            columns: ["cleaner_id"]
+            isOneToOne: false
+            referencedRelation: "cleaners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cleaner_working_exceptions: {
+        Row: {
+          cleaner_id: string
+          created_at: string
+          id: string
+          work_date: string
+        }
+        Insert: {
+          cleaner_id: string
+          created_at?: string
+          id?: string
+          work_date: string
+        }
+        Update: {
+          cleaner_id?: string
+          created_at?: string
+          id?: string
+          work_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cleaner_working_exceptions_cleaner_id_fkey"
+            columns: ["cleaner_id"]
+            isOneToOne: false
+            referencedRelation: "cleaners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cleaners: {
         Row: {
           active: boolean
@@ -509,6 +960,7 @@ export type Database = {
           home_longitude: number | null
           home_postcode: string | null
           id: string
+          is_team: boolean
           location_groups: string[] | null
           name: string
           non_working_days: string[] | null
@@ -531,6 +983,7 @@ export type Database = {
           home_longitude?: number | null
           home_postcode?: string | null
           id?: string
+          is_team?: boolean
           location_groups?: string[] | null
           name: string
           non_working_days?: string[] | null
@@ -553,6 +1006,7 @@ export type Database = {
           home_longitude?: number | null
           home_postcode?: string | null
           id?: string
+          is_team?: boolean
           location_groups?: string[] | null
           name?: string
           non_working_days?: string[] | null
@@ -699,6 +1153,77 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      consumables: {
+        Row: {
+          active: boolean
+          created_at: string
+          display_order: number
+          id: string
+          listing_id: string | null
+          name: string
+          room_type: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          display_order?: number
+          id?: string
+          listing_id?: string | null
+          name: string
+          room_type: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          display_order?: number
+          id?: string
+          listing_id?: string | null
+          name?: string
+          room_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consumables_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cost_line_types: {
+        Row: {
+          code: string
+          default_target_pct: number | null
+          display_name: string
+          id: string
+          is_settlement_cost: boolean
+          sort_order: number
+          source_category: Database["public"]["Enums"]["report_source_category"]
+        }
+        Insert: {
+          code: string
+          default_target_pct?: number | null
+          display_name: string
+          id?: string
+          is_settlement_cost?: boolean
+          sort_order?: number
+          source_category: Database["public"]["Enums"]["report_source_category"]
+        }
+        Update: {
+          code?: string
+          default_target_pct?: number | null
+          display_name?: string
+          id?: string
+          is_settlement_cost?: boolean
+          sort_order?: number
+          source_category?: Database["public"]["Enums"]["report_source_category"]
+        }
+        Relationships: []
       }
       expense_consumables: {
         Row: {
@@ -963,6 +1488,64 @@ export type Database = {
         }
         Relationships: []
       }
+      line_adjustments: {
+        Row: {
+          adjusted_by: string | null
+          amount: number
+          cost_line_type_id: string | null
+          created_at: string
+          id: string
+          listing_id: string | null
+          reason: string
+          report_period_id: string
+          target: Database["public"]["Enums"]["adjustment_target"]
+        }
+        Insert: {
+          adjusted_by?: string | null
+          amount: number
+          cost_line_type_id?: string | null
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          reason: string
+          report_period_id: string
+          target: Database["public"]["Enums"]["adjustment_target"]
+        }
+        Update: {
+          adjusted_by?: string | null
+          amount?: number
+          cost_line_type_id?: string | null
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          reason?: string
+          report_period_id?: string
+          target?: Database["public"]["Enums"]["adjustment_target"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "line_adjustments_cost_line_type_id_fkey"
+            columns: ["cost_line_type_id"]
+            isOneToOne: false
+            referencedRelation: "cost_line_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "line_adjustments_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "line_adjustments_report_period_id_fkey"
+            columns: ["report_period_id"]
+            isOneToOne: false
+            referencedRelation: "report_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_aliases: {
         Row: {
           created_at: string
@@ -1003,6 +1586,7 @@ export type Database = {
           access_details: string | null
           address: string | null
           amenities: Json
+          archived_at: string | null
           base_rate: number | null
           bathrooms: number | null
           bedrooms: number | null
@@ -1023,12 +1607,17 @@ export type Database = {
           hostaway_listing_id: number | null
           id: string
           image_url: string | null
+          internal_name: string | null
+          is_archived: boolean
           is_bundle: boolean
           is_clean: boolean
           is_communal: boolean
+          is_suspended: boolean
+          kitchens: number
           latitude: number | null
           location_group: string | null
           longitude: number | null
+          management_flat_fee: number | null
           management_rate_override: number | null
           max_guests: number | null
           min_rate: number | null
@@ -1052,6 +1641,7 @@ export type Database = {
           access_details?: string | null
           address?: string | null
           amenities?: Json
+          archived_at?: string | null
           base_rate?: number | null
           bathrooms?: number | null
           bedrooms?: number | null
@@ -1072,12 +1662,17 @@ export type Database = {
           hostaway_listing_id?: number | null
           id?: string
           image_url?: string | null
+          internal_name?: string | null
+          is_archived?: boolean
           is_bundle?: boolean
           is_clean?: boolean
           is_communal?: boolean
+          is_suspended?: boolean
+          kitchens?: number
           latitude?: number | null
           location_group?: string | null
           longitude?: number | null
+          management_flat_fee?: number | null
           management_rate_override?: number | null
           max_guests?: number | null
           min_rate?: number | null
@@ -1101,6 +1696,7 @@ export type Database = {
           access_details?: string | null
           address?: string | null
           amenities?: Json
+          archived_at?: string | null
           base_rate?: number | null
           bathrooms?: number | null
           bedrooms?: number | null
@@ -1121,12 +1717,17 @@ export type Database = {
           hostaway_listing_id?: number | null
           id?: string
           image_url?: string | null
+          internal_name?: string | null
+          is_archived?: boolean
           is_bundle?: boolean
           is_clean?: boolean
           is_communal?: boolean
+          is_suspended?: boolean
+          kitchens?: number
           latitude?: number | null
           location_group?: string | null
           longitude?: number | null
+          management_flat_fee?: number | null
           management_rate_override?: number | null
           max_guests?: number | null
           min_rate?: number | null
@@ -1445,6 +2046,7 @@ export type Database = {
           confirmation_code: string | null
           created_at: string
           currency: string
+          external_txn_id: string | null
           gross_amount: number | null
           guest_name: string | null
           id: string
@@ -1479,6 +2081,7 @@ export type Database = {
           confirmation_code?: string | null
           created_at?: string
           currency?: string
+          external_txn_id?: string | null
           gross_amount?: number | null
           guest_name?: string | null
           id?: string
@@ -1513,6 +2116,7 @@ export type Database = {
           confirmation_code?: string | null
           created_at?: string
           currency?: string
+          external_txn_id?: string | null
           gross_amount?: number | null
           guest_name?: string | null
           id?: string
@@ -1554,6 +2158,47 @@ export type Database = {
             columns: ["resolved_listing_id"]
             isOneToOne: false
             referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      owner_notification_prefs: {
+        Row: {
+          created_at: string
+          last_monthly_sent: string | null
+          last_weekly_sent: string | null
+          notify_bookings: boolean
+          notify_orin: boolean
+          orin_frequency: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          last_monthly_sent?: string | null
+          last_weekly_sent?: string | null
+          notify_bookings?: boolean
+          notify_orin?: boolean
+          orin_frequency?: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          last_monthly_sent?: string | null
+          last_weekly_sent?: string | null
+          notify_bookings?: boolean
+          notify_orin?: boolean
+          orin_frequency?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_notification_prefs_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: true
+            referencedRelation: "property_owners"
             referencedColumns: ["id"]
           },
         ]
@@ -1734,6 +2379,45 @@ export type Database = {
           },
         ]
       }
+      property_booking_sources: {
+        Row: {
+          amount: number
+          channel: Database["public"]["Enums"]["report_booking_channel"]
+          id: string
+          listing_id: string
+          report_period_id: string
+        }
+        Insert: {
+          amount?: number
+          channel: Database["public"]["Enums"]["report_booking_channel"]
+          id?: string
+          listing_id: string
+          report_period_id: string
+        }
+        Update: {
+          amount?: number
+          channel?: Database["public"]["Enums"]["report_booking_channel"]
+          id?: string
+          listing_id?: string
+          report_period_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_booking_sources_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_booking_sources_report_period_id_fkey"
+            columns: ["report_period_id"]
+            isOneToOne: false
+            referencedRelation: "report_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_contacts: {
         Row: {
           created_at: string
@@ -1775,6 +2459,106 @@ export type Database = {
           },
         ]
       }
+      property_cost_benchmarks: {
+        Row: {
+          cost_line_type_id: string
+          created_at: string
+          effective_from: string
+          id: string
+          listing_id: string
+          target_pct: number
+        }
+        Insert: {
+          cost_line_type_id: string
+          created_at?: string
+          effective_from: string
+          id?: string
+          listing_id: string
+          target_pct: number
+        }
+        Update: {
+          cost_line_type_id?: string
+          created_at?: string
+          effective_from?: string
+          id?: string
+          listing_id?: string
+          target_pct?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_cost_benchmarks_cost_line_type_id_fkey"
+            columns: ["cost_line_type_id"]
+            isOneToOne: false
+            referencedRelation: "cost_line_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_cost_benchmarks_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_costs: {
+        Row: {
+          actual_amount: number
+          cost_line_type_id: string
+          created_at: string
+          id: string
+          listing_id: string
+          report_period_id: string
+          source: Database["public"]["Enums"]["report_source_category"]
+          source_ref: string | null
+          updated_at: string
+        }
+        Insert: {
+          actual_amount?: number
+          cost_line_type_id: string
+          created_at?: string
+          id?: string
+          listing_id: string
+          report_period_id: string
+          source?: Database["public"]["Enums"]["report_source_category"]
+          source_ref?: string | null
+          updated_at?: string
+        }
+        Update: {
+          actual_amount?: number
+          cost_line_type_id?: string
+          created_at?: string
+          id?: string
+          listing_id?: string
+          report_period_id?: string
+          source?: Database["public"]["Enums"]["report_source_category"]
+          source_ref?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_costs_cost_line_type_id_fkey"
+            columns: ["cost_line_type_id"]
+            isOneToOne: false
+            referencedRelation: "cost_line_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_costs_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_costs_report_period_id_fkey"
+            columns: ["report_period_id"]
+            isOneToOne: false
+            referencedRelation: "report_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_documents: {
         Row: {
           created_at: string
@@ -1809,6 +2593,41 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "property_documents_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_equipment: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          listing_id: string
+          name: string
+          requires_photo: boolean
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          listing_id: string
+          name: string
+          requires_photo?: boolean
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          listing_id?: string
+          name?: string
+          requires_photo?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_equipment_listing_id_fkey"
             columns: ["listing_id"]
             isOneToOne: false
             referencedRelation: "listings"
@@ -2124,42 +2943,172 @@ export type Database = {
           company: string | null
           created_at: string
           email: string | null
+          flat_portfolio_fee: number | null
           id: string
+          management_fee_method: Database["public"]["Enums"]["management_fee_method"]
           management_rate_pct: number | null
           name: string
           notes: string | null
+          opening_balance: number
           phone: string | null
+          revenue_recognition: Database["public"]["Enums"]["revenue_recognition"]
+          settlement_method: Database["public"]["Enums"]["settlement_method"]
           updated_at: string
           user_id: string | null
           vat_inclusive: boolean
+          weekly_rr_amount: number | null
         }
         Insert: {
           company?: string | null
           created_at?: string
           email?: string | null
+          flat_portfolio_fee?: number | null
           id?: string
+          management_fee_method?: Database["public"]["Enums"]["management_fee_method"]
           management_rate_pct?: number | null
           name: string
           notes?: string | null
+          opening_balance?: number
           phone?: string | null
+          revenue_recognition?: Database["public"]["Enums"]["revenue_recognition"]
+          settlement_method?: Database["public"]["Enums"]["settlement_method"]
           updated_at?: string
           user_id?: string | null
           vat_inclusive?: boolean
+          weekly_rr_amount?: number | null
         }
         Update: {
           company?: string | null
           created_at?: string
           email?: string | null
+          flat_portfolio_fee?: number | null
           id?: string
+          management_fee_method?: Database["public"]["Enums"]["management_fee_method"]
           management_rate_pct?: number | null
           name?: string
           notes?: string | null
+          opening_balance?: number
           phone?: string | null
+          revenue_recognition?: Database["public"]["Enums"]["revenue_recognition"]
+          settlement_method?: Database["public"]["Enums"]["settlement_method"]
           updated_at?: string
           user_id?: string | null
           vat_inclusive?: boolean
+          weekly_rr_amount?: number | null
         }
         Relationships: []
+      }
+      property_targets: {
+        Row: {
+          created_at: string
+          effective_from: string
+          id: string
+          listing_id: string
+          target_adr: number | null
+          target_airbnb_max_pct: number | null
+          target_bookingcom_max_pct: number | null
+          target_direct_min_pct: number | null
+          target_length_of_stay: number | null
+          target_occupancy_pct: number | null
+          target_revenue: number | null
+        }
+        Insert: {
+          created_at?: string
+          effective_from: string
+          id?: string
+          listing_id: string
+          target_adr?: number | null
+          target_airbnb_max_pct?: number | null
+          target_bookingcom_max_pct?: number | null
+          target_direct_min_pct?: number | null
+          target_length_of_stay?: number | null
+          target_occupancy_pct?: number | null
+          target_revenue?: number | null
+        }
+        Update: {
+          created_at?: string
+          effective_from?: string
+          id?: string
+          listing_id?: string
+          target_adr?: number | null
+          target_airbnb_max_pct?: number | null
+          target_bookingcom_max_pct?: number | null
+          target_direct_min_pct?: number | null
+          target_length_of_stay?: number | null
+          target_occupancy_pct?: number | null
+          target_revenue?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_targets_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_periods: {
+        Row: {
+          cost_total: number | null
+          created_at: string
+          finalised_at: string | null
+          generated_at: string | null
+          id: string
+          net_settlement_balance: number | null
+          net_total: number | null
+          opening_balance: number
+          owner_id: string
+          period_end: string
+          period_start: string
+          revenue_total: number | null
+          settlement_due: number | null
+          status: Database["public"]["Enums"]["report_status"]
+          weekly_rr_total: number
+        }
+        Insert: {
+          cost_total?: number | null
+          created_at?: string
+          finalised_at?: string | null
+          generated_at?: string | null
+          id?: string
+          net_settlement_balance?: number | null
+          net_total?: number | null
+          opening_balance?: number
+          owner_id: string
+          period_end: string
+          period_start: string
+          revenue_total?: number | null
+          settlement_due?: number | null
+          status?: Database["public"]["Enums"]["report_status"]
+          weekly_rr_total?: number
+        }
+        Update: {
+          cost_total?: number | null
+          created_at?: string
+          finalised_at?: string | null
+          generated_at?: string | null
+          id?: string
+          net_settlement_balance?: number | null
+          net_total?: number | null
+          opening_balance?: number
+          owner_id?: string
+          period_end?: string
+          period_start?: string
+          revenue_total?: number | null
+          settlement_due?: number | null
+          status?: Database["public"]["Enums"]["report_status"]
+          weekly_rr_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_periods_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       requests: {
         Row: {
@@ -2397,6 +3346,27 @@ export type Database = {
           row_count?: number | null
           status?: string
           uploaded_by?: string | null
+        }
+        Relationships: []
+      }
+      user_area_permissions: {
+        Row: {
+          area_key: string
+          level: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          area_key: string
+          level: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          area_key?: string
+          level?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -2725,6 +3695,7 @@ export type Database = {
       }
     }
     Enums: {
+      adjustment_target: "revenue" | "cost_line" | "settlement"
       amenity_category:
         | "grocery"
         | "supermarket"
@@ -2746,12 +3717,22 @@ export type Database = {
         | "tourist_attraction"
         | "accommodation"
         | "other"
-      app_role: "super" | "senior" | "admin" | "client" | "cleaner"
+      app_role:
+        | "super"
+        | "senior"
+        | "admin"
+        | "client"
+        | "cleaner"
+        | "maintenance"
+      management_fee_method:
+        | "percent_per_property"
+        | "flat_per_property"
+        | "flat_per_portfolio"
       ota_attribution_outcome: "management_report" | "company_retention"
       ota_batch_status: "parsed" | "reconciled" | "partial"
       ota_collection_model: "channel" | "host"
       ota_match_method: "code" | "composite" | "manual" | "none"
-      ota_platform: "airbnb" | "bookingcom"
+      ota_platform: "airbnb" | "bookingcom" | "stripe" | "vrbo"
       ota_recon_status:
         | "auto_matched"
         | "needs_recon"
@@ -2759,6 +3740,15 @@ export type Database = {
         | "unmatched"
         | "excluded"
       ota_txn_type: "reservation" | "payout" | "resolution" | "adjustment"
+      report_booking_channel: "bookingcom" | "airbnb" | "direct"
+      report_source_category:
+        | "integration"
+        | "platform_engine"
+        | "derived"
+        | "manual"
+      report_status: "draft" | "finalised"
+      revenue_recognition: "prorate_by_nights" | "whole_in_attributed_month"
+      settlement_method: "pay_on_generation" | "weekly_draw"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2774,12 +3764,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2803,11 +3793,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2828,11 +3818,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2853,11 +3843,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2870,11 +3860,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2886,6 +3876,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      adjustment_target: ["revenue", "cost_line", "settlement"],
       amenity_category: [
         "grocery",
         "supermarket",
@@ -2908,12 +3899,24 @@ export const Constants = {
         "accommodation",
         "other",
       ],
-      app_role: ["super", "senior", "admin", "client", "cleaner"],
+      app_role: [
+        "super",
+        "senior",
+        "admin",
+        "client",
+        "cleaner",
+        "maintenance",
+      ],
+      management_fee_method: [
+        "percent_per_property",
+        "flat_per_property",
+        "flat_per_portfolio",
+      ],
       ota_attribution_outcome: ["management_report", "company_retention"],
       ota_batch_status: ["parsed", "reconciled", "partial"],
       ota_collection_model: ["channel", "host"],
       ota_match_method: ["code", "composite", "manual", "none"],
-      ota_platform: ["airbnb", "bookingcom"],
+      ota_platform: ["airbnb", "bookingcom", "stripe", "vrbo"],
       ota_recon_status: [
         "auto_matched",
         "needs_recon",
@@ -2922,6 +3925,16 @@ export const Constants = {
         "excluded",
       ],
       ota_txn_type: ["reservation", "payout", "resolution", "adjustment"],
+      report_booking_channel: ["bookingcom", "airbnb", "direct"],
+      report_source_category: [
+        "integration",
+        "platform_engine",
+        "derived",
+        "manual",
+      ],
+      report_status: ["draft", "finalised"],
+      revenue_recognition: ["prorate_by_nights", "whole_in_attributed_month"],
+      settlement_method: ["pay_on_generation", "weekly_draw"],
     },
   },
 } as const
