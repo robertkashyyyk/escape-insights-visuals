@@ -37,4 +37,4 @@ static_sites:
       # matching PRIVATE key is an Edge Function secret — it never appears here.
       - key: VITE_VAPID_PUBLIC_KEY
         scope: BUILD_TIME
-        value: BK_a1h7...
+        value: BK_a1hpuEeLQ_KCVAOjvlijt70Zf_Th6dv87_kjvUuf2FvP0V4M108AWmoE2G_06AAB_1P-97waAFWpfEOjCU2w
