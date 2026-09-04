@@ -625,6 +625,38 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
   // Keep the historical name available for downstream code that referenced it.
   const existingSet = existingByReservation;
 
+  // 4c. Re-occupancy guard for cleans already dated today. The carryover guard only
+  // re-checks cleans dated BEFORE targetDate, so a clean that landed on targetDate and
+  // then went stale (a guest has since moved in) was never re-examined. A property
+  // occupied on targetDate by a guest who checked in EARLIER (check_in < targetDate,
+  // check_out > targetDate) cannot be turned over that day — cancel any live auto clean
+  // sitting on it. Same-day arrivals (check_in === targetDate) are a legitimate turnover
+  // and are left alone; manual cleans (e.g. a deliberate mid-stay clean) are preserved.
+  {
+    const { data: occ } = await supabase
+      .from("reservations")
+      .select("listing_id")
+      .eq("status", "confirmed")
+      .lt("check_in", targetDate)
+      .gt("check_out", targetDate);
+    const occupiedListingIds = Array.from(new Set((occ || []).map((r: any) => String(r.listing_id))));
+    if (occupiedListingIds.length > 0) {
+      const { data: candidates } = await supabase
+        .from("clean_tasks")
+        .select("id, listing_id, source")
+        .eq("scheduled_date", targetDate)
+        .in("listing_id", occupiedListingIds)
+        .not("status", "in", "(cancelled,canceled,completed,done)");
+      // Preserve deliberate manual cleans (e.g. a mid-stay clean); cancel the rest.
+      const toCancel = (candidates || []).filter((c: any) => (c.source ?? "") !== "manual");
+      if (toCancel.length > 0) {
+        await supabase.from("clean_tasks").update({ status: "cancelled" }).in("id", toCancel.map((c: any) => c.id));
+        for (const c of toCancel) existingByListing.delete(`${c.listing_id}_${targetDate}`);
+        console.log(`[${targetDate}] Cancelled ${toCancel.length} clean(s) on occupied (re-let) properties.`);
+      }
+    }
+  }
+
   // 5. Get active cleaners (including home location)
   const { data: cleanersRaw } = await supabase
     .from("cleaners")
