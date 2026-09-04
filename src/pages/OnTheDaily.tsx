@@ -150,7 +150,10 @@ export default function OnTheDaily() {
       const res = resByListing.get(l.id) ?? [];
       const cl = cleansByListing.get(l.id) ?? [];
 
-      const occupiedRes = res.find((r) => r.check_in <= todayStr && r.check_out > todayStr) ?? null;
+      // "In residence" = checked in on a PRIOR day (strictly before today). A guest
+      // whose check-in is today is a same-day arrival: the turnover clean still has to
+      // happen first, so the property is Dirty/In Progress until then — not Occupied.
+      const occupiedRes = res.find((r) => r.check_in < todayStr && r.check_out > todayStr) ?? null;
       const checkoutToday = res.find((r) => r.check_out === todayStr) ?? null;
       const lastCheckout = res
         .filter((r) => r.check_out <= todayStr)
