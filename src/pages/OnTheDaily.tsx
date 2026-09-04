@@ -3,58 +3,32 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/fetchAllRows";
 import { displayName } from "@/lib/listingName";
-import { format, addDays, startOfDay, parseISO, isToday } from "date-fns";
+import { format, addDays, startOfDay, parseISO } from "date-fns";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Activity, Loader2, CircleDashed, Timer, CheckCircle2, Clock, Flag } from "lucide-react";
+import { Activity, Loader2, CircleDashed, Timer, CheckCircle2, Clock, Flag, BedDouble } from "lucide-react";
 
-type Col = "dirty" | "in_progress" | "clean";
+// Lifecycle: a guest is in (Occupied) → they leave (Dirty) → clean underway
+// (In Progress) → done & vacant (Clean).
+type Col = "occupied" | "dirty" | "in_progress" | "clean";
 
 interface Card {
-  id: string;
+  id: string;               // listing id — one card per property
   name: string;
   region: string | null;
-  cleaner: string | null;
-  time: string | null;      // checkout time
-  date: string;             // scheduled_date
   state: Col;
-  eta: string | null;       // expected ready time / duration hint
-  overran: boolean;         // completed later than expected (Clean column)
+  cleaner: string | null;
+  time: string | null;      // checkout time (dirty / in progress)
+  sub: string | null;       // occupancy note or clean date
+  eta: string | null;       // expected/actual ready time
+  overran: boolean;
   issue: { count: number; urgent: boolean } | null;
+  navDate: string;          // date to open in the schedule
 }
 
-// local "HH:MM" from an ISO timestamp
-const clockOf = (iso: string): string => {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-};
-const minsOf = (hhmm: string): number | null => {
-  const m = hhmm.match(/^(\d{1,2}):(\d{2})/);
-  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
-};
-
-// "HH:MM" + minutes → "HH:MM"
-const hhmmPlus = (hhmm: string, addMin: number): string | null => {
-  const m = hhmm.match(/^(\d{1,2}):(\d{2})/);
-  if (!m) return null;
-  const total = Number(m[1]) * 60 + Number(m[2]) + addMin;
-  const h = Math.floor((total % 1440) / 60), mi = total % 60;
-  return `${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}`;
-};
-// started_at (ISO) + minutes → local "HH:MM"
-const finishFromStarted = (iso: string, addMin: number): string => {
-  const d = new Date(new Date(iso).getTime() + addMin * 60000);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-};
-
-const stateOf = (t: any): Col => {
-  const s = (t.status || "").toLowerCase();
-  if (s === "completed" || s === "done") return "clean";
-  if (s === "in_progress" || t.started_at) return "in_progress";
-  return "dirty";
-};
-
 const COLS: { key: Col; label: string; icon: any; head: string; cell: string; dot: string }[] = [
+  { key: "occupied", label: "Occupied", icon: BedDouble,
+    head: "text-blue-700 dark:text-blue-300", cell: "bg-blue-500/5 border-blue-500/20", dot: "bg-blue-500" },
   { key: "dirty", label: "Dirty", icon: CircleDashed,
     head: "text-red-700 dark:text-red-300", cell: "bg-red-500/5 border-red-500/20", dot: "bg-red-500" },
   { key: "in_progress", label: "In Progress", icon: Timer,
@@ -68,13 +42,43 @@ const fmtTime = (t: string | null | undefined): string | null => {
   const m = String(t).match(/^(\d{1,2}):(\d{2})/);
   return m ? `${m[1].padStart(2, "0")}:${m[2]}` : null;
 };
+const hhmmPlus = (hhmm: string, addMin: number): string | null => {
+  const m = hhmm.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const total = Number(m[1]) * 60 + Number(m[2]) + addMin;
+  const h = Math.floor((total % 1440) / 60), mi = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}`;
+};
+const finishFromStarted = (iso: string, addMin: number): string => {
+  const d = new Date(new Date(iso).getTime() + addMin * 60000);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
+const clockOf = (iso: string): string => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
+const minsOf = (hhmm: string): number | null => {
+  const m = hhmm.match(/^(\d{1,2}):(\d{2})/);
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+};
 
 export default function OnTheDaily() {
   const navigate = useNavigate();
   const today = startOfDay(new Date());
   const todayStr = format(today, "yyyy-MM-dd");
-  const startStr = format(addDays(today, -7), "yyyy-MM-dd");
-  const endStr = format(addDays(today, 14), "yyyy-MM-dd");
+  const backStr = format(addDays(today, -45), "yyyy-MM-dd");
+  const fwdStr = format(addDays(today, 2), "yyyy-MM-dd");
+
+  const { data: listings = [], isLoading: lLoading } = useQuery({
+    queryKey: ["daily-listings"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("listings")
+        .select("id, name, internal_name, location_group, status, is_bundle")
+        .eq("status", "active");
+      return ((data || []) as any[]).filter((l) => !l.is_bundle);
+    },
+  });
 
   const { data: cleaners = [] } = useQuery({
     queryKey: ["daily-cleaners"],
@@ -83,115 +87,153 @@ export default function OnTheDaily() {
       return (data || []) as { id: string; name: string }[];
     },
   });
-  const cleanerName = useMemo(() => {
-    const m = new Map(cleaners.map((c) => [c.id, c.name]));
-    return (id: string | null) => (id ? m.get(id) ?? null : null);
-  }, [cleaners]);
 
-  const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ["daily-tasks", startStr, endStr],
+  // Reservations that could bear on current occupancy / recent checkouts.
+  const { data: reservations = [], isLoading: rLoading } = useQuery({
+    queryKey: ["daily-res", backStr, fwdStr],
+    queryFn: async () => fetchAllRows<any>(() =>
+      supabase.from("reservations")
+        .select("listing_id, check_in, check_out, guest_name, status")
+        .eq("status", "confirmed")
+        .gte("check_out", backStr)
+        .lte("check_in", format(addDays(today, 1), "yyyy-MM-dd"))),
+  });
+
+  // Cleans over the recent window (for in-progress, today's turnover, and
+  // "cleaned since last checkout").
+  const { data: cleans = [], isLoading: cLoading } = useQuery({
+    queryKey: ["daily-cleans", backStr, fwdStr],
     queryFn: async () => fetchAllRows<any>(() =>
       supabase.from("clean_tasks")
-        .select("id, scheduled_date, status, started_at, completed_at, estimated_start_time, cleaning_duration_minutes, assigned_cleaner_id, checkout_time, listing_id, listings!clean_tasks_listing_id_fkey(name, internal_name, location_group, is_bundle)")
-        .gte("scheduled_date", startStr).lte("scheduled_date", endStr)
+        .select("listing_id, scheduled_date, status, started_at, completed_at, estimated_start_time, cleaning_duration_minutes, checkout_time, assigned_cleaner_id")
+        .gte("scheduled_date", backStr).lte("scheduled_date", fwdStr)
         .not("status", "in", "(cancelled,canceled)")),
   });
 
-  // Open (unresolved) issues flagged on cleans in this window → task_id -> {count, urgent}
+  // Open (unresolved) issues, per property.
   const { data: issueMap = new Map<string, { count: number; urgent: boolean }>() } = useQuery({
-    queryKey: ["daily-issues", startStr, endStr],
+    queryKey: ["daily-issues", backStr],
     queryFn: async () => {
       const { data } = await supabase
         .from("clean_issues")
-        .select("clean_task_id, urgency, status, maintenance_stage, clean_tasks!inner(scheduled_date)")
-        .gte("clean_tasks.scheduled_date", startStr).lte("clean_tasks.scheduled_date", endStr);
+        .select("listing_id, urgency, status, maintenance_stage, created_at")
+        .gte("created_at", `${backStr}T00:00:00Z`);
       const m = new Map<string, { count: number; urgent: boolean }>();
       for (const r of (data || []) as any[]) {
         if (r.status === "resolved" || r.maintenance_stage === "complete") continue;
-        const cur = m.get(r.clean_task_id) ?? { count: 0, urgent: false };
+        const cur = m.get(r.listing_id) ?? { count: 0, urgent: false };
         cur.count++;
         if (r.urgency === "urgent") cur.urgent = true;
-        m.set(r.clean_task_id, cur);
+        m.set(r.listing_id, cur);
       }
       return m;
     },
   });
 
+  const cleanerName = useMemo(() => {
+    const m = new Map(cleaners.map((c) => [c.id, c.name]));
+    return (id: string | null) => (id ? m.get(id) ?? null : null);
+  }, [cleaners]);
+
   const { todayBoard, otherBoard, counts } = useMemo(() => {
-    const blank = () => ({ dirty: [] as Card[], in_progress: [] as Card[], clean: [] as Card[] });
+    // Group reservations & cleans by listing.
+    const resByListing = new Map<string, any[]>();
+    for (const r of reservations) (resByListing.get(r.listing_id) ?? resByListing.set(r.listing_id, []).get(r.listing_id))!.push(r);
+    const cleansByListing = new Map<string, any[]>();
+    for (const c of cleans) (cleansByListing.get(c.listing_id) ?? cleansByListing.set(c.listing_id, []).get(c.listing_id))!.push(c);
+
+    const blank = () => ({ occupied: [] as Card[], dirty: [] as Card[], in_progress: [] as Card[], clean: [] as Card[] });
     const tb = blank();
     const ob = blank();
-    const seenToday = new Set<string>();
-    for (const t of tasks) {
-      if (t.listings?.is_bundle) continue; // bundles have no physical state
-      const state = stateOf(t);
-      const isTodayRow = t.scheduled_date === todayStr;
-      const dur: number | null = t.cleaning_duration_minutes ?? null;
-      // Expected ready time: in-progress = start + duration; today's dirty = estimated
-      // start + duration (or just the duration if we don't have a start estimate).
-      let eta: string | null = null;
-      let overran = false;
-      if (state === "in_progress" && t.started_at && dur) {
-        eta = `ready ~${finishFromStarted(t.started_at, dur)}`;
-      } else if (state === "dirty" && isTodayRow && dur) {
-        const finish = t.estimated_start_time ? hhmmPlus(t.estimated_start_time, dur) : null;
-        eta = finish ? `ready ~${finish}` : `~${dur}m`;
-      } else if (state === "clean") {
-        // Expected finish (planned start + duration, else actual start + duration) vs
-        // actual finish (completed_at).
-        const expected = dur
-          ? (t.estimated_start_time ? hhmmPlus(t.estimated_start_time, dur)
-            : t.started_at ? finishFromStarted(t.started_at, dur) : null)
-          : null;
-        const actual = t.completed_at ? clockOf(t.completed_at) : null;
-        if (expected && actual) {
-          eta = `exp ~${expected} · done ${actual}`;
-          const em = minsOf(expected), am = minsOf(actual);
-          overran = em != null && am != null && am > em;
-        } else if (actual) {
-          eta = `done ${actual}`;
-        } else if (expected) {
-          eta = `exp ~${expected}`;
+
+    for (const l of listings) {
+      const res = resByListing.get(l.id) ?? [];
+      const cl = cleansByListing.get(l.id) ?? [];
+
+      const occupiedRes = res.find((r) => r.check_in <= todayStr && r.check_out > todayStr) ?? null;
+      const checkoutToday = res.find((r) => r.check_out === todayStr) ?? null;
+      const lastCheckout = res
+        .filter((r) => r.check_out <= todayStr)
+        .reduce<string | null>((m, r) => (!m || r.check_out > m ? r.check_out : m), null);
+
+      const inProgressClean = cl.find((c) => (c.status === "in_progress" || c.started_at) && c.status !== "completed" && c.status !== "done") ?? null;
+      const todayClean = cl.find((c) => c.scheduled_date === todayStr) ?? null;
+      const completed = cl.filter((c) => c.status === "completed" || c.status === "done");
+      const lastCompleted = completed.reduce<any>((m, c) => (!m || c.scheduled_date > m.scheduled_date ? c : m), null);
+      const cleanedSinceCheckout = lastCheckout ? completed.some((c) => c.scheduled_date >= lastCheckout) : true;
+
+      // State (priority): a clean underway → In Progress; a guest currently in →
+      // Occupied; vacated & not cleaned since → Dirty; else Clean.
+      let state: Col;
+      let relClean: any = null;
+      if (inProgressClean) { state = "in_progress"; relClean = inProgressClean; }
+      else if (occupiedRes) { state = "occupied"; }
+      else if (lastCheckout && !cleanedSinceCheckout) { state = "dirty"; relClean = todayClean; }
+      else { state = "clean"; relClean = lastCompleted; }
+
+      // Card meta by state.
+      let time: string | null = null, sub: string | null = null, eta: string | null = null, overran = false, cleaner: string | null = null;
+      const dur: number | null = relClean?.cleaning_duration_minutes ?? null;
+      if (state === "occupied" && occupiedRes) {
+        sub = `${occupiedRes.guest_name?.split(/\s+/)[0] ?? "Guest"} · out ${format(parseISO(occupiedRes.check_out), "EEE d MMM")}`;
+      } else if (state === "in_progress" && relClean) {
+        cleaner = cleanerName(relClean.assigned_cleaner_id);
+        time = fmtTime(relClean.checkout_time);
+        if (relClean.started_at && dur) eta = `ready ~${finishFromStarted(relClean.started_at, dur)}`;
+      } else if (state === "dirty") {
+        cleaner = cleanerName(relClean?.assigned_cleaner_id ?? null);
+        time = fmtTime(relClean?.checkout_time ?? checkoutToday?.check_out_time);
+        if (relClean?.scheduled_date === todayStr && dur) {
+          const finish = relClean.estimated_start_time ? hhmmPlus(relClean.estimated_start_time, dur) : null;
+          eta = finish ? `ready ~${finish}` : `~${dur}m`;
+        } else if (lastCheckout) {
+          sub = `out ${format(parseISO(lastCheckout), "EEE d MMM")}`;
         }
+      } else if (state === "clean" && relClean) {
+        cleaner = cleanerName(relClean.assigned_cleaner_id);
+        const expected = dur
+          ? (relClean.estimated_start_time ? hhmmPlus(relClean.estimated_start_time, dur)
+            : relClean.started_at ? finishFromStarted(relClean.started_at, dur) : null)
+          : null;
+        const actual = relClean.completed_at ? clockOf(relClean.completed_at) : null;
+        if (expected && actual) { eta = `exp ~${expected} · done ${actual}`; const em = minsOf(expected), am = minsOf(actual); overran = em != null && am != null && am > em; }
+        else if (actual) eta = `done ${actual}`;
+        if (relClean.scheduled_date && relClean.scheduled_date !== todayStr) sub = format(parseISO(relClean.scheduled_date), "EEE d MMM");
       }
+
       const card: Card = {
-        id: t.id,
-        name: displayName(t.listings) || "Unknown",
-        region: t.listings?.location_group ?? null,
-        cleaner: cleanerName(t.assigned_cleaner_id),
-        time: fmtTime(t.checkout_time),
-        date: t.scheduled_date,
+        id: l.id,
+        name: displayName(l) || "Unknown",
+        region: l.location_group ?? null,
         state,
+        cleaner,
+        time,
+        sub,
         eta,
         overran,
-        issue: issueMap.get(t.id) ?? null,
+        issue: issueMap.get(l.id) ?? null,
+        navDate: relClean?.scheduled_date ?? todayStr,
       };
-      if (t.scheduled_date === todayStr) {
-        // one card per property in the Today band (keep the most "active" state)
-        const key = t.listing_id;
-        if (seenToday.has(key)) continue;
-        seenToday.add(key);
-        tb[state].push(card);
-      } else {
-        ob[state].push(card);
-      }
+
+      // Today band = a turnover happening today (checkout today or a clean today).
+      const isTodayTurnover = !!checkoutToday || !!todayClean;
+      (isTodayTurnover ? tb : ob)[state].push(card);
     }
-    // Other: soonest first
-    const bydate = (a: Card, b: Card) => a.date.localeCompare(b.date);
-    (["dirty", "in_progress", "clean"] as Col[]).forEach((k) => {
-      tb[k].sort((a, b) => (a.time ?? "99").localeCompare(b.time ?? "99"));
-      ob[k].sort(bydate);
-    });
+
+    const byName = (a: Card, b: Card) => a.name.localeCompare(b.name);
+    (["occupied", "dirty", "in_progress", "clean"] as Col[]).forEach((k) => { tb[k].sort(byName); ob[k].sort(byName); });
     const counts = {
-      today: { dirty: tb.dirty.length, in_progress: tb.in_progress.length, clean: tb.clean.length },
-      other: { dirty: ob.dirty.length, in_progress: ob.in_progress.length, clean: ob.clean.length },
+      today: { occupied: tb.occupied.length, dirty: tb.dirty.length, in_progress: tb.in_progress.length, clean: tb.clean.length },
+      other: { occupied: ob.occupied.length, dirty: ob.dirty.length, in_progress: ob.in_progress.length, clean: ob.clean.length },
     };
     return { todayBoard: tb, otherBoard: ob, counts };
-  }, [tasks, todayStr, cleanerName, issueMap]);
+  }, [listings, reservations, cleans, issueMap, todayStr, cleanerName]);
 
-  const CardBox = ({ c, showDate }: { c: Card; showDate?: boolean }) => (
+  const isLoading = lLoading || rLoading || cLoading;
+
+  const CardBox = ({ c }: { c: Card }) => (
     <button
-      onClick={() => navigate(`/operations/schedule?date=${c.date}`)}
+      onClick={() => navigate(`/operations/schedule?date=${c.navDate}`)}
       className="w-full text-left rounded-lg border border-border/50 bg-card px-3 py-2 hover:border-primary/40 transition-colors"
     >
       <div className="flex items-start justify-between gap-2">
@@ -221,23 +263,24 @@ export default function OnTheDaily() {
       <div className="mt-1 flex items-center gap-2 flex-wrap text-[11px] text-muted-foreground">
         {c.region && <span className="rounded bg-secondary px-1.5 py-0.5">{c.region}</span>}
         {c.time && <span>CO {c.time}</span>}
-        {showDate && <span className="font-medium">{format(parseISO(c.date), "EEE d MMM")}</span>}
-        {c.cleaner ? <span>· {c.cleaner}</span> : <span className="text-red-500/70">· unassigned</span>}
+        {c.sub && <span>{c.sub}</span>}
+        {(c.state === "dirty" || c.state === "in_progress") && (c.cleaner ? <span>· {c.cleaner}</span> : <span className="text-red-500/70">· unassigned</span>)}
+        {c.state === "clean" && c.cleaner && <span>· {c.cleaner}</span>}
       </div>
     </button>
   );
 
-  const Band = ({ title, subtitle, board, cnt, showDate }: {
-    title: string; subtitle: string; board: Record<Col, Card[]>; cnt: Record<Col, number>; showDate?: boolean;
+  const Band = ({ title, subtitle, board, cnt }: {
+    title: string; subtitle: string; board: Record<Col, Card[]>; cnt: Record<Col, number>;
   }) => (
     <div>
       <div className="flex items-baseline gap-2 mb-2">
         <h2 className="text-sm font-bold uppercase tracking-wide">{title}</h2>
         <span className="text-xs text-muted-foreground">{subtitle}</span>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {COLS.map((col) => {
-          const list: Card[] = board[col.key];
+          const list = board[col.key];
           const Icon = col.icon;
           return (
             <div key={col.key} className={`rounded-xl border ${col.cell} p-2.5 min-h-[80px]`}>
@@ -250,7 +293,7 @@ export default function OnTheDaily() {
               <div className="space-y-2">
                 {list.length === 0
                   ? <p className="text-[11px] text-muted-foreground/50 px-1 py-2">—</p>
-                  : list.map((c) => <CardBox key={c.id} c={c} showDate={showDate} />)}
+                  : list.map((c) => <CardBox key={c.id} c={c} />)}
               </div>
             </div>
           );
@@ -267,9 +310,11 @@ export default function OnTheDaily() {
             <Activity className="h-5 w-5 text-primary" /> On The Daily
           </h1>
           <p className="text-sm text-muted-foreground">
-            Property cleanliness at a glance — <span className="text-red-600 dark:text-red-300 font-medium">Dirty</span> ·{" "}
+            Every property's current state —{" "}
+            <span className="text-blue-600 dark:text-blue-300 font-medium">Occupied</span> ·{" "}
+            <span className="text-red-600 dark:text-red-300 font-medium">Dirty</span> ·{" "}
             <span className="text-amber-600 dark:text-amber-300 font-medium">In Progress</span> ·{" "}
-            <span className="text-emerald-600 dark:text-emerald-300 font-medium">Clean</span>. Tap a card to open that day in the schedule.
+            <span className="text-emerald-600 dark:text-emerald-300 font-medium">Clean</span>. Tap a card to open the schedule.
           </p>
         </div>
 
@@ -277,20 +322,9 @@ export default function OnTheDaily() {
           <div className="py-20 text-center"><Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" /></div>
         ) : (
           <div className="space-y-6">
-            <Band
-              title="Today"
-              subtitle={format(today, "EEEE d MMMM")}
-              board={todayBoard}
-              cnt={counts.today}
-            />
+            <Band title="Today" subtitle={`${format(today, "EEEE d MMMM")} · turning over today`} board={todayBoard} cnt={counts.today} />
             <div className="border-t border-border/40" />
-            <Band
-              title="Other"
-              subtitle="Backlog &amp; upcoming turnovers"
-              board={otherBoard}
-              cnt={counts.other}
-              showDate
-            />
+            <Band title="Other" subtitle="Everything else — current state" board={otherBoard} cnt={counts.other} />
           </div>
         )}
       </div>
