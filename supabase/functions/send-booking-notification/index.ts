@@ -20,6 +20,14 @@ const fmt = (d: string | null) => (d ? new Date(d + "T00:00:00Z").toLocaleDateSt
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
+    // Shared-secret gate — the trigger sends x-notify-secret. Once the secret is
+    // set the endpoint rejects anything else; before it's set (rollout window) it
+    // stays open so nothing breaks between deploying and configuring.
+    const SHARED = Deno.env.get("NOTIFY_SHARED_SECRET");
+    if (SHARED && req.headers.get("x-notify-secret") !== SHARED) {
+      return json({ error: "unauthorized" }, 401);
+    }
+
     const PUB = Deno.env.get("VAPID_PUBLIC_KEY");
     const PRIV = Deno.env.get("VAPID_PRIVATE_KEY");
     const SUBJECT = Deno.env.get("VAPID_SUBJECT") || "mailto:hello@escapeordinarygroup.com";
