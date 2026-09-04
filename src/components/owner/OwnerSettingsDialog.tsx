@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { PushNotificationToggle } from "@/components/PushNotificationToggle";
 
 interface Prefs {
   notify_bookings: boolean;
@@ -60,7 +61,9 @@ export function OwnerSettingsDialog({ ownerId, open, onOpenChange, canChangePass
       <DialogContent>
         <DialogHeader><DialogTitle>Notification settings</DialogTitle></DialogHeader>
         <div className="space-y-5 py-1">
-          <div className="flex items-start justify-between gap-4">
+          <PushNotificationToggle />
+
+          <div className="flex items-start justify-between gap-4 border-t border-border/30 pt-4">
             <div>
               <Label className="text-sm">Booking emails</Label>
               <p className="text-xs text-muted-foreground mt-0.5">Email me when a new booking is confirmed or a booking is cancelled.</p>

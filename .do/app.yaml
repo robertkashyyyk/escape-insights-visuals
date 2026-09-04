@@ -31,3 +31,10 @@ static_sites:
       - key: VITE_SUPABASE_PUBLISHABLE_KEY
         scope: BUILD_TIME
         value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmdHFqcm1ka3NycnBjemhvbWxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2OTYyMzAsImV4cCI6MjA5MDI3MjIzMH0.pnIOzWvQOxPLUsf3srx4Qqdc73xUAOa8aenokDABMOA
+      # Web-push PUBLIC VAPID key — public by design (the client subscribes with it).
+      # Replace the placeholder with the real public key, then redeploy. Until then
+      # the notification toggle stays inert (shows "not switched on yet"). The
+      # matching PRIVATE key is an Edge Function secret — it never appears here.
+      - key: VITE_VAPID_PUBLIC_KEY
+        scope: BUILD_TIME
+        value: REPLACE_WITH_VAPID_PUBLIC_KEY
