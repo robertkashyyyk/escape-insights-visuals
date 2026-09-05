@@ -640,6 +640,16 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
       .lt("check_in", targetDate)
       .gt("check_out", targetDate);
     const occupiedListingIds = Array.from(new Set((occ || []).map((r: any) => String(r.listing_id))));
+    // A property with a real checkout on targetDate genuinely needs turning over that
+    // day — NEVER cancel its clean, even if an overlapping/adjacent booking makes it
+    // look "occupied" (e.g. a Hostaway modification twin). Only truly stale mid-stay
+    // cleans (occupied, no checkout that day) get cancelled.
+    const { data: coToday } = await supabase
+      .from("reservations")
+      .select("listing_id")
+      .eq("status", "confirmed")
+      .eq("check_out", targetDate);
+    const checkoutTodayIds = new Set((coToday || []).map((r: any) => String(r.listing_id)));
     if (occupiedListingIds.length > 0) {
       const { data: candidates } = await supabase
         .from("clean_tasks")
@@ -647,8 +657,10 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         .eq("scheduled_date", targetDate)
         .in("listing_id", occupiedListingIds)
         .not("status", "in", "(cancelled,canceled,completed,done)");
-      // Preserve deliberate manual cleans (e.g. a mid-stay clean); cancel the rest.
-      const toCancel = (candidates || []).filter((c: any) => (c.source ?? "") !== "manual");
+      // Preserve deliberate manual cleans (mid-stay) AND any property with a checkout today.
+      const toCancel = (candidates || []).filter(
+        (c: any) => (c.source ?? "") !== "manual" && !checkoutTodayIds.has(String(c.listing_id))
+      );
       if (toCancel.length > 0) {
         await supabase.from("clean_tasks").update({ status: "cancelled" }).in("id", toCancel.map((c: any) => c.id));
         for (const c of toCancel) existingByListing.delete(`${c.listing_id}_${targetDate}`);
