@@ -287,9 +287,13 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
           await supabase.from("clean_tasks").update({ status: "cancelled" }).eq("id", t.id);
           continue;
         }
-        // Skip + retire cleans the property was already re-let (and turned over) for.
+        // Skip + retire cleans the property was already re-let for — but only when the
+        // next guest checked in on a PRIOR day (strictly before targetDate), i.e. they're
+        // already in residence and it's too late to clean. A guest arriving TODAY
+        // (check_in === targetDate) is exactly who this clean prepares for, so it must be
+        // carried forward, not cancelled.
         const srcCheckout = t.reservation_id ? checkoutByRes.get(String(t.reservation_id)) : t.scheduled_date;
-        if (srcCheckout && (checkinsByListing[lid] || []).some((ci) => ci > srcCheckout && ci <= targetDate)) {
+        if (srcCheckout && (checkinsByListing[lid] || []).some((ci) => ci > srcCheckout && ci < targetDate)) {
           await supabase.from("clean_tasks").update({ status: "cancelled" }).eq("id", t.id);
           continue;
         }
