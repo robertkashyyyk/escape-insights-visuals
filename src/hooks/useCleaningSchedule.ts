@@ -177,6 +177,8 @@ export function useCleaningSchedule() {
         .lte("scheduled_date", rangeEndStr);
       return (data || []) as any[];
     },
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: checkoutReservations = [] } = useQuery({

@@ -143,6 +143,12 @@ export function useMatrixSchedule(weekAnchor: Date) {
         (task) => !CANCELLED_TASK_STATUSES.has((task.status || "").toLowerCase())
       );
     },
+    // The app defaults to a 1-hour staleTime + no refetch-on-focus, which made the
+    // Matrix show hour-old data and disagree with the Day view. The schedule is live
+    // operational data — keep it fresh so returning to the tab always reflects reality.
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   // Open (unresolved) issues flagged on this week's cleans → task_id -> {count, urgent}
@@ -164,6 +170,8 @@ export function useMatrixSchedule(weekAnchor: Date) {
       }
       return map;
     },
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
   });
 
   // Reservations covering the week (for guest names + times)
@@ -181,6 +189,8 @@ export function useMatrixSchedule(weekAnchor: Date) {
         .lte("check_in", lookEnd));
       return data;
     },
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
   });
 
   // Realtime subscription — scoped to the current week's tasks only.

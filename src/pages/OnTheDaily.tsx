@@ -97,6 +97,8 @@ export default function OnTheDaily() {
         .eq("status", "confirmed")
         .gte("check_out", backStr)
         .lte("check_in", format(addDays(today, 1), "yyyy-MM-dd"))),
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
   });
 
   // Cleans over the recent window (for in-progress, today's turnover, and
@@ -108,6 +110,8 @@ export default function OnTheDaily() {
         .select("listing_id, scheduled_date, status, started_at, completed_at, estimated_start_time, cleaning_duration_minutes, checkout_time, assigned_cleaner_id")
         .gte("scheduled_date", backStr).lte("scheduled_date", fwdStr)
         .not("status", "in", "(cancelled,canceled)")),
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
   });
 
   // Open (unresolved) issues, per property.

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { MatrixView } from "@/components/cleaning/MatrixView";
+import { ScheduleAlertsBanner } from "@/components/cleaning/ScheduleAlertsBanner";
 import { useRole } from "@/contexts/AuthContext";
 
 const PRIORITY_CONFIG: Record<Priority, { label: string; color: string; icon: string }> = {
@@ -253,6 +254,8 @@ export default function CleaningSchedule() {
             {regenLabel}
           </Button>
         </div>
+
+        <ScheduleAlertsBanner />
 
         {/* Matrix View */}
         {(viewMode as any) === "matrix" && (
