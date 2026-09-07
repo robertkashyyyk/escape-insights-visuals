@@ -540,9 +540,11 @@ export function useCleaningSchedule() {
     };
     const report = (created: number, unassigned: number, rangeLabel: string) => {
       if (created === 0 && unassigned === 0) {
-        toast({ title: "Nothing to generate", description: days > 1
-          ? `No checkouts found for ${rangeLabel}. Nothing to generate.`
-          : `No checkouts found for ${rangeLabel}. If you just removed a manual clean, it cannot be auto-regenerated — add it again from the matrix.` });
+        // created=0 & unassigned=0 means every checkout is already covered — NOT that
+        // there are no checkouts. Word it so it doesn't read like something's wrong.
+        toast({ title: "Already up to date", description: days > 1
+          ? `Every checkout for ${rangeLabel} already has a clean — nothing new to add.`
+          : `${rangeLabel} is already covered — nothing new to add. (If you just removed a manual clean, re-add it from the matrix — those aren't auto-regenerated.)` });
       } else if (created === 0 && unassigned > 0) {
         toast({ title: "Tasks remain unassigned", variant: "destructive",
           description: `${unassigned} task${unassigned === 1 ? "" : "s"} for ${rangeLabel} could not be assigned — no cleaner covers that location group. Add the location to a cleaner in Settings → Cleaners, or drag manually in the matrix.` });
