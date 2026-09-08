@@ -161,15 +161,23 @@ export default function Properties() {
             {filtered?.map((l) => {
               const ownerName = (l.property_owners as any)?.name;
               const cleaner = (l as any).primary_cleaner;
-              const isClean = derivedIsClean(l);
               const isBundle = (l as any).is_bundle ?? false;
+              // Status light matches On The Daily's palette. Pulse the "needs attention"
+              // states (dirty / in progress); steady dot for occupied / clean.
+              const st = stateById.get(l.id)?.state
+                ?? ((l as any).is_clean ?? true ? "clean" : "dirty");
+              const dot =
+                st === "occupied" ? { c: "bg-blue-500", t: "Occupied", pulse: false } :
+                st === "in_progress" ? { c: "bg-amber-500", t: "Cleaning in progress", pulse: true } :
+                st === "dirty" ? { c: "bg-red-500", t: "Needs cleaning", pulse: true } :
+                { c: "bg-emerald-500", t: "Clean", pulse: false };
               return (
                 <div
                   key={l.id}
                   className="glass-card rounded-xl border border-border/30 border-l-2 border-l-primary/60 p-5 flex flex-col gap-3 transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5 hover:border-l-primary relative"
                 >
-                  {!isBundle && !isClean && (
-                    <div className="absolute top-3 right-3 h-3 w-3 rounded-full bg-red-500 animate-pulse" title="Needs cleaning" />
+                  {!isBundle && (
+                    <div className={`absolute top-3 right-3 h-3 w-3 rounded-full ${dot.c} ${dot.pulse ? "animate-pulse" : ""}`} title={dot.t} />
                   )}
                   {isBundle && (
                     <div className="absolute top-3 right-3">
