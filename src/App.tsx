@@ -40,6 +40,7 @@ import PermissionsMatrix from "./pages/PermissionsMatrix";
 import Update260826 from "./pages/Update260826";
 import Update280826 from "./pages/Update280826";
 import Update310826 from "./pages/Update310826";
+import Update080926 from "./pages/Update080926";
 import CleanerPortal from "./pages/CleanerPortal";
 import CleanerManual from "./pages/CleanerManual";
 import OwnerPortfolio from "./pages/owner/OwnerPortfolio";
@@ -90,6 +91,7 @@ const App = () => (
             <Route path="/260826Update" element={<Update260826 />} />
             <Route path="/280826Update" element={<Update280826 />} />
             <Route path="/310826Update" element={<Update310826 />} />
+            <Route path="/080926Update" element={<Update080926 />} />
             <Route path="/owner" element={<ProtectedRoute requiredRoles={["client", "super", "senior"]}><OwnerPreviewProvider><OwnerPortfolio /></OwnerPreviewProvider></ProtectedRoute>} />
             <Route path="/owner/calendar" element={<ProtectedRoute requiredRoles={["client", "super", "senior"]}><OwnerPreviewProvider><OwnerCalendar /></OwnerPreviewProvider></ProtectedRoute>} />
             <Route path="/owner/reservations" element={<ProtectedRoute requiredRoles={["client", "super", "senior"]}><OwnerPreviewProvider><OwnerReservations /></OwnerPreviewProvider></ProtectedRoute>} />
