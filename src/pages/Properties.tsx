@@ -63,8 +63,13 @@ export default function Properties() {
       (l.property_owners as any)?.name?.toLowerCase().includes(q);
     const matchesLocation = locationFilter === "all" || l.location_group === locationFilter;
     const matchesOwner = ownerFilter === "all" || (l.property_owners as any)?.name === ownerFilter;
-    const isClean = derivedIsClean(l);
-    const matchesClean = cleanFilter === "all" || (cleanFilter === "clean" && isClean) || (cleanFilter === "dirty" && !isClean);
+    const st = stateById.get(l.id)?.state ?? null;
+    const fallbackClean = (l as any).is_clean ?? true;
+    const matchesClean =
+      cleanFilter === "all" ||
+      (cleanFilter === "clean" && (st ? st === "clean" : fallbackClean)) ||
+      (cleanFilter === "dirty" && (st ? (st === "dirty" || st === "in_progress") : !fallbackClean)) ||
+      (cleanFilter === "occupied" && st === "occupied");
     const matchesArchive = showArchived ? true : !((l as any).is_archived ?? false);
     return matchesSearch && matchesLocation && matchesOwner && matchesClean && matchesArchive;
   });
@@ -106,6 +111,7 @@ export default function Properties() {
             <ToggleGroupItem value="all" className="text-xs px-3">All</ToggleGroupItem>
             <ToggleGroupItem value="clean" className="text-xs px-3">Clean</ToggleGroupItem>
             <ToggleGroupItem value="dirty" className="text-xs px-3">Dirty</ToggleGroupItem>
+            <ToggleGroupItem value="occupied" className="text-xs px-3">Occupied</ToggleGroupItem>
           </ToggleGroup>
           <div className="flex items-center gap-3 ml-auto">
             <ToggleGroup

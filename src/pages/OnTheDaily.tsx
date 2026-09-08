@@ -3,8 +3,12 @@ import { usePropertyStates, type CleanState, type PropertyState } from "@/hooks/
 import { format, parseISO } from "date-fns";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Activity, Loader2, CircleDashed, Timer, CheckCircle2, Clock, Flag, BedDouble, ArrowDownAZ, CalendarClock } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Activity, Loader2, CircleDashed, Timer, CheckCircle2, Clock, Flag, BedDouble, ArrowDownAZ, CalendarClock, ChevronDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuCheckboxItem, DropdownMenuItem, DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 const COLS: { key: CleanState; label: string; icon: any; head: string; cell: string; dot: string }[] = [
   { key: "occupied", label: "Occupied", icon: BedDouble,
@@ -19,12 +23,53 @@ const COLS: { key: CleanState; label: string; icon: any; head: string; cell: str
 
 const shortDate = (d: string) => format(parseISO(d), "EEE d MMM");
 
+/** Multi-select dropdown filter (checkboxes; empty = all). */
+function MultiFilter({ label, options, selected, onToggle, onClear }: {
+  label: string;
+  options: { value: string; label: string }[];
+  selected: Set<string>;
+  onToggle: (v: string) => void;
+  onClear: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 text-xs gap-1 min-w-[9rem] justify-between font-normal">
+          <span className="truncate">{selected.size === 0 ? label : `${selected.size} selected`}</span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-h-80 overflow-auto w-56">
+        {selected.size > 0 && (
+          <>
+            <DropdownMenuItem onClick={onClear} className="text-xs text-muted-foreground">Clear ({selected.size})</DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        {options.map((o) => (
+          <DropdownMenuCheckboxItem
+            key={o.value}
+            checked={selected.has(o.value)}
+            onCheckedChange={() => onToggle(o.value)}
+            onSelect={(e) => e.preventDefault()}
+            className="text-xs"
+          >
+            {o.label}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export default function OnTheDaily() {
   const navigate = useNavigate();
   const { states, cleaners, loading } = usePropertyStates();
   const [sortMode, setSortMode] = useState<"az" | "date">("date");
-  const [locationFilter, setLocationFilter] = useState("all");
-  const [cleanerFilter, setCleanerFilter] = useState("all");
+  const [locSel, setLocSel] = useState<Set<string>>(new Set());
+  const [cleanerSel, setCleanerSel] = useState<Set<string>>(new Set());
+  const toggle = (setter: React.Dispatch<React.SetStateAction<Set<string>>>) => (v: string) =>
+    setter((prev) => { const n = new Set(prev); n.has(v) ? n.delete(v) : n.add(v); return n; });
 
   const regions = useMemo(
     () => Array.from(new Set(states.map((s) => s.region).filter(Boolean))).sort() as string[],
@@ -33,8 +78,8 @@ export default function OnTheDaily() {
 
   const board = useMemo(() => {
     const passes = (s: PropertyState) =>
-      (locationFilter === "all" || s.region === locationFilter) &&
-      (cleanerFilter === "all" || s.cleanerId === cleanerFilter);
+      (locSel.size === 0 || (s.region != null && locSel.has(s.region))) &&
+      (cleanerSel.size === 0 || (s.cleanerId != null && cleanerSel.has(s.cleanerId)));
     const cmp = sortMode === "az"
       ? (a: PropertyState, b: PropertyState) => a.name.localeCompare(b.name)
       : (a: PropertyState, b: PropertyState) => a.sortKey.localeCompare(b.sortKey) || a.name.localeCompare(b.name);
@@ -42,7 +87,7 @@ export default function OnTheDaily() {
     for (const s of states) if (passes(s)) out[s.state].push(s);
     (Object.keys(out) as CleanState[]).forEach((k) => out[k].sort(cmp));
     return out;
-  }, [states, locationFilter, cleanerFilter, sortMode]);
+  }, [states, locSel, cleanerSel, sortMode]);
 
   const Card = ({ c }: { c: PropertyState }) => (
     <button
@@ -115,22 +160,22 @@ export default function OnTheDaily() {
                 <ArrowDownAZ className="h-3.5 w-3.5" /> A–Z
               </button>
             </div>
-            {/* Location filter */}
-            <Select value={locationFilter} onValueChange={setLocationFilter}>
-              <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="All locations" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All locations</SelectItem>
-                {regions.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {/* Cleaner filter */}
-            <Select value={cleanerFilter} onValueChange={setCleanerFilter}>
-              <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="All cleaners" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All cleaners</SelectItem>
-                {cleaners.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            {/* Location filter (multi-select) */}
+            <MultiFilter
+              label="All locations"
+              options={regions.map((r) => ({ value: r, label: r }))}
+              selected={locSel}
+              onToggle={toggle(setLocSel)}
+              onClear={() => setLocSel(new Set())}
+            />
+            {/* Cleaner filter (multi-select) */}
+            <MultiFilter
+              label="All cleaners"
+              options={cleaners.map((c) => ({ value: c.id, label: c.name }))}
+              selected={cleanerSel}
+              onToggle={toggle(setCleanerSel)}
+              onClear={() => setCleanerSel(new Set())}
+            />
           </div>
         </div>
 
