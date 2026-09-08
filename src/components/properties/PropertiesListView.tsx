@@ -26,9 +26,11 @@ interface ListingRow {
 interface Props {
   rows: ListingRow[];
   onEdit: (id: string) => void;
+  /** Listing ids that currently need cleaning (dirty/in-progress), derived live. */
+  dirtyIds?: Set<string>;
 }
 
-export function PropertiesListView({ rows, onEdit }: Props) {
+export function PropertiesListView({ rows, onEdit, dirtyIds }: Props) {
   return (
     <div className="glass-card rounded-xl border border-border/30 overflow-hidden">
       <div className="overflow-x-auto">
@@ -49,7 +51,7 @@ export function PropertiesListView({ rows, onEdit }: Props) {
           <tbody>
             {rows.map((l) => {
               const ownerName = l.property_owners?.name;
-              const isClean = l.is_clean ?? true;
+              const isClean = dirtyIds ? !dirtyIds.has(l.id) : (l.is_clean ?? true);
               return (
                 <tr key={l.id} className="border-t border-border/20 hover:bg-secondary/20 transition-colors">
                   <td className="px-4 py-3">

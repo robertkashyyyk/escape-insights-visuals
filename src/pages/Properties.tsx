@@ -14,8 +14,21 @@ import { PropertyFeatures } from "@/components/properties/PropertyFeatures";
 import { PropertiesListView } from "@/components/properties/PropertiesListView";
 import { Link } from "react-router-dom";
 import { displayName } from "@/lib/listingName";
+import { usePropertyStates } from "@/hooks/usePropertyStates";
 
 export default function Properties() {
+  // Derived, live clean/dirty state (from bookings + cleans) — the is_clean flag
+  // drifts, so we key the Clean/Dirty filter off the same source as On The Daily.
+  const { byId: stateById } = usePropertyStates();
+  // A property "needs cleaning" when it's dirty or a clean is underway; occupied &
+  // clean both count as not-needing-a-clean. Falls back to is_clean for anything
+  // without a derived state (e.g. bundles).
+  const derivedIsClean = (l: any): boolean => {
+    const s = stateById.get(l.id)?.state;
+    if (!s) return (l as any).is_clean ?? true;
+    return s !== "dirty" && s !== "in_progress";
+  };
+
   const [search, setSearch] = useState("");
   const [locationFilter, setLocationFilter] = useState<string>("all");
   const [ownerFilter, setOwnerFilter] = useState<string>("all");
@@ -50,7 +63,7 @@ export default function Properties() {
       (l.property_owners as any)?.name?.toLowerCase().includes(q);
     const matchesLocation = locationFilter === "all" || l.location_group === locationFilter;
     const matchesOwner = ownerFilter === "all" || (l.property_owners as any)?.name === ownerFilter;
-    const isClean = (l as any).is_clean ?? true;
+    const isClean = derivedIsClean(l);
     const matchesClean = cleanFilter === "all" || (cleanFilter === "clean" && isClean) || (cleanFilter === "dirty" && !isClean);
     const matchesArchive = showArchived ? true : !((l as any).is_archived ?? false);
     return matchesSearch && matchesLocation && matchesOwner && matchesClean && matchesArchive;
@@ -132,13 +145,17 @@ export default function Properties() {
         ) : filtered?.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground text-sm">No properties found</div>
         ) : view === "list" ? (
-          <PropertiesListView rows={filtered as any} onEdit={(id) => setEditingId(id)} />
+          <PropertiesListView
+            rows={filtered as any}
+            onEdit={(id) => setEditingId(id)}
+            dirtyIds={new Set((filtered ?? []).filter((l) => !derivedIsClean(l)).map((l) => l.id))}
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered?.map((l) => {
               const ownerName = (l.property_owners as any)?.name;
               const cleaner = (l as any).primary_cleaner;
-              const isClean = (l as any).is_clean ?? true;
+              const isClean = derivedIsClean(l);
               const isBundle = (l as any).is_bundle ?? false;
               return (
                 <div
