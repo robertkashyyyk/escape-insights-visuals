@@ -46,17 +46,23 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  // Check for incremental mode (cron sends this, manual sync does full)
-  let syncMode = "full";
-  let lookbackDays = 0;
+  // Runs default to INCREMENTAL with a short lookback. Hostaway returns reservations
+  // newest-modified first, so a few days' window captures everything that's actually
+  // changed and finishes well inside the time budget — the previous full/14-day default
+  // re-pulled ~half of ~12k reservations every hour and timed out ("completed with
+  // errors"). Pass {mode:"full"} for a full reconciliation of all history.
+  let syncMode = "incremental";
+  let lookbackDays = 3;
   try {
     const body = await req.json();
-    if (body?.mode === "incremental" || body?.lookback_days) {
-      syncMode = "incremental";
-      lookbackDays = body.lookback_days || 14; // Default 14-day lookback
+    if (body?.mode === "full" || body?.full === true) {
+      syncMode = "full";
+      lookbackDays = 0;
+    } else if (body?.lookback_days) {
+      lookbackDays = body.lookback_days;
     }
   } catch {
-    // No body = full sync
+    // No body → incremental default (the hourly cron path)
   }
 
   const batchId = crypto.randomUUID();
