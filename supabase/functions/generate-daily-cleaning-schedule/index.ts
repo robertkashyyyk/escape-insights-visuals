@@ -821,13 +821,30 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     return best;
   }
 
-  // 7. Build new tasks — at most ONE per (listing_id, scheduled_date).
+  // 7. Build new tasks — at most ONE per (listing_id, scheduled_date), and at most
+  // ONE (non-cancelled) clean per booking overall. Load which of today's checkout
+  // bookings already have a clean (live OR completed) on any date, so a re-touched or
+  // date-shifted booking can't spawn a second clean.
+  const checkoutResIds = Array.from(new Set(activeCheckoutsForGeneration.map((r: any) => String(r.id))));
+  const reservationsWithClean = new Set<string>();
+  if (checkoutResIds.length > 0) {
+    const { data: resCleanRows } = await supabase
+      .from("clean_tasks")
+      .select("reservation_id")
+      .in("reservation_id", checkoutResIds)
+      .neq("source", "manual")
+      .not("status", "in", "(cancelled,canceled)");
+    for (const c of resCleanRows || []) if (c.reservation_id) reservationsWithClean.add(String(c.reservation_id));
+  }
+
   const newTasks: TaskInfo[] = [];
   const plannedListingDate = new Set<string>();
 
   for (const r of activeCheckoutsForGeneration) {
     const key = `${r.id}_${targetDate}`;
     if (existingSet.has(key)) continue;
+    // Booking already has a clean somewhere (incl. completed) → don't duplicate it.
+    if (reservationsWithClean.has(String(r.id))) continue;
 
     // If this checkout is on a bundle, create tasks for each component instead
     const componentIds = bundleMap.get(r.listing_id);
@@ -1192,6 +1209,11 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     // Guard the "one live auto clean per reservation" unique index: never insert a
     // second live clean for a reservation that already has one (in the DB or twice
     // within this batch), or the whole batch insert fails with a duplicate-key error.
+    // Reservation-level dedupe: a booking must never get a SECOND auto clean, even on
+    // a different date. Previously this excluded completed/done, so a booking whose
+    // clean was already done still got a fresh one each morning if it was re-touched or
+    // its dates drifted (12b spawned 4, DM27 re-generated after completion). Count any
+    // non-cancelled clean (incl. completed) as "already covered".
     const resIds = Array.from(new Set(toInsert.map((t) => t.reservation_id).filter(Boolean).map(String)));
     const existingLive = new Set<string>();
     if (resIds.length) {
@@ -1200,7 +1222,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         .select("reservation_id")
         .in("reservation_id", resIds)
         .neq("source", "manual")
-        .not("status", "in", "(cancelled,completed,done)");
+        .not("status", "in", "(cancelled,canceled)");
       for (const r of liveRows || []) if (r.reservation_id) existingLive.add(String(r.reservation_id));
     }
     const seenRes = new Set<string>();
