@@ -13,6 +13,7 @@ import { ArrowLeft, Bed, Bath, Users, MapPin, PoundSterling, Brush, Building2, W
 import { displayName, brandedName } from "@/lib/listingName";
 import { propagateCleaningDuration } from "@/lib/propagateCleanDuration";
 import { useCommunalGroups } from "@/hooks/useCommunalGroups";
+import { PropertyActivity } from "@/components/properties/PropertyActivity";
 
 const DURATION_OPTIONS = [60, 90, 120, 150, 180];
 
@@ -298,6 +299,12 @@ export default function PropertyDetail() {
             )}
           </DetailCard>
         </div>
+
+        {id && (
+          <div className="mt-4">
+            <PropertyActivity listingId={id} />
+          </div>
+        )}
 
         <div className="space-y-4">
           <OperationalSection
