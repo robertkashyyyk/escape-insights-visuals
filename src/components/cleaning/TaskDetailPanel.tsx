@@ -98,8 +98,9 @@ export function TaskDetailPanel({
 
   // Open (unresolved) issues flagged on THIS clean.
   const [issues, setIssues] = useState<{ id: string; issue_type: string; description: string; urgency: string; created_at: string; photo_paths: string[] | null }[]>([]);
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   useEffect(() => {
-    if (!open || !task) { setIssues([]); return; }
+    if (!open || !task) { setIssues([]); setPhotoUrls({}); return; }
     let cancelled = false;
     (async () => {
       const { data } = await supabase
@@ -108,7 +109,19 @@ export function TaskDetailPanel({
         .eq("clean_task_id", task.id)
         .order("created_at", { ascending: false });
       if (cancelled) return;
-      setIssues(((data ?? []) as any[]).filter((i) => i.status !== "resolved" && i.maintenance_stage !== "complete"));
+      const open = ((data ?? []) as any[]).filter((i) => i.status !== "resolved" && i.maintenance_stage !== "complete");
+      setIssues(open);
+      // Sign the private issue photos so the manager can see them inline.
+      const paths = open.flatMap((i) => i.photo_paths ?? []);
+      if (paths.length > 0) {
+        const entries = await Promise.all(paths.map(async (p: string) => {
+          const { data: signed } = await supabase.storage.from("clean-issue-photos").createSignedUrl(p, 3600);
+          return [p, signed?.signedUrl] as const;
+        }));
+        if (!cancelled) setPhotoUrls(Object.fromEntries(entries.filter(([, u]) => !!u) as [string, string][]));
+      } else if (!cancelled) {
+        setPhotoUrls({});
+      }
     })();
     return () => { cancelled = true; };
   }, [open, task?.id]);
@@ -302,7 +315,24 @@ export function TaskDetailPanel({
                     </div>
                     <p className="text-[13px] text-foreground/90 mt-1 whitespace-pre-wrap">{iss.description}</p>
                     {iss.photo_paths && iss.photo_paths.length > 0 && (
-                      <p className="text-[10px] text-muted-foreground mt-1">📷 {iss.photo_paths.length} photo{iss.photo_paths.length === 1 ? "" : "s"} — see Maintenance</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {iss.photo_paths.map((p) => (
+                          photoUrls[p] ? (
+                            <a key={p} href={photoUrls[p]} target="_blank" rel="noopener noreferrer" title="Open full size">
+                              <img
+                                src={photoUrls[p]}
+                                alt="Issue photo"
+                                loading="lazy"
+                                className="h-20 w-20 rounded-md object-cover border border-red-500/20 hover:border-red-500/50 transition-colors"
+                              />
+                            </a>
+                          ) : (
+                            <div key={p} className="h-20 w-20 rounded-md bg-muted/40 border border-border/30 flex items-center justify-center">
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            </div>
+                          )
+                        ))}
+                      </div>
                     )}
                   </div>
                 ))}
