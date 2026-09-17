@@ -250,6 +250,21 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         .in("id", priorListingIds.length ? priorListingIds : ["00000000-0000-0000-0000-000000000000"]);
       const priorBundleIds = new Set((priorBundleRows || []).map((r: any) => String(r.id)));
 
+      // A clean is a stale DUPLICATE if the same booking already has a COMPLETED
+      // clean — e.g. the property was cleaned and marked done by one cleaner, but a
+      // second clean for the same reservation stayed open and keeps rolling forward
+      // (the re-gen bug), landing already-done work on another cleaner's board.
+      // Retire these instead of dragging them onto today.
+      const priorResIdsForDup = Array.from(
+        new Set((priorOpen || []).map((t: any) => t.reservation_id).filter(Boolean).map(String))
+      );
+      const { data: completedSiblings } = await supabase
+        .from("clean_tasks")
+        .select("reservation_id")
+        .in("reservation_id", priorResIdsForDup.length ? priorResIdsForDup : ["00000000-0000-0000-0000-000000000000"])
+        .in("status", ["completed", "done"]);
+      const reservationsCompleted = new Set((completedSiblings || []).map((r: any) => String(r.reservation_id)));
+
       // Don't roll into a listing that already has a clean scheduled for today.
       const { data: existingToday } = await supabase
         .from("clean_tasks")
@@ -284,6 +299,12 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         // Retire any clean that ended up on a bundle listing — it has no row and can
         // never be completed, so never drag it forward.
         if (priorBundleIds.has(lid)) {
+          await supabase.from("clean_tasks").update({ status: "cancelled" }).eq("id", t.id);
+          continue;
+        }
+        // Booking already cleaned & completed (by any cleaner, any date) → this open
+        // row is a duplicate of done work. Retire it rather than rolling it forward.
+        if (t.reservation_id && reservationsCompleted.has(String(t.reservation_id))) {
           await supabase.from("clean_tasks").update({ status: "cancelled" }).eq("id", t.id);
           continue;
         }
