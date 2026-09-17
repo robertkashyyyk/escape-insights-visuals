@@ -200,6 +200,12 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
   const isCurrentDayRefresh = targetDate === todayLondon();
   let arrivalListingIds: string[] = [];
 
+  // Archived / inactive (de-listed) properties never get cleans — exclude them from
+  // generation and retire any live cleans that already sit on them.
+  const { data: inactiveRows } = await supabase
+    .from("listings").select("id").or("is_archived.eq.true,status.eq.inactive");
+  const inactiveListingIds = new Set((inactiveRows || []).map((r: any) => String(r.id)));
+
   if (isCurrentDayRefresh) {
     // Arrivals today drive the P0 escalation (dirty property, guest incoming).
     const { data: arrivalsTodayRaw } = await supabase
@@ -425,6 +431,22 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         if (comps && comps.has(String(t.listing_id))) continue;  // valid bundle component
         await supabase.from("clean_tasks")
           .update({ status: "cancelled", warning_reason: "Booking moved to another property" })
+          .eq("id", t.id);
+      }
+    }
+
+    // Inactive-listing cleanup: retire any live clean on an archived / inactive property.
+    if (inactiveListingIds.size > 0) {
+      const { data: inactiveCleans } = await supabase
+        .from("clean_tasks")
+        .select("id, listing_id")
+        .gte("scheduled_date", targetDate)
+        .neq("source", "manual")
+        .not("status", "in", CANCELLED_TASK_STATUSES)
+        .in("listing_id", Array.from(inactiveListingIds));
+      for (const t of inactiveCleans || []) {
+        await supabase.from("clean_tasks")
+          .update({ status: "cancelled", warning_reason: "Property archived/inactive" })
           .eq("id", t.id);
       }
     }
@@ -953,6 +975,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     for (const targetLid of targetListingIds) {
       const listing = listingMap.get(targetLid);
       if (!listing) continue;
+      if (inactiveListingIds.has(targetLid)) continue;  // never clean a de-listed property
 
       // This booking already has a clean for this listing (incl. completed, any date)
       // → don't duplicate it. Per-listing so bundle components are independent.
