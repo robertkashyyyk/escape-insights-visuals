@@ -383,6 +383,51 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         }
       }
     }
+
+    // Moved-booking cleanup: cancel any live clean whose booking has since moved to a
+    // DIFFERENT property. When a reservation's listing changes in Hostaway, the old
+    // clean is stranded on the previous property (and the new property gets none). We
+    // retire the stranded clean here; generation/fan-out then creates the correct one
+    // on the booking's current property. Bundle components are exempt — their clean
+    // legitimately sits on a component listing while the booking sits on the bundle.
+    const { data: liveFuture } = await supabase
+      .from("clean_tasks")
+      .select("id, listing_id, reservation_id")
+      .gte("scheduled_date", targetDate)
+      .neq("source", "manual")
+      .not("status", "in", CANCELLED_TASK_STATUSES)
+      .not("reservation_id", "is", null);
+    const mbResIds = Array.from(new Set((liveFuture || []).map((t: any) => String(t.reservation_id))));
+    if (mbResIds.length > 0) {
+      // Chunk the id lookup: a single .in() with hundreds of UUIDs builds a GET URL
+      // that overruns PostgREST's URL length limit and silently returns nothing.
+      const resListing = new Map<string, string>();
+      for (let i = 0; i < mbResIds.length; i += 100) {
+        const chunk = mbResIds.slice(i, i + 100);
+        const { data: chunkRows } = await supabase
+          .from("reservations").select("id, listing_id").in("id", chunk);
+        for (const r of chunkRows || []) resListing.set(String(r.id), String(r.listing_id));
+      }
+      const { data: mbBundles } = await supabase
+        .from("listings").select("id, bundle_components").eq("is_bundle", true);
+      const compsByBundle = new Map<string, Set<string>>();
+      for (const b of mbBundles || []) {
+        const comps = new Set<string>(
+          (((b.bundle_components as any[]) || []).map((c: any) => String(c.listing_id)).filter(Boolean))
+        );
+        compsByBundle.set(String(b.id), comps);
+      }
+      for (const t of liveFuture || []) {
+        const resList = resListing.get(String(t.reservation_id));
+        if (!resList) continue;                                  // reservation gone — leave it
+        if (resList === String(t.listing_id)) continue;          // already on the right listing
+        const comps = compsByBundle.get(resList);
+        if (comps && comps.has(String(t.listing_id))) continue;  // valid bundle component
+        await supabase.from("clean_tasks")
+          .update({ status: "cancelled", warning_reason: "Booking moved to another property" })
+          .eq("id", t.id);
+      }
+    }
   }
 
   // Self-heal rows incorrectly promoted into a future P0 during an earlier
