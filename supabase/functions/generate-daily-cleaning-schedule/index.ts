@@ -822,19 +822,24 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
   }
 
   // 7. Build new tasks — at most ONE per (listing_id, scheduled_date), and at most
-  // ONE (non-cancelled) clean per booking overall. Load which of today's checkout
-  // bookings already have a clean (live OR completed) on any date, so a re-touched or
-  // date-shifted booking can't spawn a second clean.
+  // ONE (non-cancelled) clean per booking PER LISTING. Load which (reservation, listing)
+  // pairs already have a clean (live OR completed) on any date, so a re-touched or
+  // date-shifted booking can't spawn a second clean for the same listing.
+  //
+  // Keyed per-listing (not per-reservation) so a BUNDLE booking still fans out to every
+  // component: if one component already has its clean, the others are still created.
   const checkoutResIds = Array.from(new Set(activeCheckoutsForGeneration.map((r: any) => String(r.id))));
-  const reservationsWithClean = new Set<string>();
+  const reservationListingWithClean = new Set<string>(); // `${reservation_id}_${listing_id}`
   if (checkoutResIds.length > 0) {
     const { data: resCleanRows } = await supabase
       .from("clean_tasks")
-      .select("reservation_id")
+      .select("reservation_id, listing_id")
       .in("reservation_id", checkoutResIds)
       .neq("source", "manual")
       .not("status", "in", "(cancelled,canceled)");
-    for (const c of resCleanRows || []) if (c.reservation_id) reservationsWithClean.add(String(c.reservation_id));
+    for (const c of resCleanRows || [])
+      if (c.reservation_id && c.listing_id)
+        reservationListingWithClean.add(`${String(c.reservation_id)}_${String(c.listing_id)}`);
   }
 
   const newTasks: TaskInfo[] = [];
@@ -843,8 +848,6 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
   for (const r of activeCheckoutsForGeneration) {
     const key = `${r.id}_${targetDate}`;
     if (existingSet.has(key)) continue;
-    // Booking already has a clean somewhere (incl. completed) → don't duplicate it.
-    if (reservationsWithClean.has(String(r.id))) continue;
 
     // If this checkout is on a bundle, create tasks for each component instead
     const componentIds = bundleMap.get(r.listing_id);
@@ -855,6 +858,10 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     for (const targetLid of targetListingIds) {
       const listing = listingMap.get(targetLid);
       if (!listing) continue;
+
+      // This booking already has a clean for this listing (incl. completed, any date)
+      // → don't duplicate it. Per-listing so bundle components are independent.
+      if (reservationListingWithClean.has(`${String(r.id)}_${String(targetLid)}`)) continue;
 
       // Dedupe: skip if a task for this listing+date already exists in DB or was
       // planned earlier in this run (handles Hostaway returning sibling reservations
