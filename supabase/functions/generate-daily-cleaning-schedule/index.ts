@@ -357,6 +357,32 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         haveToday.add(lid);
       }
     }
+
+    // Companion guard: retire any clean sitting ON today whose booking already has a
+    // completed clean. These are duplicates that rolled forward to today BEFORE the
+    // carryover guard above could catch them (that guard only scans prior-dated rows).
+    const { data: todayOpenDup } = await supabase
+      .from("clean_tasks")
+      .select("id, reservation_id")
+      .eq("scheduled_date", targetDate)
+      .neq("source", "manual")
+      .not("status", "in", CANCELLED_TASK_STATUSES);
+    const todayDupResIds = Array.from(
+      new Set((todayOpenDup || []).map((t: any) => t.reservation_id).filter(Boolean).map(String))
+    );
+    if (todayDupResIds.length > 0) {
+      const { data: doneForToday } = await supabase
+        .from("clean_tasks")
+        .select("reservation_id")
+        .in("reservation_id", todayDupResIds)
+        .in("status", ["completed", "done"]);
+      const doneResToday = new Set((doneForToday || []).map((r: any) => String(r.reservation_id)));
+      for (const t of todayOpenDup || []) {
+        if (t.reservation_id && doneResToday.has(String(t.reservation_id))) {
+          await supabase.from("clean_tasks").update({ status: "cancelled" }).eq("id", t.id);
+        }
+      }
+    }
   }
 
   // Self-heal rows incorrectly promoted into a future P0 during an earlier
