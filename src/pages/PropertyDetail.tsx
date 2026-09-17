@@ -14,6 +14,7 @@ import { displayName, brandedName } from "@/lib/listingName";
 import { propagateCleaningDuration } from "@/lib/propagateCleanDuration";
 import { useCommunalGroups } from "@/hooks/useCommunalGroups";
 import { PropertyActivity } from "@/components/properties/PropertyActivity";
+import { usePropertyStates } from "@/hooks/usePropertyStates";
 
 const DURATION_OPTIONS = [60, 90, 120, 150, 180];
 
@@ -97,7 +98,18 @@ export default function PropertyDetail() {
   const operationalNotes = (listing as any).operational_notes;
   const troubleshootingNotes = (listing as any).troubleshooting_notes;
   const accessDetails = (listing as any).access_details;
-  const isClean = (listing as any).is_clean ?? true;
+  const { byId: propStates } = usePropertyStates();
+  const derived = id ? propStates.get(id) : undefined;
+  // 4-state badge matching On The Daily (falls back to the legacy flag until derived loads).
+  const STATE_BADGE: Record<string, { label: string; cls: string }> = {
+    occupied: { label: "Occupied", cls: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+    dirty: { label: "Needs Cleaning", cls: "bg-red-500/20 text-red-400 border-red-500/30" },
+    in_progress: { label: "Clean in progress", cls: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
+    clean: { label: "Clean", cls: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" },
+  };
+  const badge = derived
+    ? STATE_BADGE[derived.state]
+    : ((listing as any).is_clean ?? true ? STATE_BADGE.clean : STATE_BADGE.dirty);
 
   const l = listing as any;
   const isCommunal = l.is_communal ?? false;
@@ -120,15 +132,10 @@ export default function PropertyDetail() {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-display font-bold text-foreground">{displayName(listing)}</h1>
-                {isClean ? (
-                  <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
-                    <SprayCan className="h-3 w-3 mr-1" /> Clean
-                  </Badge>
-                ) : (
-                  <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
-                    <SprayCan className="h-3 w-3 mr-1" /> Needs Cleaning
-                  </Badge>
-                )}
+                <Badge className={`${badge.cls} text-xs`}>
+                  <SprayCan className="h-3 w-3 mr-1" /> {badge.label}
+                  {derived?.expected ? <span className="ml-1 opacity-70">· {derived.expected}</span> : null}
+                </Badge>
               </div>
               {brandedName(listing) && (
                 <p className="text-sm text-muted-foreground mt-1">{brandedName(listing)}</p>

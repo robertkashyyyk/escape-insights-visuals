@@ -105,6 +105,16 @@ export default function OnTheDaily() {
             </span>
           )}
           <span className="truncate">{c.name}</span>
+          {c.priorityUrgent && (
+            <span className="shrink-0 inline-flex items-center rounded px-1 py-0.5 text-[9px] font-bold bg-red-600 text-white" title="Arrival today — must be cleaned before check-in">
+              URGENT
+            </span>
+          )}
+          {c.sameDay && (
+            <span className="shrink-0 inline-flex items-center rounded px-1 py-0.5 text-[9px] font-bold bg-purple-600 text-white" title="Same-day changeover — guest checking in the same day">
+              SDC
+            </span>
+          )}
         </div>
         {c.expected && (
           <span className={`shrink-0 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${

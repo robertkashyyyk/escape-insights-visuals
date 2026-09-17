@@ -22,6 +22,8 @@ export interface PropertyState {
   expected: string | null;          // "ready ~14:30" / "Wed 10 Sep" / "done 13:13"
   overran: boolean;                 // clean finished later than expected
   issue: { count: number; urgent: boolean } | null;
+  sameDay: boolean;                 // same-day changeout (SDC) — guest arriving the day of the clean
+  priorityUrgent: boolean;          // arrival-risk / P0 carryover — needs doing today
   sortKey: string;                  // ISO-ish for earliest-first sorting
 }
 
@@ -98,7 +100,7 @@ export function usePropertyStates() {
     queryKey: ["pstate-cleans", backStr, fwdStr],
     queryFn: async () => fetchAllRows<any>(() =>
       supabase.from("clean_tasks")
-        .select("listing_id, scheduled_date, status, started_at, completed_at, estimated_start_time, cleaning_duration_minutes, checkout_time, assigned_cleaner_id")
+        .select("listing_id, scheduled_date, status, started_at, completed_at, estimated_start_time, cleaning_duration_minutes, checkout_time, assigned_cleaner_id, is_same_day_turnaround, priority, priority_level")
         .gte("scheduled_date", backStr).lte("scheduled_date", fwdStr)
         .not("status", "in", "(cancelled,canceled)")),
     ...fresh,
@@ -199,12 +201,19 @@ export function usePropertyStates() {
         sortKey = relClean.scheduled_date ?? todayStr;
       }
 
+      // SDC / priority only meaningful while a turnover is pending (dirty / in progress).
+      const sameDay = (state === "dirty" || state === "in_progress")
+        && !!relClean?.is_same_day_turnaround;
+      const priorityUrgent = (state === "dirty" || state === "in_progress")
+        && (relClean?.priority_level === 0 || relClean?.priority === "arrival_risk_orphan");
+
       out.push({
         listingId: l.id,
         name: displayName(l) || "Unknown",
         region: l.location_group ?? null,
         state, cleaner, cleanerId, checkoutTime, fromDate, toDate, expected, overran,
         issue: issueMap.get(l.id) ?? null,
+        sameDay, priorityUrgent,
         sortKey,
       });
     }
