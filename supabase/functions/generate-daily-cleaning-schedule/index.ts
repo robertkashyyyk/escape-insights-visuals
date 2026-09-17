@@ -893,8 +893,11 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
   const plannedListingDate = new Set<string>();
 
   for (const r of activeCheckoutsForGeneration) {
-    const key = `${r.id}_${targetDate}`;
-    if (existingSet.has(key)) continue;
+    // NB: no per-(reservation, date) short-circuit here — a bundle booking fans out
+    // to several component listings under ONE reservation, so skipping the whole
+    // booking because one component already has a clean would strand the others.
+    // Dedupe is enforced per component below (reservationListingWithClean +
+    // existingByListing + plannedListingDate).
 
     // If this checkout is on a bundle, create tasks for each component instead
     const componentIds = bundleMap.get(r.listing_id);
@@ -1268,16 +1271,21 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     // clean was already done still got a fresh one each morning if it was re-touched or
     // its dates drifted (12b spawned 4, DM27 re-generated after completion). Count any
     // non-cancelled clean (incl. completed) as "already covered".
+    // Keyed per (reservation, listing) — NOT per reservation — so a BUNDLE booking
+    // still inserts a clean for every component. A per-reservation key would insert
+    // the first component and silently drop the rest (e.g. Ernie's Den created but
+    // Lily's Pad dropped), leaving half the bundle uncleaned.
     const resIds = Array.from(new Set(toInsert.map((t) => t.reservation_id).filter(Boolean).map(String)));
-    const existingLive = new Set<string>();
+    const existingLive = new Set<string>(); // `${reservation_id}_${listing_id}`
     if (resIds.length) {
       const { data: liveRows } = await supabase
         .from("clean_tasks")
-        .select("reservation_id")
+        .select("reservation_id, listing_id")
         .in("reservation_id", resIds)
         .neq("source", "manual")
         .not("status", "in", "(cancelled,canceled)");
-      for (const r of liveRows || []) if (r.reservation_id) existingLive.add(String(r.reservation_id));
+      for (const r of liveRows || [])
+        if (r.reservation_id && r.listing_id) existingLive.add(`${String(r.reservation_id)}_${String(r.listing_id)}`);
     }
     const seenRes = new Set<string>();
     const rows = toInsert
@@ -1290,8 +1298,9 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         if (t.reservation_id && suppressedByReservation.has(`${t.reservation_id}_${t.scheduled_date}`)) return false;
         const rid = t.reservation_id ? String(t.reservation_id) : null;
         if (!rid) return true;                    // no reservation → not constrained
-        if (existingLive.has(rid) || seenRes.has(rid)) return false; // already covered
-        seenRes.add(rid);
+        const key = `${rid}_${t.listing_id}`;
+        if (existingLive.has(key) || seenRes.has(key)) return false; // already covered
+        seenRes.add(key);
         return true;
       })
       .map((t) => ({
