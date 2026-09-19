@@ -555,17 +555,19 @@ export default function CleanerPortal() {
   const todayFormatted = format(today, "EEEE, d MMMM yyyy");
 
   // Bucket tasks by period
+  // Compare by DATE STRING (yyyy-MM-dd sorts chronologically). The boundary Dates
+  // carry an end-of-day time (endOfWeek → 23:59:59.999, preserved by addDays), so
+  // comparing parseISO(date) (local midnight) against them dropped the first day of
+  // the week — e.g. Monday's cleans failed `>= nextWeekStart` (Mon 23:59:59) and
+  // showed as "0 jobs" even though they existed.
+  const thisWeekEndStr = format(thisWeekEnd, "yyyy-MM-dd");
+  const nextWeekStartStr = format(nextWeekStart, "yyyy-MM-dd");
+  const nextWeekEndStr = format(nextWeekEnd, "yyyy-MM-dd");
   const isInPeriod = (date: string, period: PeriodKey): boolean => {
     if (period === "today") return date === todayStr;
     if (period === "tomorrow") return date === tomorrowStr;
-    if (period === "rest_week") {
-      const d = parseISO(date);
-      return d > addDays(today, 1) && d <= thisWeekEnd;
-    }
-    if (period === "next_week") {
-      const d = parseISO(date);
-      return d >= nextWeekStart && d <= nextWeekEnd;
-    }
+    if (period === "rest_week") return date > tomorrowStr && date <= thisWeekEndStr;
+    if (period === "next_week") return date >= nextWeekStartStr && date <= nextWeekEndStr;
     return false;
   };
 
