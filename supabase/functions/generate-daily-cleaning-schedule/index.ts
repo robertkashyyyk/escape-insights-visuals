@@ -271,12 +271,16 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         .in("status", ["completed", "done"]);
       const reservationsCompleted = new Set((completedSiblings || []).map((r: any) => String(r.reservation_id)));
 
-      // Don't roll into a listing that already has a clean scheduled for today.
+      // Don't roll into a listing that already has a LIVE clean scheduled for today.
+      // Must exclude cancelled/canceled rows: a cancelled row on today's date is not
+      // coverage, and treating it as such made the carryover retire the live prior
+      // clean below (the "disappeared clean" bug).
       const { data: existingToday } = await supabase
         .from("clean_tasks")
         .select("listing_id")
         .in("listing_id", priorListingIds)
-        .eq("scheduled_date", targetDate);
+        .eq("scheduled_date", targetDate)
+        .not("status", "in", "(cancelled,canceled)");
       const haveToday = new Set((existingToday || []).map((r: any) => String(r.listing_id)));
       const promotedListings = new Set<string>();
 
@@ -325,9 +329,12 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
           continue;
         }
         if (haveToday.has(lid) || promotedListings.has(lid)) {
-          // Already covered today (or a sibling just rolled) — delete the redundant
-          // prior task so no duplicate active cleans remain.
-          await supabase.from("clean_tasks").delete().eq("id", t.id);
+          // Already covered today (or a sibling just rolled) — retire the redundant
+          // prior task so no duplicate active cleans remain. NEVER hard-delete: cancel
+          // it with a reason so the row survives for audit/history.
+          await supabase.from("clean_tasks")
+            .update({ status: "cancelled", warning_reason: "Superseded — another clean already covers this property today" })
+            .eq("id", t.id);
           continue;
         }
         const isArrival = arrivalSet.has(lid);
