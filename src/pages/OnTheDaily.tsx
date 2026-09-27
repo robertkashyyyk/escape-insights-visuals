@@ -82,7 +82,12 @@ export default function OnTheDaily() {
       (cleanerSel.size === 0 || (s.cleanerId != null && cleanerSel.has(s.cleanerId)));
     const cmp = sortMode === "az"
       ? (a: PropertyState, b: PropertyState) => a.name.localeCompare(b.name)
-      : (a: PropertyState, b: PropertyState) => a.sortKey.localeCompare(b.sortKey) || a.name.localeCompare(b.name);
+      // Priority first (0 arrival-risk → 1 same-day → 2 standard), then estimated
+      // start/earliest, then name.
+      : (a: PropertyState, b: PropertyState) =>
+          a.priorityLevel - b.priorityLevel ||
+          a.sortKey.localeCompare(b.sortKey) ||
+          a.name.localeCompare(b.name);
     const out: Record<CleanState, PropertyState[]> = { occupied: [], dirty: [], in_progress: [], clean: [] };
     for (const s of states) if (passes(s)) out[s.state].push(s);
     (Object.keys(out) as CleanState[]).forEach((k) => out[k].sort(cmp));
@@ -163,7 +168,7 @@ export default function OnTheDaily() {
             <div className="inline-flex rounded-md border border-border/50 overflow-hidden">
               <button onClick={() => setSortMode("date")}
                 className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium ${sortMode === "date" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary"}`}>
-                <CalendarClock className="h-3.5 w-3.5" /> Earliest
+                <CalendarClock className="h-3.5 w-3.5" /> Priority
               </button>
               <button onClick={() => setSortMode("az")}
                 className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium border-l border-border/50 ${sortMode === "az" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary"}`}>

@@ -24,6 +24,7 @@ export interface PropertyState {
   issue: { count: number; urgent: boolean } | null;
   sameDay: boolean;                 // same-day changeout (SDC) — guest arriving the day of the clean
   priorityUrgent: boolean;          // arrival-risk / P0 carryover — needs doing today
+  priorityLevel: number;            // 0 arrival-risk, 1 same-day, 2 standard (99 = not pending)
   sortKey: string;                  // ISO-ish for earliest-first sorting
 }
 
@@ -206,6 +207,11 @@ export function usePropertyStates() {
         && !!relClean?.is_same_day_turnaround;
       const priorityUrgent = (state === "dirty" || state === "in_progress")
         && (relClean?.priority_level === 0 || relClean?.priority === "arrival_risk_orphan");
+      // Lower = more urgent (0 arrival-risk, 1 same-day, 2 standard). Only meaningful
+      // for pending turnovers; occupied/clean sort last.
+      const priorityLevel = (state === "dirty" || state === "in_progress")
+        ? (typeof relClean?.priority_level === "number" ? relClean.priority_level : 2)
+        : 99;
 
       out.push({
         listingId: l.id,
@@ -213,7 +219,7 @@ export function usePropertyStates() {
         region: l.location_group ?? null,
         state, cleaner, cleanerId, checkoutTime, fromDate, toDate, expected, overran,
         issue: issueMap.get(l.id) ?? null,
-        sameDay, priorityUrgent,
+        sameDay, priorityUrgent, priorityLevel,
         sortKey,
       });
     }
