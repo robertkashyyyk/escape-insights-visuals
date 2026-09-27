@@ -489,10 +489,17 @@ export function TaskDetailPanel({
               come back when you regenerate</b>. The booking itself is untouched.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {sameDay && (
+            <div className="rounded-md border border-red-500/50 bg-red-500/10 px-3 py-2.5 text-sm text-red-700 dark:text-red-300">
+              <b>⚠️ A guest checks in here on {task.scheduled_date}.</b> This is a same-day
+              changeover — marking the clean “not required” leaves the property un-turned for
+              an arriving guest. Only do this if you're certain no clean is needed.
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleNotRequired} disabled={busy} className="bg-amber-600 hover:bg-amber-600/90">
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Yes, not required"}
+            <AlertDialogAction onClick={handleNotRequired} disabled={busy} className={sameDay ? "bg-red-600 hover:bg-red-600/90" : "bg-amber-600 hover:bg-amber-600/90"}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : (sameDay ? "Override — not required" : "Yes, not required")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
