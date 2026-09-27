@@ -30,6 +30,7 @@ export interface ChecklistItem {
   photo_url: string | null;
   flagged: boolean;
   requires_photo: boolean;
+  min_photos: number;
 }
 
 interface Props {
@@ -48,10 +49,24 @@ const roomTitle = (type: string, index: number, count: number) =>
 
 export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onChanged, onComplete, readOnly = false, memberName = null }: Props) {
   const [items, setItems] = useState<ChecklistItem[]>([]);
+  const [photoCounts, setPhotoCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [completing, setCompleting] = useState(false);
+
+  // How many proof photos an item still needs before it can be ticked (0 = satisfied).
+  const photosNeeded = (item: ChecklistItem) =>
+    item.requires_photo ? Math.max(0, (item.min_photos ?? 1) - (photoCounts[item.id] ?? 0)) : 0;
+
+  const loadPhotoCounts = async (itemIds: string[]) => {
+    if (!itemIds.length) { setPhotoCounts({}); return; }
+    const { data } = await (supabase.from as any)("clean_checklist_photos")
+      .select("checklist_item_id").in("checklist_item_id", itemIds);
+    const counts: Record<string, number> = {};
+    for (const r of (data ?? []) as any[]) counts[r.checklist_item_id] = (counts[r.checklist_item_id] ?? 0) + 1;
+    setPhotoCounts(counts);
+  };
 
   useEffect(() => {
     if (!task) return;
@@ -62,13 +77,13 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
       const { data: existing } = await supabase
         .from("clean_checklist_items").select("*").eq("clean_task_id", task.id);
       if (cancelled) return;
-      if (existing && existing.length) { setItems(existing as any); setLoading(false); return; }
+      if (existing && existing.length) { setItems(existing as any); await loadPhotoCounts(existing.map((i: any) => i.id)); setLoading(false); return; }
 
       // Build the expected set from config.
       const [listingRes, consRes, equipRes] = await Promise.all([
         supabase.from("listings").select("kitchens, bathrooms").eq("id", task.listing_id).single(),
         (supabase.from as any)("consumables").select("id, name, room_type, display_order").is("listing_id", null).eq("active", true).order("display_order"),
-        (supabase.from as any)("property_equipment").select("id, name, requires_photo").eq("listing_id", task.listing_id).eq("active", true).order("name"),
+        (supabase.from as any)("property_equipment").select("id, name, requires_photo, min_photos").eq("listing_id", task.listing_id).eq("active", true).order("name"),
       ]);
       if (cancelled) return;
       const kitchens = Math.max(1, (listingRes.data as any)?.kitchens ?? 1);
@@ -80,11 +95,12 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
       // NB: set requires_photo on EVERY row. In a mixed-array insert, PostgREST
       // inserts NULL (not the column default) for rows that omit a key another row
       // has — which breaks the not-null constraint. Non-equipment items = false.
+      // NB: set min_photos on EVERY row too (same mixed-array-insert reason as requires_photo).
       const rows: any[] = [];
-      for (const label of requestLabels) rows.push({ clean_task_id: task.id, category: "request", label, requires_photo: false });
-      for (let k = 1; k <= kitchens; k++) for (const c of kitchenItems) rows.push({ clean_task_id: task.id, category: "consumable", room_type: "kitchen", room_index: k, label: c.name, ref_id: c.id, requires_photo: false });
-      for (let b = 1; b <= bathrooms; b++) for (const c of bathItems) rows.push({ clean_task_id: task.id, category: "consumable", room_type: "bathroom", room_index: b, label: c.name, ref_id: c.id, requires_photo: false });
-      for (const e of (equipRes.data ?? []) as any[]) rows.push({ clean_task_id: task.id, category: "equipment", label: e.name, ref_id: e.id, requires_photo: e.requires_photo ?? true });
+      for (const label of requestLabels) rows.push({ clean_task_id: task.id, category: "request", label, requires_photo: false, min_photos: 1 });
+      for (let k = 1; k <= kitchens; k++) for (const c of kitchenItems) rows.push({ clean_task_id: task.id, category: "consumable", room_type: "kitchen", room_index: k, label: c.name, ref_id: c.id, requires_photo: false, min_photos: 1 });
+      for (let b = 1; b <= bathrooms; b++) for (const c of bathItems) rows.push({ clean_task_id: task.id, category: "consumable", room_type: "bathroom", room_index: b, label: c.name, ref_id: c.id, requires_photo: false, min_photos: 1 });
+      for (const e of (equipRes.data ?? []) as any[]) rows.push({ clean_task_id: task.id, category: "equipment", label: e.name, ref_id: e.id, requires_photo: e.requires_photo ?? true, min_photos: Math.max(1, e.min_photos ?? 1) });
 
       if (rows.length) {
         const { error: insErr } = await supabase.from("clean_checklist_items").insert(rows);
@@ -93,6 +109,7 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
       const { data } = await supabase.from("clean_checklist_items").select("*").eq("clean_task_id", task.id);
       if (cancelled) return;
       setItems((data ?? []) as any);
+      await loadPhotoCounts(((data ?? []) as any[]).map((i) => i.id));
       setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -101,6 +118,14 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
   const toggle = async (item: ChecklistItem) => {
     if (readOnly) return;
     const next = !item.checked;
+    // Can't tick a photo-required item until its proof photos are in.
+    if (next) {
+      const need = photosNeeded(item);
+      if (need > 0) {
+        toast.error(`Add ${need} more photo${need === 1 ? "" : "s"} before ticking “${item.label}”`);
+        return;
+      }
+    }
     const now = new Date().toISOString();
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, checked: next, checked_at: next ? now : null, check_all: false } : i)));
     setBusy(item.id);
@@ -114,15 +139,30 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
     if (!task || readOnly) return;
     setUploading(item.id);
     try {
-      // Upload the original file — no in-browser decode (see note at top of file).
-      const path = `${task.id}/${item.id}.${fileExt(file)}`;
+      // Append a NEW photo each time (unique path) — F1 allows multiple proof photos.
+      const path = `${task.id}/${item.id}/${crypto.randomUUID()}.${fileExt(file)}`;
       const { error: upErr } = await supabase.storage.from("clean-photos")
-        .upload(path, file, { upsert: true, contentType: file.type || "image/jpeg" });
+        .upload(path, file, { contentType: file.type || "image/jpeg" });
       if (upErr) throw upErr;
       const url = `${supabase.storage.from("clean-photos").getPublicUrl(path).data.publicUrl}?t=${Date.now()}`;
       const now = new Date().toISOString();
-      await supabase.from("clean_checklist_items").update({ photo_url: url, checked: true, checked_at: now, checked_by: userId, checked_by_member: memberName }).eq("id", item.id);
-      setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, photo_url: url, checked: true, checked_at: now } : i)));
+      // Record the photo in the child table.
+      await (supabase.from as any)("clean_checklist_photos").insert({
+        checklist_item_id: item.id, photo_path: url, taken_by_member: memberName,
+      });
+      const newCount = (photoCounts[item.id] ?? 0) + 1;
+      setPhotoCounts((prev) => ({ ...prev, [item.id]: newCount }));
+      // Keep photo_url = the first photo for read-compatibility.
+      const patch: any = item.photo_url ? {} : { photo_url: url };
+      // Auto-tick only once the minimum is met.
+      const nowMet = !item.requires_photo || newCount >= (item.min_photos ?? 1);
+      if (nowMet) { patch.checked = true; patch.checked_at = now; patch.checked_by = userId; patch.checked_by_member = memberName; }
+      if (Object.keys(patch).length) {
+        await supabase.from("clean_checklist_items").update(patch).eq("id", item.id);
+      }
+      setItems((prev) => prev.map((i) => (i.id === item.id
+        ? { ...i, photo_url: i.photo_url ?? url, ...(nowMet ? { checked: true, checked_at: now } : {}) }
+        : i)));
       onChanged?.();
     } catch (e: any) {
       toast.error(`Photo upload failed: ${e?.message ?? "try again"}`);
@@ -276,39 +316,37 @@ export function CleanChecklistSheet({ task, requestLabels, userId, onClose, onCh
                     // Tick-only equipment (e.g. Coffee Machine) — no photo, just a tick.
                     i.requires_photo === false ? (
                       <Row key={i.id} item={i} />
-                    ) : (
+                    ) : (() => {
+                      const count = photoCounts[i.id] ?? 0;
+                      const min = i.min_photos ?? 1;
+                      const met = count >= min;
+                      return (
                       <div key={i.id} className="flex items-center gap-3 px-3 py-2.5">
-                        <span className={`h-5 w-5 rounded-md border flex items-center justify-center shrink-0 ${i.photo_url ? "bg-emerald-500 border-emerald-500 text-white" : "border-border"}`}>
-                          {i.photo_url && <Check className="h-3.5 w-3.5" />}
+                        <span className={`h-5 w-5 rounded-md border flex items-center justify-center shrink-0 ${met ? "bg-emerald-500 border-emerald-500 text-white" : "border-border"}`}>
+                          {met && <Check className="h-3.5 w-3.5" />}
                         </span>
-                        <span className={`text-sm flex-1 ${i.photo_url ? "text-muted-foreground" : "text-foreground"}`}>{i.label}</span>
-                        {i.photo_url ? (
-                          <div className="flex items-center gap-3">
-                            {/* No inline <img>: decoding the full-size photo for a
-                                thumbnail spikes memory and, stacked, makes the next
-                                capture fail with iOS "low memory". View opens it on
-                                demand instead. */}
+                        <span className={`text-sm flex-1 ${met ? "text-muted-foreground" : "text-foreground"}`}>
+                          {i.label}
+                          <span className={`ml-1.5 text-[11px] ${met ? "text-emerald-600" : "text-muted-foreground"}`}>{count}/{min}{min > 1 ? " photos" : ""}</span>
+                        </span>
+                        <div className="flex items-center gap-3">
+                          {i.photo_url && (
                             <a href={i.photo_url} target="_blank" rel="noopener noreferrer"
                               className="text-[11px] font-medium text-emerald-600">View</a>
-                            {!readOnly && (
-                              <label className="text-[11px] text-primary cursor-pointer">
-                                Retake
-                                <input type="file" accept="image/*" capture="environment" className="hidden"
-                                  onChange={(e) => e.target.files?.[0] && handlePhoto(i, e.target.files[0])} />
-                              </label>
-                            )}
-                          </div>
-                        ) : readOnly ? (
-                          <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1"><Camera className="h-3.5 w-3.5" /> Photo needed</span>
-                        ) : (
-                          <label className={`text-xs font-medium px-2.5 py-1.5 rounded-md border inline-flex items-center gap-1.5 cursor-pointer ${uploading === i.id ? "opacity-60" : "border-primary/40 text-primary hover:bg-primary/10"}`}>
-                            {uploading === i.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />} Photo
-                            <input type="file" accept="image/*" capture="environment" className="hidden" disabled={uploading === i.id}
-                              onChange={(e) => e.target.files?.[0] && handlePhoto(i, e.target.files[0])} />
-                          </label>
-                        )}
+                          )}
+                          {readOnly ? (
+                            !met && <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1"><Camera className="h-3.5 w-3.5" /> {min - count} needed</span>
+                          ) : (
+                            <label className={`text-xs font-medium px-2.5 py-1.5 rounded-md border inline-flex items-center gap-1.5 cursor-pointer ${uploading === i.id ? "opacity-60" : met ? "border-border text-muted-foreground hover:bg-secondary/40" : "border-primary/40 text-primary hover:bg-primary/10"}`}>
+                              {uploading === i.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />} {met ? "Add" : "Photo"}
+                              <input type="file" accept="image/*" capture="environment" className="hidden" disabled={uploading === i.id}
+                                onChange={(e) => e.target.files?.[0] && handlePhoto(i, e.target.files[0])} />
+                            </label>
+                          )}
+                        </div>
                       </div>
-                    )
+                      );
+                    })()
                   )}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1.5">Camera items must be photographed in approved condition; the rest are a tick.</p>
