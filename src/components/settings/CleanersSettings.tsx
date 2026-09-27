@@ -299,7 +299,7 @@ export function CleanersSettings() {
     //    covers each region under the updated settings.
     try {
       await supabase.functions.invoke("generate-daily-cleaning-schedule", {
-        body: { date: startStr, days_ahead: days },
+        body: { date: startStr, days_ahead: days, source: "cleaners-settings" },
       });
       toast({ title: "Cleans regenerated", description: `${ids.length} upcoming clean${ids.length === 1 ? "" : "s"} reallocated after ${cleanerName}'s change.` });
     } catch (e: any) {

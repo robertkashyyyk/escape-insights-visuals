@@ -43,7 +43,7 @@ export function CleanerWorkingExceptionsSection({ cleanerId, cleanerName }: { cl
       setSaving(false); return;
     }
     // Re-run that day's schedule so this cleaner can pick up unassigned jobs.
-    await supabase.functions.invoke("generate-daily-cleaning-schedule", { body: { date } }).catch(() => {});
+    await supabase.functions.invoke("generate-daily-cleaning-schedule", { body: { date, source: "working-exceptions" } }).catch(() => {});
     toast({ title: "Working day added", description: `${cleanerName} now available on ${format(parseISO(date), "EEE d MMM")} — schedule refreshed.` });
     setDate(""); setSaving(false); fetchAll();
   };

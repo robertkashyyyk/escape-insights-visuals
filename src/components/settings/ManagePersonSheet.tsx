@@ -175,7 +175,7 @@ export function ManagePersonSheet({ user, isSelf, onClose, onChanged }: Props) {
     const { error } = await (supabase.from("clean_tasks" as any) as any)
       .update({ assigned_cleaner_id: null, status: "unassigned" }).in("id", regen.ids);
     if (!error) {
-      await supabase.functions.invoke("generate-daily-cleaning-schedule", { body: { date: regen.startStr, days_ahead: regen.days } });
+      await supabase.functions.invoke("generate-daily-cleaning-schedule", { body: { date: regen.startStr, days_ahead: regen.days, source: "manage-person" } });
     }
     setBusy(null); setRegen(null);
     toast({ title: error ? "Regenerate failed" : "Cleans regenerated", description: error?.message || `${regen.ids.length} clean(s) reallocated.`, variant: error ? "destructive" : undefined });

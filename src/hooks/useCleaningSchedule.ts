@@ -570,7 +570,7 @@ export function useCleaningSchedule() {
       let data: any = null, invokeError: any = null;
       try {
         const res = await supabase.functions.invoke("generate-daily-cleaning-schedule", {
-          body: days > 1 ? { date: startStr, days_ahead: days } : { date: startStr },
+          body: days > 1 ? { date: startStr, days_ahead: days, source: "cleaning-schedule" } : { date: startStr, source: "cleaning-schedule" },
         });
         data = res.data; invokeError = res.error;
       } catch (e) { invokeError = e; }

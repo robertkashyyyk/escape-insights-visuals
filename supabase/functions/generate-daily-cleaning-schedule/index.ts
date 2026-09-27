@@ -60,6 +60,8 @@ interface TaskInfo {
   checkin_time: string | null;
   is_same_day_turnaround: boolean;
   existing_task_id?: string | null; // present if this is a pre-existing unassigned row to UPDATE rather than INSERT
+  origin?: string;                   // TEMP trace: which code path produced this row
+  srcCheckout?: string | null;       // TEMP trace: reservation's check_out at build time
   source?: string;
   notes?: string;
   overloaded?: boolean;
@@ -89,6 +91,11 @@ const CLUSTER_SOFT_MAX = 3;  // 1–3 → one cleaner; 4+ → split
 const ROLLING_WINDOW_DAYS = 28;
 const CANCELLED_TASK_STATUSES = "(completed,done,cancelled,canceled)";
 
+// TEMPORARY phantom-insert instrumentation (remove after 2026-09-30). Logs every
+// clean_tasks INSERT with its code path, reservation, the reservation's current
+// check_out, targetDate, and the invoking body source. Self-disables after expiry.
+const PHANTOM_TRACE_UNTIL = Date.parse("2026-09-30T23:59:00Z");
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -103,11 +110,13 @@ Deno.serve(async (req) => {
     let targetDate: string | null = null;
     let daysAhead = 0;
     let targetListingId: string | null = null;
+    let bodySource = "unknown";
     try {
       const body = await req.json();
       if (body?.date) targetDate = body.date;
       if (typeof body?.days_ahead === "number") daysAhead = body.days_ahead;
       if (typeof body?.listing_id === "string" && body.listing_id) targetListingId = body.listing_id;
+      if (typeof body?.source === "string" && body.source) bodySource = body.source;
     } catch {
       // no body
     }
@@ -133,7 +142,7 @@ Deno.serve(async (req) => {
     const perDayResults: Array<{ date: string; created: number; unassigned: number }> = [];
 
     for (const targetDate of dates) {
-      const { created, unassigned } = await processDate(supabase, targetDate, targetListingId);
+      const { created, unassigned } = await processDate(supabase, targetDate, targetListingId, bodySource);
       grandTotalCreated += created;
       grandTotalUnassigned += unassigned;
       perDayResults.push({ date: targetDate, created, unassigned });
@@ -173,7 +182,7 @@ Deno.serve(async (req) => {
   }
 });
 
-async function processDate(supabase: any, targetDate: string, targetListingId: string | null = null): Promise<{ created: number; unassigned: number }> {
+async function processDate(supabase: any, targetDate: string, targetListingId: string | null = null, traceSource: string = "unknown"): Promise<{ created: number; unassigned: number }> {
   // Optional fast path: when a specific listing_id is provided, restrict processing
   // to that one listing. Used by the reactive same-day allocation trigger.
   const restrictTo = (id: string) => !targetListingId || String(id) === targetListingId;
@@ -1032,6 +1041,8 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         checkout_time: checkoutTime,
         checkin_time: checkinTime,
         is_same_day_turnaround: isSameDay,
+        origin: componentIds && componentIds.length > 0 ? "generation-bundle-fanout" : "generation-checkout",
+        srcCheckout: r.check_out,
       });
     }
   }
@@ -1066,6 +1077,8 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
       existing_task_id: orphan.id,
       source: orphan.source || "hostaway",
       warning_reason: orphan.warning_reason ?? null,
+      origin: "orphan-promotion",
+      srcCheckout: null,
     });
   }
 
@@ -1363,7 +1376,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         if (r.reservation_id && r.listing_id) existingLive.add(`${String(r.reservation_id)}_${String(r.listing_id)}`);
     }
     const seenRes = new Set<string>();
-    const rows = toInsert
+    const toInsertFinal = toInsert
       .filter((t) => {
         // Never create a clean on a bundle listing itself — it has no matrix row,
         // so the clean would be invisible (a phantom "unassigned" count). If a bundle
@@ -1377,7 +1390,14 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         if (existingLive.has(key) || seenRes.has(key)) return false; // already covered
         seenRes.add(key);
         return true;
-      })
+      });
+    // TEMPORARY phantom-insert trace (self-disables 2026-09-30). One line per row.
+    if (Date.now() < PHANTOM_TRACE_UNTIL) {
+      for (const t of toInsertFinal) {
+        console.log(`[PHANTOM-TRACE] path=${t.origin ?? "?"} caller=${traceSource} targetDate=${targetDate} scheduled_date=${t.scheduled_date} reservation_id=${t.reservation_id ?? "none"} srcCheckout=${t.srcCheckout ?? "?"} clean_source=${t.source ?? "hostaway"} sameDay=${t.is_same_day_turnaround}`);
+      }
+    }
+    const rows = toInsertFinal
       .map((t) => ({
         listing_id: t.listing_id,
         reservation_id: t.reservation_id,

@@ -259,7 +259,7 @@ export function useMatrixSchedule(weekAnchor: Date) {
       (async () => {
         try {
           await supabase.functions.invoke("generate-daily-cleaning-schedule", {
-            body: { date: weekStartStr, days_ahead: 7 },
+            body: { date: weekStartStr, days_ahead: 7, source: "matrix-autogen" },
           });
           if (cancelled) return;
           qc.invalidateQueries({ queryKey: ["matrix-tasks", weekStartStr, weekEndStr] });
@@ -359,7 +359,7 @@ export function useMatrixSchedule(weekAnchor: Date) {
       try {
         const { data, error: fnErr } = await supabase.functions.invoke(
           "generate-daily-cleaning-schedule",
-          { body: { date: scheduledDate } }
+          { body: { date: scheduledDate, source: "matrix-manual-removal" } }
         );
         if (fnErr) throw fnErr;
         const created = data?.tasks_created ?? 0;

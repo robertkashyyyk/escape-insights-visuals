@@ -139,7 +139,7 @@ export function CleanerHolidaysSection({ cleanerId, cleanerName }: Props) {
       const endD = parseISO(end);
       const days = Math.round((endD.getTime() - startD.getTime()) / 86400000) + 1;
       await supabase.functions.invoke("generate-daily-cleaning-schedule", {
-        body: { date: start, days_ahead: days },
+        body: { date: start, days_ahead: days, source: "cleaner-holidays" },
       });
       toast({ title: "Reallocation triggered", description: `${pendingReallocate.taskCount} task(s) sent back into the pool.` });
     } catch (e: any) {
