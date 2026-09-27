@@ -150,6 +150,7 @@ export function ManagePersonSheet({ user, isSelf, onClose, onChanged }: Props) {
       home_longitude: cleaner.home_longitude ?? null,
       region: (cleaner.location_groups ?? [])[0] || "Other",
       name: cleaner.name, email: cleaner.email, phone: cleaner.phone ?? null,
+      is_offline: cleaner.is_offline ?? false,
     }).eq("id", cleaner.id);
     setBusy(null);
     if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
@@ -245,6 +246,18 @@ export function ManagePersonSheet({ user, isSelf, onClose, onChanged }: Props) {
                 {!cleaner ? <p className="text-xs text-muted-foreground">Loading…</p> : cleanerValue && (
                   <>
                     <CleanerProfileFields value={cleanerValue} onChange={(patch) => setCleaner({ ...cleaner, ...patch })} />
+                    <div className="flex items-start justify-between gap-3 rounded-lg border border-border/40 p-3">
+                      <div>
+                        <p className="text-sm font-medium">Offline cleaner</p>
+                        <p className="text-xs text-muted-foreground">
+                          No app login. Their cleans are auto-completed at end of day (marked “assumed”, not counted for pay) and never carried over.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={!!cleaner.is_offline}
+                        onCheckedChange={(v) => setCleaner({ ...cleaner, is_offline: v })}
+                      />
+                    </div>
                     <Button className="gap-2" onClick={saveCleaner} disabled={busy === "cleaner"}>
                       {busy === "cleaner" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save cleaner details
                     </Button>
