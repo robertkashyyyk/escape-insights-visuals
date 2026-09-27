@@ -112,6 +112,7 @@ export default function CleanerPortal() {
   // Team cleaners: several people share one login and pick who they are.
   const [teamMembers, setTeamMembers] = useState<{ id: string; name: string }[]>([]);
   const [activeMember, setActiveMember] = useState<string | null>(null);
+  const [briefsByListing, setBriefsByListing] = useState<Record<string, any[]>>({});
   const [showMemberPicker, setShowMemberPicker] = useState(false);
   const [checklistByTask, setChecklistByTask] = useState<Record<string, { done: number; total: number }>>({});
   const [activePeriod, setActivePeriod] = useState<PeriodKey>("today");
@@ -357,6 +358,46 @@ export default function CleanerPortal() {
     () => tasks.map((t) => `${t.id}:${t.listing_id}:${t.scheduled_date}:${t.reservation_id ?? ""}`).sort().join("|"),
     [tasks],
   );
+  // F2: load open ops briefs for the visible tasks' listings (pinned card + Understood).
+  useEffect(() => {
+    if (tasks.length === 0) { setBriefsByListing({}); return; }
+    let cancelled = false;
+    (async () => {
+      const listingIds = Array.from(new Set(tasks.map((t) => t.listing_id)));
+      const { data } = await (supabase.from as any)("property_briefs")
+        .select("id, listing_id, body, photo_paths, consumed_at, consumed_by_member")
+        .in("listing_id", listingIds)
+        .is("resolved_at", null)
+        .order("created_at", { ascending: true });
+      if (cancelled) return;
+      // Sign the private brief photos for display.
+      const byListing: Record<string, any[]> = {};
+      for (const b of (data ?? []) as any[]) {
+        const urls: string[] = [];
+        for (const path of (b.photo_paths ?? [])) {
+          const { data: s } = await supabase.storage.from("clean-issue-photos").createSignedUrl(path, 3600);
+          if (s?.signedUrl) urls.push(s.signedUrl);
+        }
+        (byListing[b.listing_id] ??= []).push({ ...b, photo_urls: urls });
+      }
+      if (!cancelled) setBriefsByListing(byListing);
+    })();
+    return () => { cancelled = true; };
+  }, [taskKey]);
+
+  const acknowledgeBrief = async (brief: any, taskId: string) => {
+    const now = new Date().toISOString();
+    setBriefsByListing((prev) => {
+      const copy = { ...prev };
+      copy[brief.listing_id] = (copy[brief.listing_id] ?? []).map((b) =>
+        b.id === brief.id ? { ...b, consumed_at: now, consumed_by_member: activeMember } : b);
+      return copy;
+    });
+    await (supabase.from as any)("property_briefs")
+      .update({ consumed_by_clean_task_id: taskId, consumed_at: now, consumed_by_member: activeMember })
+      .eq("id", brief.id);
+  };
+
   useEffect(() => {
     if (tasks.length === 0) { setRequestsByTask({}); return; }
     let cancelled = false;
@@ -943,6 +984,30 @@ export default function CleanerPortal() {
                                 ))}
                               </div>
                             )}
+
+                            {/* F2: ops briefs for this property — pinned before & throughout. */}
+                            {(briefsByListing[task.listing_id] ?? []).map((brief) => (
+                              <div key={brief.id} className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2.5">
+                                <p className="text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-300 font-semibold mb-1">📌 Brief from the office</p>
+                                <p className="text-[13px] text-foreground/90 whitespace-pre-wrap">{brief.body}</p>
+                                {Array.isArray(brief.photo_urls) && brief.photo_urls.length > 0 && (
+                                  <div className="flex flex-wrap gap-2 mt-2">
+                                    {brief.photo_urls.map((u: string, idx: number) => (
+                                      <a key={idx} href={u} target="_blank" rel="noopener noreferrer"
+                                        className="text-[11px] font-medium text-amber-700 dark:text-amber-300 underline">Photo {idx + 1}</a>
+                                    ))}
+                                  </div>
+                                )}
+                                {brief.consumed_at ? (
+                                  <p className="text-[11px] text-emerald-600 mt-2 inline-flex items-center gap-1"><Check className="h-3 w-3" /> Understood{brief.consumed_by_member ? ` — ${brief.consumed_by_member}` : ""}</p>
+                                ) : !isReadOnlyPeriod && (
+                                  <button onClick={() => acknowledgeBrief(brief, task.id)}
+                                    className="mt-2 text-xs font-semibold px-3 py-1.5 rounded-md bg-amber-600 text-white active:scale-[0.98]">
+                                    Understood
+                                  </button>
+                                )}
+                              </div>
+                            ))}
 
                             {/* Manager note for this specific clean (set in the schedule task panel). */}
                             {task.notes && task.notes.trim() && (

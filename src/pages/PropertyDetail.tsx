@@ -14,6 +14,7 @@ import { displayName, brandedName } from "@/lib/listingName";
 import { propagateCleaningDuration } from "@/lib/propagateCleanDuration";
 import { useCommunalGroups } from "@/hooks/useCommunalGroups";
 import { PropertyActivity } from "@/components/properties/PropertyActivity";
+import { PropertyBriefs } from "@/components/properties/PropertyBriefs";
 import { usePropertyStates } from "@/hooks/usePropertyStates";
 
 const DURATION_OPTIONS = [60, 90, 120, 150, 180];
@@ -306,6 +307,12 @@ export default function PropertyDetail() {
             )}
           </DetailCard>
         </div>
+
+        {id && (
+          <div className="mt-4">
+            <PropertyBriefs listingId={id} />
+          </div>
+        )}
 
         {id && (
           <div className="mt-4">
