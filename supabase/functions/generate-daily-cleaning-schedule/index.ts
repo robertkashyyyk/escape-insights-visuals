@@ -94,7 +94,7 @@ const CANCELLED_TASK_STATUSES = "(completed,done,cancelled,canceled)";
 // TEMPORARY phantom-insert instrumentation (remove after 2026-09-30). Logs every
 // clean_tasks INSERT with its code path, reservation, the reservation's current
 // check_out, targetDate, and the invoking body source. Self-disables after expiry.
-const PHANTOM_TRACE_UNTIL = Date.parse("2026-09-30T23:59:00Z");
+const PHANTOM_TRACE_UNTIL = Date.parse("2026-10-07T23:59:00Z");
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -111,12 +111,16 @@ Deno.serve(async (req) => {
     let daysAhead = 0;
     let targetListingId: string | null = null;
     let bodySource = "unknown";
+    let backfill = false;      // explicit admin opt-in to (re)generate for past dates
+    let skipRefresh = false;   // callers on page-load skip the current-day carryover
     try {
       const body = await req.json();
       if (body?.date) targetDate = body.date;
       if (typeof body?.days_ahead === "number") daysAhead = body.days_ahead;
       if (typeof body?.listing_id === "string" && body.listing_id) targetListingId = body.listing_id;
       if (typeof body?.source === "string" && body.source) bodySource = body.source;
+      if (body?.backfill === true) backfill = true;
+      if (body?.skip_refresh === true) skipRefresh = true;
     } catch {
       // no body
     }
@@ -137,12 +141,27 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Never generate for dates BEFORE today — a past target makes generation create
+    // cleans for past checkouts, which the current-day carryover then rolls forward
+    // and churns (the phantom-clean bug). Only an explicit {backfill:true} admin run
+    // may touch past dates.
+    if (!backfill) {
+      const today = todayLondon();
+      const before = dates.length;
+      const kept = dates.filter((d) => d >= today);
+      if (kept.length !== before) {
+        console.log(`[schedule] dropped ${before - kept.length} past date(s) (caller=${bodySource}); pass {backfill:true} to force.`);
+      }
+      dates.length = 0;
+      dates.push(...kept);
+    }
+
     let grandTotalCreated = 0;
     let grandTotalUnassigned = 0;
     const perDayResults: Array<{ date: string; created: number; unassigned: number }> = [];
 
     for (const targetDate of dates) {
-      const { created, unassigned } = await processDate(supabase, targetDate, targetListingId, bodySource);
+      const { created, unassigned } = await processDate(supabase, targetDate, targetListingId, bodySource, skipRefresh);
       grandTotalCreated += created;
       grandTotalUnassigned += unassigned;
       perDayResults.push({ date: targetDate, created, unassigned });
@@ -182,7 +201,7 @@ Deno.serve(async (req) => {
   }
 });
 
-async function processDate(supabase: any, targetDate: string, targetListingId: string | null = null, traceSource: string = "unknown"): Promise<{ created: number; unassigned: number }> {
+async function processDate(supabase: any, targetDate: string, targetListingId: string | null = null, traceSource: string = "unknown", skipRefresh: boolean = false): Promise<{ created: number; unassigned: number }> {
   // Optional fast path: when a specific listing_id is provided, restrict processing
   // to that one listing. Used by the reactive same-day allocation trigger.
   const restrictTo = (id: string) => !targetListingId || String(id) === targetListingId;
@@ -206,7 +225,10 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
   // 0. P0 PROMOTION: only on the actual current day. Future week regeneration
   // must keep cleans on checkout day; the early-morning refresh promotes them
   // to P0 only if they are still incomplete on arrival day.
-  const isCurrentDayRefresh = targetDate === todayLondon();
+  // Page-load callers (e.g. matrix auto-gen) pass skip_refresh so opening the app
+  // never triggers the carryover/re-occupancy churn — only the cron and explicit
+  // regenerate run the current-day refresh.
+  const isCurrentDayRefresh = targetDate === todayLondon() && !skipRefresh;
   let arrivalListingIds: string[] = [];
 
   // Archived / inactive (de-listed) properties never get cleans — exclude them from
@@ -375,6 +397,15 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
             overloaded: false,
           })
           .eq("id", t.id);
+        if (Date.now() < PHANTOM_TRACE_UNTIL) {
+          try {
+            await supabase.from("phantom_trace").insert({
+              path: "carryover-update", caller: traceSource, target_date: targetDate,
+              scheduled_date: targetDate, reservation_id: t.reservation_id ?? null,
+              src_checkout: priorDate, clean_source: t.source ?? null,
+            });
+          } catch (_) { /* trace only */ }
+        }
         promotedListings.add(lid);
         haveToday.add(lid);
       }
@@ -1391,11 +1422,19 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         seenRes.add(key);
         return true;
       });
-    // TEMPORARY phantom-insert trace (self-disables 2026-09-30). One line per row.
-    if (Date.now() < PHANTOM_TRACE_UNTIL) {
-      for (const t of toInsertFinal) {
-        console.log(`[PHANTOM-TRACE] path=${t.origin ?? "?"} caller=${traceSource} targetDate=${targetDate} scheduled_date=${t.scheduled_date} reservation_id=${t.reservation_id ?? "none"} srcCheckout=${t.srcCheckout ?? "?"} clean_source=${t.source ?? "hostaway"} sameDay=${t.is_same_day_turnaround}`);
-      }
+    // TEMPORARY phantom-insert trace to a queryable table (self-disables 2026-10-07).
+    if (Date.now() < PHANTOM_TRACE_UNTIL && toInsertFinal.length > 0) {
+      try {
+        await supabase.from("phantom_trace").insert(toInsertFinal.map((t) => ({
+          path: t.origin ?? "unknown",
+          caller: traceSource,
+          target_date: targetDate,
+          scheduled_date: t.scheduled_date,
+          reservation_id: t.reservation_id ?? null,
+          src_checkout: t.srcCheckout ?? null,
+          clean_source: t.source ?? "hostaway",
+        })));
+      } catch (_) { /* trace must never break generation */ }
     }
     const rows = toInsertFinal
       .map((t) => ({
@@ -1419,14 +1458,18 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         source: t.source ?? "hostaway",
       }));
     if (rows.length > 0) {
+      const traceOn = Date.now() < PHANTOM_TRACE_UNTIL;
+      if (traceOn) console.log(`[PHANTOM-TRACE] bulk-insert attempt count=${rows.length} caller=${traceSource} targetDate=${targetDate}`);
       const { error: insertErr } = await supabase.from("clean_tasks").insert(rows);
       if (insertErr && (insertErr as any).code === "23505") {
         // A live clean already exists for one of these reservations (the one-live-
         // clean-per-reservation index). Retry row-by-row and skip the conflicting
         // ones rather than failing the whole run.
+        if (traceOn) console.log(`[PHANTOM-TRACE] bulk-insert hit 23505 → row-by-row retry, caller=${traceSource} targetDate=${targetDate}`);
         let ok = 0;
         for (const row of rows) {
           const { error: e } = await supabase.from("clean_tasks").insert(row);
+          if (traceOn) console.log(`[PHANTOM-TRACE] retry-insert ${e ? `SKIP(${(e as any).code})` : "OK"} listing=${(row as any).listing_id} reservation=${(row as any).reservation_id ?? "none"} scheduled_date=${(row as any).scheduled_date} clean_source=${(row as any).source}`);
           if (e && (e as any).code !== "23505") throw e;
           if (!e) ok++;
         }
