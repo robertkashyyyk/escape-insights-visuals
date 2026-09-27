@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { planBundleCleans } from "../_shared/bundleFanout.ts";
 
 const AVG_SPEED_KMH = 40;
 const DEFAULT_CHECKOUT = "10:00";
@@ -1013,20 +1014,27 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     // Dedupe is enforced per component below (reservationListingWithClean +
     // existingByListing + plannedListingDate).
 
-    // If this checkout is on a bundle, create tasks for each component instead
+    // If this checkout is on a bundle, fan out to its components (shared rule, also
+    // covered by the bundle regression test). planBundleCleans drops the bundle listing
+    // itself and any component that already has a live clean for this booking (per-
+    // listing dedupe — components are independent).
     const componentIds = bundleMap.get(r.listing_id);
-    const targetListingIds = componentIds && componentIds.length > 0
-      ? componentIds
-      : [r.listing_id];
+    const isBundle = !!(componentIds && componentIds.length > 0);
+    const componentListingIds = isBundle ? componentIds! : [r.listing_id];
+    const componentsWithLiveClean = new Set(
+      componentListingIds.filter((cid) =>
+        reservationListingWithClean.has(`${String(r.id)}_${String(cid)}`))
+    );
+    const targetListingIds = planBundleCleans({
+      bundleListingId: isBundle ? r.listing_id : "",
+      componentListingIds,
+      componentsWithLiveClean,
+    });
 
     for (const targetLid of targetListingIds) {
       const listing = listingMap.get(targetLid);
       if (!listing) continue;
       if (inactiveListingIds.has(targetLid)) continue;  // never clean a de-listed property
-
-      // This booking already has a clean for this listing (incl. completed, any date)
-      // → don't duplicate it. Per-listing so bundle components are independent.
-      if (reservationListingWithClean.has(`${String(r.id)}_${String(targetLid)}`)) continue;
 
       // Dedupe: skip if a task for this listing+date already exists in DB or was
       // planned earlier in this run (handles Hostaway returning sibling reservations

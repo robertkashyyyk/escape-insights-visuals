@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { planBundleCleans } from "@/lib/bundleFanout";
+// Import the SAME module the edge scheduler uses, so breaking the edge fan-out
+// breaks this test.
+import { planBundleCleans } from "../../supabase/functions/_shared/bundleFanout";
 
 // Regression guard for the Ernie's Den & Lily's Pad bundle bug: a bundle booking must
 // fan out to every component that needs a clean, and completing/having one component's
