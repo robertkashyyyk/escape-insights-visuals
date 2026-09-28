@@ -1,7 +1,12 @@
 project_id = "pftqjrmdksrrpczhomln"
 
+# Auth-gated: verify_jwt=true so the platform verifies the JWT signature; each function
+# also rejects anon via _shared/auth.ts (service_role + authenticated only).
+[functions.generate-daily-cleaning-schedule]
+verify_jwt = true
+
 [functions.generate-orin-brief]
-verify_jwt = false
+verify_jwt = true
 
 [functions.orin-chat]
 verify_jwt = false
@@ -9,13 +14,14 @@ verify_jwt = false
 [functions.notify-urgent-issue]
 verify_jwt = true
 
-# Internal sync triggered by the hostaway-auto-sync cron (which passes the
-# publishable key, not a JWT). Gate off so the cron isn't rejected with 401.
+# Called by the hostaway-auto-sync cron (now sends the service_role JWT via
+# edge_auth_header) and by the frontend (logged-in user JWT). Gated on.
 [functions.hostaway-sync]
-verify_jwt = false
+verify_jwt = true
 
 [functions.ota-ingest]
 verify_jwt = true
 
+# Called only by the stripe-auto-sync cron (now sends the service_role JWT).
 [functions.stripe-sync]
-verify_jwt = false
+verify_jwt = true

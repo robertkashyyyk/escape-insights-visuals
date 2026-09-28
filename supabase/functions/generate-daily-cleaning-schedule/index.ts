@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { planBundleCleans } from "../_shared/bundleFanout.ts";
+import { rejectAnon } from "../_shared/auth.ts";
 
 const AVG_SPEED_KMH = 40;
 const DEFAULT_CHECKOUT = "10:00";
@@ -101,6 +102,11 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+
+  // Auth: internal callers (service_role: cron + DB triggers) and logged-in users
+  // (authenticated) only. A bare anon/publishable-key call is rejected.
+  const authFail = rejectAnon(req, corsHeaders);
+  if (authFail) return authFail;
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,

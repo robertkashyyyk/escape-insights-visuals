@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { rejectAnon } from "../_shared/auth.ts";
 
 const HOSTAWAY_API = "https://api.hostaway.com/v1";
 const LIMIT = 100;
@@ -39,6 +40,8 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  const authFail = rejectAnon(req, corsHeaders);
+  if (authFail) return authFail;
   const START_MS = Date.now();
 
   const supabase = createClient(

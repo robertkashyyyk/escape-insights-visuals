@@ -11,6 +11,7 @@
 // POST { days?: number }  (lookback window; default 120)
 // ============================================================================
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { rejectAnon } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,6 +43,7 @@ function chargeIdOf(bt: any): string | null {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  { const authFail = rejectAnon(req, corsHeaders); if (authFail) return authFail; }
   try {
     const KEY = Deno.env.get("STRIPE_API_KEY");
     if (!KEY) return json({ error: "STRIPE_API_KEY not set" }, 500);
