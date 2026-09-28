@@ -1,10 +1,12 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+import { rejectAnon } from "../_shared/auth.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
+  { const authFail = rejectAnon(req, corsHeaders); if (authFail) return authFail; }
 
   try {
     const supabase = createClient(

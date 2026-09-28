@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { rejectAnon } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,6 +10,7 @@ const corsHeaders = {
 // RELATIVELY — % changes, occupancy %, trends — NEVER absolute £ figures.
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  { const authFail = rejectAnon(req, corsHeaders); if (authFail) return authFail; }
   try {
     const { owner_id, period = "monthly" } = await req.json();
     if (!owner_id) return json({ skipped: "no owner_id" });

@@ -9,6 +9,7 @@
 // avoidable GDPR scope.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import webpush from "npm:web-push@3.6.7";
+import { rejectAnon } from "../_shared/auth.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -19,6 +20,7 @@ const fmt = (d: string | null) => (d ? new Date(d + "T00:00:00Z").toLocaleDateSt
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  { const authFail = rejectAnon(req, cors); if (authFail) return authFail; }
   try {
     // Shared-secret gate — the trigger sends x-notify-secret. Once the secret is
     // set the endpoint rejects anything else; before it's set (rollout window) it

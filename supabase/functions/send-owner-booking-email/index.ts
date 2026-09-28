@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { rejectAnon } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +9,7 @@ const corsHeaders = {
 // Owner-facing booking emails. Branded, and deliberately WITHOUT any £ figures.
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  { const authFail = rejectAnon(req, corsHeaders); if (authFail) return authFail; }
 
   try {
     const { reservation_id, event } = await req.json(); // event: "new" | "cancelled"

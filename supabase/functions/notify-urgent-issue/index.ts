@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { rejectAnon } from "../_shared/auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +16,7 @@ interface Payload {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  { const authFail = rejectAnon(req, corsHeaders); if (authFail) return authFail; }
 
   try {
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');

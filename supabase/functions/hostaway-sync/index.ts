@@ -441,21 +441,38 @@ Deno.serve(async (req) => {
 
     console.log(`Sync complete (${syncMode}): ${totalListings} listings, ${totalReservations} reservations, ${skippedReservations} skipped`);
 
-    // Trigger cleaning schedule generation for next 90 days (fire-and-forget)
-    try {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-      fetch(`${supabaseUrl}/functions/v1/generate-daily-cleaning-schedule`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${anonKey}`,
-        },
-        body: JSON.stringify({ days_ahead: 90 }),
-      }).catch((e) => console.warn("Post-sync cleaning trigger failed:", e));
-      console.log("Triggered cleaning schedule regeneration (90-day rolling)");
-    } catch (e) {
-      console.warn("Failed to trigger post-sync cleaning generation:", e);
+    // Trigger cleaning schedule generation for next 90 days.
+    // Edge-to-edge call MUST use the service_role key (the scheduler rejects anon).
+    //
+    // The scheduler holds the HTTP connection open for the full ~20-30s generation
+    // run before returning, so we must NOT let this isolate be torn down when we
+    // return the sync response below — a bare fire-and-forget fetch() gets dropped
+    // before the request is even sent (that was the regression: the hourly 90-day
+    // refresh silently never ran). EdgeRuntime.waitUntil keeps the isolate alive
+    // until the call completes, without delaying the sync response to the caller.
+    const postSyncSchedule = (async () => {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const resp = await fetch(`${supabaseUrl}/functions/v1/generate-daily-cleaning-schedule`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({ days_ahead: 90, source: "hostaway-sync-post" }),
+        });
+        console.log(`Post-sync scheduler (90-day) responded ${resp.status}`);
+      } catch (e) {
+        console.warn("Post-sync cleaning trigger failed:", e);
+      }
+    })();
+    // @ts-ignore EdgeRuntime is provided by the Supabase edge runtime.
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(postSyncSchedule);
+    } else {
+      await postSyncSchedule;
     }
 
     return new Response(

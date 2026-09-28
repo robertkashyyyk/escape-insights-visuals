@@ -25,3 +25,30 @@ verify_jwt = true
 # Called only by the stripe-auto-sync cron (now sends the service_role JWT).
 [functions.stripe-sync]
 verify_jwt = true
+
+# Sender / privileged functions — verify_jwt=true + rejectAnon (service_role from their
+# DB triggers/crons, or authenticated from the frontend).
+[functions.notify-cleaner-schedule-update]
+verify_jwt = true
+
+[functions.send-owner-booking-email]
+verify_jwt = true
+
+[functions.send-owner-orin-digest]
+verify_jwt = true
+
+[functions.send-booking-notification]
+verify_jwt = true
+
+[functions.manage-cron]
+verify_jwt = true
+
+# Admin-only mutation endpoints. Their own getUser + super-role gate already rejects
+# anon; verify_jwt=true adds a gateway backstop (they're always called with a
+# logged-in user JWT from the admin UI). orin-chat stays verify_jwt=false by design
+# (streaming chat with its own getUser gate).
+[functions.invite-user]
+verify_jwt = true
+
+[functions.manage-users]
+verify_jwt = true
