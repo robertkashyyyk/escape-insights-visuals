@@ -393,9 +393,10 @@ export default function CleanerPortal() {
         b.id === brief.id ? { ...b, consumed_at: now, consumed_by_member: activeMember } : b);
       return copy;
     });
-    await (supabase.from as any)("property_briefs")
-      .update({ consumed_by_clean_task_id: taskId, consumed_at: now, consumed_by_member: activeMember })
-      .eq("id", brief.id);
+    const { error } = await (supabase.rpc as any)("acknowledge_brief", {
+      p_brief_id: brief.id, p_clean_task_id: taskId, p_member: activeMember,
+    });
+    if (error) toast.error("Couldn't record acknowledgement — try again");
   };
 
   useEffect(() => {
