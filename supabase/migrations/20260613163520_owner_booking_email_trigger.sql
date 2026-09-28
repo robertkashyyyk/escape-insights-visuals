@@ -10,7 +10,7 @@ SET search_path = public
 AS $$
 DECLARE
   v_event text;
-  v_anon  text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmdHFqcm1ka3NycnBjemhvbWxuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2OTYyMzAsImV4cCI6MjA5MDI3MjIzMH0.pnIOzWvQOxPLUsf3srx4Qqdc73xUAOa8aenokDABMOA';
+  v_anon  text := 'REDACTED_USE_edge_auth_header';
 BEGIN
   IF (TG_OP = 'INSERT' AND NEW.status = 'confirmed') THEN
     v_event := 'new';
