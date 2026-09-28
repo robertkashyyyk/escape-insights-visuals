@@ -113,6 +113,7 @@ export default function CleanerPortal() {
   const [teamMembers, setTeamMembers] = useState<{ id: string; name: string }[]>([]);
   const [activeMember, setActiveMember] = useState<string | null>(null);
   const [briefsByListing, setBriefsByListing] = useState<Record<string, any[]>>({});
+  const [earnings, setEarnings] = useState<any | null>(null);
   const [showMemberPicker, setShowMemberPicker] = useState(false);
   const [checklistByTask, setChecklistByTask] = useState<Record<string, { done: number; total: number }>>({});
   const [activePeriod, setActivePeriod] = useState<PeriodKey>("today");
@@ -398,6 +399,18 @@ export default function CleanerPortal() {
     });
     if (error) toast.error("Couldn't record acknowledgement — try again");
   };
+
+  // F3: the calling cleaner's own "this month" earnings (self-scoped RPC; never other
+  // cleaners' rates). Hidden until a rate exists. Not shown in admin preview.
+  useEffect(() => {
+    if (isAdmin || !user) { setEarnings(null); return; }
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase.rpc as any)("my_earnings");
+      if (!cancelled) setEarnings(data ?? null);
+    })();
+    return () => { cancelled = true; };
+  }, [user, isAdmin, cleaner?.id]);
 
   useEffect(() => {
     if (tasks.length === 0) { setRequestsByTask({}); return; }
@@ -769,6 +782,34 @@ export default function CleanerPortal() {
             />
           </div>
         </div>
+
+        {/* F3: this-month earnings (self only; hidden until a rate exists) */}
+        {earnings?.has_rate && (
+          <div className="px-4 pt-4">
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-emerald-700 dark:text-emerald-300 font-semibold">This month</p>
+                  <p className="text-lg font-bold text-foreground">£{Number(earnings.earned ?? 0).toFixed(0)} <span className="text-xs font-normal text-muted-foreground">earned</span></p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-muted-foreground">+ £{Number(earnings.due ?? 0).toFixed(0)} due</p>
+                  <p className="text-[10px] text-muted-foreground/70">may change</p>
+                </div>
+              </div>
+              {Array.isArray(earnings.by_member) && earnings.by_member.length > 1 && (
+                <div className="mt-2 pt-2 border-t border-emerald-500/15 space-y-0.5">
+                  {earnings.by_member.map((m: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>{m.member}</span>
+                      <span className="tabular-nums">{m.completed} · £{Number(m.earned ?? 0).toFixed(0)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Temporal navigation */}
         <div className="px-4 pt-4 space-y-2">

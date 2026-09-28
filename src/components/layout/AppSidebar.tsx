@@ -400,6 +400,25 @@ export function AppSidebar() {
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )}
+                {(!role || role === "super" || role === "senior") && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to="/settings/pay-rates"
+                        end
+                        className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                          location.pathname === "/settings/pay-rates"
+                            ? "bg-primary/10 text-primary"
+                            : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                        }`}
+                        activeClassName=""
+                      >
+                        <PoundSterling className={`h-[18px] w-[18px] shrink-0 ${location.pathname === "/settings/pay-rates" ? "text-primary" : ""}`} />
+                        {!collapsed && <span>Pay Rates</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
                     <NavLink
