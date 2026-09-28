@@ -31,3 +31,6 @@ dist-ssr
 
 # Supabase CLI local link artifacts
 supabase/.temp
+
+# Raw prod schema dump (baseline built from it; never commit the dump)
+supabase/prod_public_schema.sql
