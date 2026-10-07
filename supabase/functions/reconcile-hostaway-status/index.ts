@@ -76,12 +76,20 @@ Deno.serve(async (req) => {
     // 4. Compare.
     type Disc = Record<string, unknown>;
     const discrepancies: Disc[] = [];
-    let missingInHostaway = 0;
+    const unmatched: Disc[] = [];
     for (const r of ours || []) {
       const hid = (r as any).hostaway_reservation_id as number | null;
-      if (!hid) continue;
+      const base = {
+        reservation_id: (r as any).id, hostaway_id: hid,
+        guest: (r as any).guest_name,
+        property: (r as any).listings?.internal_name || (r as any).listings?.name,
+        owner: (r as any).listings?.property_owners?.name ?? null,
+        check_in: (r as any).check_in, check_out: (r as any).check_out,
+        our_status: (r as any).status, total_amount: (r as any).total_amount,
+      };
+      if (!hid) { unmatched.push({ ...base, reason: "no hostaway_reservation_id" }); continue; }
       const ha = hostawayById.get(hid);
-      if (!ha) { missingInHostaway++; continue; } // outside window on Hostaway side or truncated
+      if (!ha) { unmatched.push({ ...base, reason: "not in Hostaway departure>=cutoff set" }); continue; }
       const { status: correct, known } = mapHostawayStatus(ha.raw);
       if (correct !== (r as any).status) {
         discrepancies.push({
@@ -105,8 +113,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 5. Attach clean info for the discrepant reservations.
-    const ids = discrepancies.map((d) => d.reservation_id as string);
+    // 5. Attach clean info for the discrepant + unmatched reservations.
+    const withCleans = [...discrepancies, ...unmatched];
+    const ids = withCleans.map((d) => d.reservation_id as string);
     if (ids.length > 0) {
       const { data: cleans } = await supabase
         .from("clean_tasks")
@@ -118,7 +127,7 @@ Deno.serve(async (req) => {
         if (!byRes.has(k)) byRes.set(k, []);
         byRes.get(k)!.push(c);
       }
-      for (const d of discrepancies) {
+      for (const d of withCleans) {
         const cs = byRes.get(String(d.reservation_id)) || [];
         d.cleans = cs.map((c) => ({
           scheduled_date: c.scheduled_date, status: c.status, not_required: c.not_required,
@@ -134,7 +143,9 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       cutoff, hostaway_in_window: hostawayById.size, pages, truncated,
       our_reservations_in_window: (ours || []).length,
-      missing_in_hostaway_window: missingInHostaway,
+      unmatched_count: unmatched.length,
+      unmatched,
+      unknown_mapped_count: discrepancies.filter((d) => d.correct_status === "unknown").length,
       discrepancy_count: discrepancies.length,
       discrepancies,
     }, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
