@@ -62,8 +62,6 @@ interface TaskInfo {
   checkin_time: string | null;
   is_same_day_turnaround: boolean;
   existing_task_id?: string | null; // present if this is a pre-existing unassigned row to UPDATE rather than INSERT
-  origin?: string;                   // TEMP trace: which code path produced this row
-  srcCheckout?: string | null;       // TEMP trace: reservation's check_out at build time
   source?: string;
   notes?: string;
   overloaded?: boolean;
@@ -92,11 +90,6 @@ const CLUSTER_RADIUS_KM = 8; // ~5 miles
 const CLUSTER_SOFT_MAX = 3;  // 1–3 → one cleaner; 4+ → split
 const ROLLING_WINDOW_DAYS = 28;
 const CANCELLED_TASK_STATUSES = "(completed,done,cancelled,canceled)";
-
-// TEMPORARY phantom-insert instrumentation (remove after 2026-09-30). Logs every
-// clean_tasks INSERT with its code path, reservation, the reservation's current
-// check_out, targetDate, and the invoking body source. Self-disables after expiry.
-const PHANTOM_TRACE_UNTIL = Date.parse("2026-10-07T23:59:00Z");
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -168,7 +161,7 @@ Deno.serve(async (req) => {
     const perDayResults: Array<{ date: string; created: number; unassigned: number }> = [];
 
     for (const targetDate of dates) {
-      const { created, unassigned } = await processDate(supabase, targetDate, targetListingId, bodySource, skipRefresh);
+      const { created, unassigned } = await processDate(supabase, targetDate, targetListingId, skipRefresh);
       grandTotalCreated += created;
       grandTotalUnassigned += unassigned;
       perDayResults.push({ date: targetDate, created, unassigned });
@@ -208,7 +201,7 @@ Deno.serve(async (req) => {
   }
 });
 
-async function processDate(supabase: any, targetDate: string, targetListingId: string | null = null, traceSource: string = "unknown", skipRefresh: boolean = false): Promise<{ created: number; unassigned: number }> {
+async function processDate(supabase: any, targetDate: string, targetListingId: string | null = null, skipRefresh: boolean = false): Promise<{ created: number; unassigned: number }> {
   // Optional fast path: when a specific listing_id is provided, restrict processing
   // to that one listing. Used by the reactive same-day allocation trigger.
   const restrictTo = (id: string) => !targetListingId || String(id) === targetListingId;
@@ -404,15 +397,6 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
             overloaded: false,
           })
           .eq("id", t.id);
-        if (Date.now() < PHANTOM_TRACE_UNTIL) {
-          try {
-            await supabase.from("phantom_trace").insert({
-              path: "carryover-update", caller: traceSource, target_date: targetDate,
-              scheduled_date: targetDate, reservation_id: t.reservation_id ?? null,
-              src_checkout: priorDate, clean_source: t.source ?? null,
-            });
-          } catch (_) { /* trace only */ }
-        }
         promotedListings.add(lid);
         haveToday.add(lid);
       }
@@ -1086,8 +1070,6 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         checkout_time: checkoutTime,
         checkin_time: checkinTime,
         is_same_day_turnaround: isSameDay,
-        origin: componentIds && componentIds.length > 0 ? "generation-bundle-fanout" : "generation-checkout",
-        srcCheckout: r.check_out,
       });
     }
   }
@@ -1122,8 +1104,6 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
       existing_task_id: orphan.id,
       source: orphan.source || "hostaway",
       warning_reason: orphan.warning_reason ?? null,
-      origin: "orphan-promotion",
-      srcCheckout: null,
     });
   }
 
@@ -1436,20 +1416,6 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         seenRes.add(key);
         return true;
       });
-    // TEMPORARY phantom-insert trace to a queryable table (self-disables 2026-10-07).
-    if (Date.now() < PHANTOM_TRACE_UNTIL && toInsertFinal.length > 0) {
-      try {
-        await supabase.from("phantom_trace").insert(toInsertFinal.map((t) => ({
-          path: t.origin ?? "unknown",
-          caller: traceSource,
-          target_date: targetDate,
-          scheduled_date: t.scheduled_date,
-          reservation_id: t.reservation_id ?? null,
-          src_checkout: t.srcCheckout ?? null,
-          clean_source: t.source ?? "hostaway",
-        })));
-      } catch (_) { /* trace must never break generation */ }
-    }
     const rows = toInsertFinal
       .map((t) => ({
         listing_id: t.listing_id,
@@ -1472,18 +1438,14 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         source: t.source ?? "hostaway",
       }));
     if (rows.length > 0) {
-      const traceOn = Date.now() < PHANTOM_TRACE_UNTIL;
-      if (traceOn) console.log(`[PHANTOM-TRACE] bulk-insert attempt count=${rows.length} caller=${traceSource} targetDate=${targetDate}`);
       const { error: insertErr } = await supabase.from("clean_tasks").insert(rows);
       if (insertErr && (insertErr as any).code === "23505") {
         // A live clean already exists for one of these reservations (the one-live-
         // clean-per-reservation index). Retry row-by-row and skip the conflicting
         // ones rather than failing the whole run.
-        if (traceOn) console.log(`[PHANTOM-TRACE] bulk-insert hit 23505 → row-by-row retry, caller=${traceSource} targetDate=${targetDate}`);
         let ok = 0;
         for (const row of rows) {
           const { error: e } = await supabase.from("clean_tasks").insert(row);
-          if (traceOn) console.log(`[PHANTOM-TRACE] retry-insert ${e ? `SKIP(${(e as any).code})` : "OK"} listing=${(row as any).listing_id} reservation=${(row as any).reservation_id ?? "none"} scheduled_date=${(row as any).scheduled_date} clean_source=${(row as any).source}`);
           if (e && (e as any).code !== "23505") throw e;
           if (!e) ok++;
         }
