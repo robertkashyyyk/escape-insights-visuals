@@ -184,7 +184,7 @@ export function useMatrixSchedule(weekAnchor: Date) {
       const data = await fetchAllRows<MatrixReservation>(() => supabase
         .from("reservations")
         .select("id, listing_id, check_in, check_out, guest_name, check_in_time, check_out_time, status")
-        .eq("status", "confirmed")
+        .in("status", ["confirmed", "ownerStay"])
         .gte("check_out", lookStart)
         .lte("check_in", lookEnd));
       return data;

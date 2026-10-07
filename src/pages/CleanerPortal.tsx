@@ -422,7 +422,7 @@ export default function CleanerPortal() {
         .from("reservations")
         .select("id, listing_id, check_in")
         .in("listing_id", listingIds)
-        .eq("status", "confirmed")
+        .in("status", ["confirmed", "ownerStay"])
         .gte("check_in", minDate)
         .order("check_in", { ascending: true });
       if (cancelled) return;

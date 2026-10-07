@@ -29,7 +29,7 @@ export function computeOrphanGapDates(
 
   // Only confirmed bookings define real gaps. Cancelled etc. shouldn't fill a gap.
   const confirmed = reservations
-    .filter((r) => !r.status || r.status === "confirmed")
+    .filter((r) => !r.status || r.status === "confirmed" || r.status === "ownerStay")
     .map((r) => ({ ci: parseISO(r.check_in), co: parseISO(r.check_out) }))
     .sort((a, b) => a.ci.getTime() - b.ci.getTime());
 

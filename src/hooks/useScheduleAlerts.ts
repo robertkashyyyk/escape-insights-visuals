@@ -50,7 +50,7 @@ export function useScheduleAlerts() {
       const checkouts = await fetchAllRows<any>(() =>
         supabase.from("reservations")
           .select("listing_id, check_out, guest_name, listings!reservations_listing_id_fkey(name, internal_name, is_bundle)")
-          .eq("status", "confirmed")
+          .in("status", ["confirmed", "ownerStay"])
           .gte("check_out", start)
           .lte("check_out", end));
 

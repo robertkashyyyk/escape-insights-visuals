@@ -243,7 +243,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
       .from("reservations")
       .select("listing_id")
       .eq("check_in", targetDate)
-      .eq("status", "confirmed");
+      .in("status", ["confirmed", "ownerStay"]);
     arrivalListingIds = Array.from(
       new Set((arrivalsTodayRaw || []).map((r: any) => String(r.listing_id)))
     );
@@ -328,7 +328,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         .from("reservations")
         .select("listing_id, check_in")
         .in("listing_id", priorListingIds)
-        .eq("status", "confirmed")
+        .in("status", ["confirmed", "ownerStay"])
         .lte("check_in", targetDate);
       const checkinsByListing: Record<string, string[]> = {};
       for (const r of reoccArrivals || []) {
@@ -497,7 +497,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     .from("reservations")
     .select("id, listing_id")
     .eq("check_out", targetDate)
-    .eq("status", "confirmed");
+    .in("status", ["confirmed", "ownerStay"]);
   const activeCheckouts = (healCheckouts || []).filter((r: any) => !manuallyCleanedToday.has(String(r.listing_id)));
   const healReservationIds = activeCheckouts.map((r: any) => String(r.id));
   if (!isCurrentDayRefresh && healReservationIds.length > 0) {
@@ -525,7 +525,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         .select("listing_id")
         .in("listing_id", movedListingIds)
         .eq("check_in", targetDate)
-        .eq("status", "confirmed");
+        .in("status", ["confirmed", "ownerStay"]);
       const sameDayListings = new Set((sameDayArrivals || []).map((r: any) => String(r.listing_id)));
 
       for (const t of futureP0Rows || []) {
@@ -556,7 +556,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     .from("reservations")
     .select("id, listing_id, check_in, check_out, status, check_out_time")
     .eq("check_out", targetDate)
-    .eq("status", "confirmed");
+    .in("status", ["confirmed", "ownerStay"]);
   if (coErr) throw coErr;
   const activeCheckoutsForGeneration = (checkouts || []).filter(
     (r: any) => !manuallyCleanedToday.has(String(r.listing_id))
@@ -644,7 +644,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     .select("listing_id, check_in, check_in_time")
     .in("listing_id", listingIds)
     .gte("check_in", targetDate)
-    .eq("status", "confirmed")
+    .in("status", ["confirmed", "ownerStay"])
     .order("check_in");
 
   const nextCheckinMap = new Map<string, { date: string; time: string | null }>();
@@ -679,7 +679,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
         .select("listing_id, check_in_time")
         .in("listing_id", sdcListingIds)
         .eq("check_in", targetDate)
-        .eq("status", "confirmed");
+        .in("status", ["confirmed", "ownerStay"]);
       const arrivalTimeByListing = new Map<string, string | null>();
       for (const a of sdcArrivals || []) {
         if (!arrivalTimeByListing.has(String(a.listing_id))) {
@@ -792,7 +792,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     const { data: occ } = await supabase
       .from("reservations")
       .select("listing_id")
-      .eq("status", "confirmed")
+      .in("status", ["confirmed", "ownerStay"])
       .lt("check_in", targetDate)
       .gt("check_out", targetDate);
     const occupiedListingIds = Array.from(new Set((occ || []).map((r: any) => String(r.listing_id))));
@@ -803,7 +803,7 @@ async function processDate(supabase: any, targetDate: string, targetListingId: s
     const { data: coToday } = await supabase
       .from("reservations")
       .select("listing_id")
-      .eq("status", "confirmed")
+      .in("status", ["confirmed", "ownerStay"])
       .eq("check_out", targetDate);
     const checkoutTodayIds = new Set((coToday || []).map((r: any) => String(r.listing_id)));
     if (occupiedListingIds.length > 0) {

@@ -91,7 +91,7 @@ export function usePropertyStates() {
     queryFn: async () => fetchAllRows<any>(() =>
       supabase.from("reservations")
         .select("listing_id, check_in, check_out, guest_name, status")
-        .eq("status", "confirmed")
+        .in("status", ["confirmed", "ownerStay"])
         .gte("check_out", backStr)
         .lte("check_in", fwdStr)),
     ...fresh,

@@ -86,7 +86,7 @@ export function useOwnerCalendar(): { data?: OwnerCalendar; isLoading: boolean }
         .from("reservations")
         .select("id, listing_id, check_in, check_out, status, guest_name, platform, total_amount")
         .in("listing_id", ids)
-        .eq("status", "confirmed")
+        .in("status", ["confirmed", "ownerStay"])
         .lt("check_in", wEndExcl)
         .gt("check_out", wStartStr);
 

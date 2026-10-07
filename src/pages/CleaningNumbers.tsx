@@ -103,7 +103,7 @@ export default function CleaningNumbers() {
         .select("id, listing_id, check_out, status")
         .gte("check_out", rangeStartStr)
         .lte("check_out", rangeEndStr)
-        .eq("status", "confirmed"));
+        .in("status", ["confirmed", "ownerStay"]));
       return data;
     },
   });
@@ -118,7 +118,7 @@ export default function CleaningNumbers() {
         .select("id, listing_id, check_out, status")
         .gte("check_out", prevStartStr)
         .lte("check_out", prevEndStr)
-        .eq("status", "confirmed"));
+        .in("status", ["confirmed", "ownerStay"]));
       return data;
     },
   });

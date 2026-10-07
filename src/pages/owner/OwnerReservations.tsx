@@ -84,8 +84,9 @@ export default function OwnerReservations() {
 
   const filtered = useMemo(() => {
     if (!data) return [];
-    // Owners only see confirmed bookings (not inquiries / pending / cancelled).
-    let list = data.reservations.filter((r: any) => r.status === "confirmed");
+    // Owners see confirmed guest bookings + their own owner stays (occupancy),
+    // not inquiries / pending / cancelled.
+    let list = data.reservations.filter((r: any) => r.status === "confirmed" || r.status === "ownerStay");
 
     if (propertyFilter !== "all") {
       list = list.filter((r: any) => r.listing_id === propertyFilter);

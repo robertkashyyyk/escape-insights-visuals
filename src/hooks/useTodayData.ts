@@ -47,21 +47,21 @@ export function useTodayData() {
         .select("check_in, check_out, guest_name, listing_id, listings(name, internal_name)")
         .or(`check_in.gte.${todayStr},check_out.gte.${todayStr}`)
         .lte("check_in", weekEnd)
-        .eq("status", "confirmed");
+        .in("status", ["confirmed", "ownerStay"]);
 
       const { data: mtdRes } = await supabase
         .from("reservations")
         .select(REVENUE_FIELDS)
         .gte("check_in", monthStart)
         .lte("check_in", monthEnd)
-        .eq("status", "confirmed");
+        .in("status", ["confirmed", "ownerStay"]);
 
       const { data: next30Res } = await supabase
         .from("reservations")
         .select("id")
         .gte("check_in", todayStr)
         .lte("check_in", next30)
-        .eq("status", "confirmed");
+        .in("status", ["confirmed", "ownerStay"]);
 
       const { count: totalListings } = await supabase
         .from("listings")

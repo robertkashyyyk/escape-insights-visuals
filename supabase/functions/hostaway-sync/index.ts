@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { rejectAnon } from "../_shared/auth.ts";
+import { mapHostawayStatus } from "../_shared/hostawayStatus.ts";
 
 const HOSTAWAY_API = "https://api.hostaway.com/v1";
 const LIMIT = 100;
@@ -74,6 +75,8 @@ Deno.serve(async (req) => {
   let totalListings = 0;
   let skippedReservations = 0;
   const errors: string[] = [];
+  // Distinct unrecognised Hostaway statuses seen this run → logged to sync_logs.errors.
+  const unknownStatuses = new Map<string, number>();
 
   try {
     await supabase.from("sync_logs").insert({
@@ -305,12 +308,12 @@ Deno.serve(async (req) => {
           }
         }
 
-        let status = "confirmed";
-        const rawStatus = (r.status || "").toLowerCase();
-        if (rawStatus === "cancelled" || rawStatus === "canceled" || rawStatus === "declined") {
-          status = "cancelled";
-        } else if (rawStatus === "inquiry" || rawStatus === "enquiry") {
-          status = "inquiry";
+        // Explicit status mapping (see _shared/hostawayStatus.ts). Unknown Hostaway
+        // statuses map to 'unknown' (NEVER silently 'confirmed') and are logged below.
+        const rawHostawayStatus = r.status ?? null;
+        const { status, known: statusKnown } = mapHostawayStatus(rawHostawayStatus);
+        if (!statusKnown) {
+          unknownStatuses.set(String(rawHostawayStatus ?? "∅"), (unknownStatuses.get(String(rawHostawayStatus ?? "∅")) || 0) + 1);
         }
 
         const platform = r.channelName || r.source || "hostaway";
@@ -380,6 +383,7 @@ Deno.serve(async (req) => {
           check_in_time: checkInTime,
           check_out_time: checkOutTime,
           status,
+          hostaway_status: rawHostawayStatus,
           platform: platform.toLowerCase(),
           channel_reservation_code: channelReservationCode ? String(channelReservationCode) : null,
           total_amount: totalPrice,
@@ -426,6 +430,11 @@ Deno.serve(async (req) => {
       .from("upload_batches")
       .update({ status: "completed", row_count: totalReservations })
       .eq("id", batchId);
+
+    // Surface any unrecognised Hostaway statuses so they're visible + investigated.
+    for (const [s, c] of unknownStatuses) {
+      errors.push(`Unknown Hostaway status "${s}" x${c} — stored as 'unknown' (not live, not revenue)`);
+    }
 
     await supabase
       .from("sync_logs")

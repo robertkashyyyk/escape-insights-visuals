@@ -189,7 +189,7 @@ export function useCleaningSchedule() {
         .select("id, listing_id, check_in, check_out, status, guest_name, check_in_time, check_out_time")
         .gte("check_out", rangeStartStr)
         .lte("check_out", rangeEndStr)
-        .eq("status", "confirmed")
+        .in("status", ["confirmed", "ownerStay"])
         .order("check_out"));
       return data;
     },
@@ -203,7 +203,7 @@ export function useCleaningSchedule() {
         .select("id, listing_id, check_in, check_out, status, guest_name, check_in_time, check_out_time")
         .gte("check_in", rangeStartStr)
         .lte("check_in", lookAheadStr)
-        .eq("status", "confirmed")
+        .in("status", ["confirmed", "ownerStay"])
         .order("check_in"));
       return data;
     },
